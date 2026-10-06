@@ -74,6 +74,9 @@ fun SettingsScreen(
             .padding(horizontal = 16.dp)
             .padding(bottom = 80.dp)
     ) {
+        SectionTitle("体重记录")
+        WeightCard(vm)
+
         SectionTitle("身体档案")
         CardBox {
             Row(verticalAlignment = Alignment.CenterVertically) {
