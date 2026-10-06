@@ -95,31 +95,31 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     fun waterOn(date: LocalDate): WaterEntry? =
         waterEntries.firstOrNull { it.date == date.toString() }
 
-    /** 记录饮水：在当天累计值上追加 */
-    fun addWater(ml: Double) {
-        val today = LocalDate.now().toString()
-        val cur = waterEntries.firstOrNull { it.date == today }
-        val e = (cur ?: WaterEntry(date = today, ml = 0.0)).copy(ml = (cur?.ml ?: 0.0) + ml)
+    /** 记录饮水：在指定日期的累计值上追加 */
+    fun addWater(ml: Double, date: LocalDate) {
+        val key = date.toString()
+        val cur = waterEntries.firstOrNull { it.date == key }
+        val e = (cur ?: WaterEntry(date = key, ml = 0.0)).copy(ml = (cur?.ml ?: 0.0) + ml)
         viewModelScope.launch(Dispatchers.IO) {
             dao.insertWaterEntry(e)
             waterEntries = dao.allWaterEntries()
         }
     }
 
-    /** 直接设定当天饮水总量 */
-    fun setWaterTotal(ml: Double) {
-        val today = LocalDate.now().toString()
-        val cur = waterEntries.firstOrNull { it.date == today }
-        val e = (cur ?: WaterEntry(date = today, ml = 0.0)).copy(ml = ml)
+    /** 直接设定指定日期的饮水总量 */
+    fun setWaterTotal(ml: Double, date: LocalDate) {
+        val key = date.toString()
+        val cur = waterEntries.firstOrNull { it.date == key }
+        val e = (cur ?: WaterEntry(date = key, ml = 0.0)).copy(ml = ml)
         viewModelScope.launch(Dispatchers.IO) {
             dao.insertWaterEntry(e)
             waterEntries = dao.allWaterEntries()
         }
     }
 
-    fun clearWater() {
-        val today = LocalDate.now().toString()
-        waterEntries.firstOrNull { it.date == today }?.let { e ->
+    fun clearWater(date: LocalDate) {
+        val key = date.toString()
+        waterEntries.firstOrNull { it.date == key }?.let { e ->
             viewModelScope.launch(Dispatchers.IO) {
                 dao.deleteWaterEntry(e)
                 waterEntries = dao.allWaterEntries()
