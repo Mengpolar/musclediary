@@ -275,10 +275,10 @@ fun SwipeEntryRow(
                 contentAlignment = Alignment.Center,
             ) { Text("删除", color = Ink0, fontSize = 13.sp, fontWeight = FontWeight.Bold) }
         }
-        // 前景内容
+        // 前景内容（自身撑开高度，背景按钮 matchParentSize 跟随）
         Row(
             Modifier
-                .matchParentSize()
+                .fillMaxWidth()
                 .offset { IntOffset(offset.value.roundToInt(), 0) }
                 .background(Ink2)
                 .pointerInput(Unit) {

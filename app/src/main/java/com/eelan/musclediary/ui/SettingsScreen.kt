@@ -74,9 +74,6 @@ fun SettingsScreen(
             .padding(horizontal = 16.dp)
             .padding(bottom = 80.dp)
     ) {
-        SectionTitle("体重记录")
-        WeightCard(vm)
-
         SectionTitle("目标模式")
         CardBox {
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -224,7 +221,12 @@ fun SettingsScreen(
                     modifier = Modifier.fillMaxWidth(),
                     color = Accent, trackColor = Ink2,
                 )
-                Text("下载中 $progress%", fontSize = 12.sp, color = TextLo)
+                Text(
+                    "下载中 $progress% · " +
+                            "${String.format("%.1f", (updateInfo?.sizeBytes ?: 0) * progress / 100.0 / 1048576.0)}" +
+                            " / ${Updater.formatSize(updateInfo?.sizeBytes ?: 0)}",
+                    fontSize = 12.sp, color = TextLo,
+                )
             }
         }
     }
@@ -246,6 +248,9 @@ fun SettingsScreen(
             title = { Text("发现新版本 v${info.version}", color = TextHi) },
             text = {
                 Column {
+                    Text("新版本 v${info.version} · 包大小 ${Updater.formatSize(info.sizeBytes)}",
+                        fontSize = 14.sp, color = TextHi, fontWeight = FontWeight.Medium)
+                    Spacer(Modifier.height(6.dp))
                     Text(info.notes.ifBlank { "无更新说明" }, fontSize = 13.sp, color = TextLo,
                         modifier = Modifier.heightIn(max = 200.dp))
                 }

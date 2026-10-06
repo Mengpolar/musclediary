@@ -31,7 +31,7 @@ fun TodayScreen(vm: AppViewModel) {
     val protein = food.sumOf { it.protein }
     val carb = food.sumOf { it.carb }
     val fat = food.sumOf { it.fat }
-    val water = vm.waterOn(LocalDate.now())?.ml ?: 0.0
+    val water = vm.waterOn(date)?.ml ?: 0.0
     val waterTarget = Calc.waterTargetMl(p.weightKg)
 
     var showSheet by remember { mutableStateOf(false) }
@@ -87,6 +87,11 @@ fun TodayScreen(vm: AppViewModel) {
                         "目标 = 体重 ${fmt1(p.weightKg)}kg × 35ml；多次记录会累加",
                         fontSize = 11.sp, color = TextLo,
                     )
+                    Spacer(Modifier.height(4.dp))
+                    if (date != LocalDate.now()) {
+                        Text("当前查看的是 ${date.monthValue}月${date.dayOfMonth}日 的饮水记录", fontSize = 11.sp, color = Warn)
+                        Spacer(Modifier.height(4.dp))
+                    }
                     Spacer(Modifier.height(8.dp))
                     Text(
                         "＋ 记录饮水", fontSize = 13.sp, color = Accent,
@@ -112,20 +117,21 @@ fun TodayScreen(vm: AppViewModel) {
         CalendarSheet(vm, onDismiss = { showCalendar = false })
     }
     if (showWater) {
-        WaterDialog(vm, waterTarget, onDismiss = { showWater = false })
+        WaterDialog(vm, date, waterTarget, onDismiss = { showWater = false })
     }
 }
 
-/** 饮水记录对话框：累计追加，可改当天总量、可清空 */
+/** 饮水记录对话框：追加到所选日期，可改总量、可清空 */
 @Composable
-fun WaterDialog(vm: AppViewModel, targetMl: Double, onDismiss: () -> Unit) {
+fun WaterDialog(vm: AppViewModel, date: LocalDate, targetMl: Double, onDismiss: () -> Unit) {
     var text by remember { mutableStateOf("") }
     var editMode by remember { mutableStateOf(false) }
-    val current = vm.waterOn(LocalDate.now())?.ml ?: 0.0
+    val current = vm.waterOn(date)?.ml ?: 0.0
+    val dateLabel = if (date == LocalDate.now()) "今日" else "${date.monthValue}月${date.dayOfMonth}日"
     AlertDialog(
         onDismissRequest = onDismiss,
         containerColor = Ink2,
-        title = { Text(if (editMode) "设定今日饮水总量" else "记录饮水", color = TextHi, fontSize = 16.sp) },
+        title = { Text(if (editMode) "设定${dateLabel}饮水总量" else "记录${dateLabel}饮水", color = TextHi, fontSize = 16.sp) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text(
@@ -147,8 +153,8 @@ fun WaterDialog(vm: AppViewModel, targetMl: Double, onDismiss: () -> Unit) {
                         }
                     }
                     if (current > 0) {
-                        TextButton(onClick = { vm.clearWater() }) {
-                            Text("清空今日", fontSize = 12.sp, color = MaterialTheme.colorScheme.error)
+                        TextButton(onClick = { vm.clearWater(date) }) {
+                            Text("清空", fontSize = 12.sp, color = MaterialTheme.colorScheme.error)
                         }
                     }
                 }
@@ -158,7 +164,7 @@ fun WaterDialog(vm: AppViewModel, targetMl: Double, onDismiss: () -> Unit) {
             TextButton(onClick = {
                 text.toDoubleOrNull()?.let { v ->
                     if (v > 0) {
-                        if (editMode) vm.setWaterTotal(v) else vm.addWater(v)
+                        if (editMode) vm.setWaterTotal(v, date) else vm.addWater(v, date)
                         onDismiss()
                     }
                 }

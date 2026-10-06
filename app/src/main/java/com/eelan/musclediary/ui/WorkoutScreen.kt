@@ -71,15 +71,13 @@ fun WorkoutScreen(vm: AppViewModel) {
             }
             Spacer(Modifier.height(12.dp))
             CardBox {
-                Text("体重与 BMI", fontSize = 15.sp, fontWeight = FontWeight.Bold, color = TextHi)
+                Text("BMI", fontSize = 15.sp, fontWeight = FontWeight.Bold, color = TextHi)
                 Spacer(Modifier.height(4.dp))
                 BmiBar(Calc.bmi(vm.profile.weightKg, vm.profile.heightCm),
                     vm.profile.weightKg, vm.profile.heightCm)
-                Spacer(Modifier.height(8.dp))
-                WeightChart(vm.weightEntries.sortedBy { it.date })
-                Spacer(Modifier.height(4.dp))
-                Text("体重记录在「我的」页录入，曲线随记录自动延伸", fontSize = 11.sp, color = TextLo)
             }
+            Spacer(Modifier.height(12.dp))
+            WeightCard(vm)
             SectionTitle("锻炼记录（${entries.size}） · 共消耗 ${fmt0(entries.sumOf { it.calories })} kcal · 左滑可修改/删除")
             if (entries.isEmpty()) {
                 Text(

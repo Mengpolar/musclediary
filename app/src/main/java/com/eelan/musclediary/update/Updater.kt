@@ -16,7 +16,7 @@ object Updater {
     const val REPO = "Mengpolar/musclediary"
     const val RELEASES_URL = "https://github.com/$REPO/releases"
 
-    data class UpdateInfo(val version: String, val notes: String, val apkUrl: String)
+    data class UpdateInfo(val version: String, val notes: String, val apkUrl: String, val sizeBytes: Long)
 
     /** 查询最新版本；无更新返回 null；网络失败抛异常由调用方提示 */
     suspend fun check(currentVersion: String): UpdateInfo? = withContext(Dispatchers.IO) {
@@ -25,12 +25,17 @@ object Updater {
         val tag = obj.optString("tag_name").removePrefix("v")
         if (tag.isEmpty()) throw IllegalStateException("仓库还没有发布过 Release")
         if (!isNewer(currentVersion, tag)) return@withContext null
-        val apk = obj.optJSONArray("assets")
+        val asset = obj.optJSONArray("assets")
             ?.let { arr -> (0 until arr.length()).map { arr.getJSONObject(it) } }
             ?.firstOrNull { it.optString("name").endsWith(".apk") }
-            ?.optString("browser_download_url")
             ?: throw IllegalStateException("Release 中没有 APK 附件")
-        UpdateInfo(tag, obj.optString("body"), apk)
+        UpdateInfo(tag, obj.optString("body"), asset.optString("browser_download_url"), asset.optLong("size"))
+    }
+
+    fun formatSize(bytes: Long): String = when {
+        bytes >= 1 shl 20 -> String.format("%.1f MB", bytes / 1048576.0)
+        bytes >= 1 shl 10 -> String.format("%.0f KB", bytes / 1024.0)
+        else -> "$bytes B"
     }
 
     suspend fun downloadApk(ctx: Context, url: String, onProgress: (Int) -> Unit): File =
