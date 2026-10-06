@@ -2,7 +2,7 @@ package com.eelan.musclediary.data
 
 import com.eelan.musclediary.domain.Muscle
 
-/** 内置食物模板：数据来自 calzen.ai（USDA FoodData Central 及食谱分析），每 100g 的蛋白质/碳水/脂肪（克） */
+/** 内置食物模板：每 100g 的蛋白质/碳水/脂肪（克），数据参考 USDA FoodData Central 等公开营养数据库 */
 object FoodSeed {
     const val version = 2
 
