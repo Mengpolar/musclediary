@@ -7,7 +7,6 @@ import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.FitnessCenter
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Restaurant
@@ -52,7 +51,6 @@ fun AppRoot(vm: AppViewModel) {
         Tab("今日", Icons.Default.Home),
         Tab("饮食", Icons.Default.Restaurant),
         Tab("锻炼", Icons.Default.FitnessCenter),
-        Tab("日历", Icons.Default.CalendarMonth),
         Tab("我的", Icons.Default.Settings),
     )
 
@@ -82,11 +80,10 @@ fun AppRoot(vm: AppViewModel) {
         ) {
             Column(Modifier.fillMaxSize().padding(top = 12.dp)) {
                 when (tab) {
-                    0 -> TodayScreen(vm, onGoDiet = { tab = 1 }, onGoWorkout = { tab = 2 })
+                    0 -> TodayScreen(vm)
                     1 -> DietScreen(vm)
                     2 -> WorkoutScreen(vm)
-                    3 -> CalendarScreen(vm)
-                    4 -> when (manage) {
+                    3 -> when (manage) {
                         0 -> ManageTemplatesScreen(vm, 0, onClose = { manage = -1 })
                         1 -> ManageTemplatesScreen(vm, 1, onClose = { manage = -1 })
                         else -> SettingsScreen(

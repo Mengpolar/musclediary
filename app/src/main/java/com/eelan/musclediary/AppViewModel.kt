@@ -36,12 +36,16 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         private set
     var weightEntries by mutableStateOf<List<WeightEntry>>(emptyList())
         private set
+    var waterEntries by mutableStateOf<List<WaterEntry>>(emptyList())
+        private set
 
     init {
         viewModelScope.launch(Dispatchers.IO) {
             if (dao.foodTemplateCount() == 0) dao.insertFoodTemplates(FoodSeed.items)
             if (dao.exerciseTemplateCount() == 0) dao.insertExerciseTemplates(ExerciseSeed.items)
             profile = dao.getProfile() ?: Profile().also { dao.upsertProfile(it) }
+            // 老版本升级：盈余数值对齐新模式区间（增肌 200~300 / 减脂 −300~−500）
+            if (profile.surplusKcal > 300) profile = profile.copy(surplusKcal = 250.0)
             // 内置食物数据源升级：重建内置模板（自定义模板与历史记录不受影响）
             if (profile.seedVersion < FoodSeed.version) {
                 dao.clearBuiltinFoodTemplates()
@@ -54,6 +58,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             foodEntries = dao.allFoodEntries()
             exerciseEntries = dao.allExerciseEntries()
             weightEntries = dao.allWeightEntries()
+            waterEntries = dao.allWaterEntries()
             withContext(Dispatchers.Main) { loaded = true }
         }
     }
@@ -85,6 +90,69 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     fun deleteWeight(e: WeightEntry) {
         viewModelScope.launch(Dispatchers.IO) { dao.deleteWeightEntry(e) }
         weightEntries = weightEntries.filterNot { it.id == e.id }
+    }
+
+    fun waterOn(date: LocalDate): WaterEntry? =
+        waterEntries.firstOrNull { it.date == date.toString() }
+
+    /** 记录饮水：在当天累计值上追加 */
+    fun addWater(ml: Double) {
+        val today = LocalDate.now().toString()
+        val cur = waterEntries.firstOrNull { it.date == today }
+        val e = (cur ?: WaterEntry(date = today, ml = 0.0)).copy(ml = (cur?.ml ?: 0.0) + ml)
+        viewModelScope.launch(Dispatchers.IO) {
+            dao.insertWaterEntry(e)
+            waterEntries = dao.allWaterEntries()
+        }
+    }
+
+    /** 直接设定当天饮水总量 */
+    fun setWaterTotal(ml: Double) {
+        val today = LocalDate.now().toString()
+        val cur = waterEntries.firstOrNull { it.date == today }
+        val e = (cur ?: WaterEntry(date = today, ml = 0.0)).copy(ml = ml)
+        viewModelScope.launch(Dispatchers.IO) {
+            dao.insertWaterEntry(e)
+            waterEntries = dao.allWaterEntries()
+        }
+    }
+
+    fun clearWater() {
+        val today = LocalDate.now().toString()
+        waterEntries.firstOrNull { it.date == today }?.let { e ->
+            viewModelScope.launch(Dispatchers.IO) {
+                dao.deleteWaterEntry(e)
+                waterEntries = dao.allWaterEntries()
+            }
+        }
+    }
+
+    /** 修改饮食记录克数：营养按克数比例重算 */
+    fun updateFoodEntry(e: FoodEntry, newGrams: Double) {
+        if (e.grams <= 0) return
+        val k = newGrams / e.grams
+        val upd = e.copy(grams = newGrams, protein = e.protein * k, carb = e.carb * k, fat = e.fat * k)
+        viewModelScope.launch(Dispatchers.IO) { dao.updateFoodEntry(upd) }
+        foodEntries = foodEntries.map { if (it.id == e.id) upd else it }
+    }
+
+    /** 修改锻炼记录数量：热量与刺激分按比例重算 */
+    fun updateExerciseEntry(e: ExerciseEntry, newQty: Double) {
+        if (e.qty <= 0) return
+        val k = newQty / e.qty
+        val upd = e.copy(
+            qty = newQty,
+            calories = e.calories * k,
+            minutes = e.minutes * k,
+            musclesJson = run {
+                val obj = org.json.JSONObject(e.musclesJson)
+                val out = org.json.JSONObject()
+                obj.keys().forEach { key -> out.put(key, obj.optDouble(key, 0.0) * k) }
+                out.toString()
+            },
+        )
+        viewModelScope.launch(Dispatchers.IO) { dao.updateExerciseEntry(upd) }
+        exerciseEntries = exerciseEntries.map { if (it.id == e.id) upd else it }
     }
 
     fun addFood(t: FoodTemplate, grams: Double, date: LocalDate) {

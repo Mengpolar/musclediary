@@ -77,6 +77,63 @@ fun SettingsScreen(
         SectionTitle("体重记录")
         WeightCard(vm)
 
+        SectionTitle("目标模式")
+        CardBox {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text("训练阶段", fontSize = 14.sp, color = TextHi, modifier = Modifier.weight(1f))
+                FilterChip(
+                    selected = p.mode == 0, onClick = {
+                        vm.updateProfile(p.copy(mode = 0, surplusKcal = p.surplusKcal.coerceIn(200.0, 300.0)))
+                    },
+                    label = { Text("增肌期") },
+                    colors = FilterChipDefaults.filterChipColors(selectedContainerColor = Accent.copy(alpha = 0.35f)),
+                )
+                Spacer(Modifier.width(8.dp))
+                FilterChip(
+                    selected = p.mode == 1, onClick = {
+                        vm.updateProfile(p.copy(mode = 1, surplusKcal = p.surplusKcal.coerceIn(-500.0, -300.0)))
+                    },
+                    label = { Text("减脂期") },
+                    colors = FilterChipDefaults.filterChipColors(selectedContainerColor = Accent.copy(alpha = 0.35f)),
+                )
+            }
+            Spacer(Modifier.height(4.dp))
+            if (p.mode == 0) {
+                Text("增肌期：蛋白质 2.0g/kg · 碳水 5.0g/kg · 脂肪 1.0g/kg，热量盈余 200~300 大卡",
+                    fontSize = 11.sp, color = TextLo)
+            } else {
+                Text("减脂期：蛋白质 1.5g/kg · 碳水 2.0g/kg · 脂肪 0.8g/kg，热量赤字 300~500 大卡",
+                    fontSize = 11.sp, color = TextLo)
+            }
+            Text("三维基础目标之外多出/不足的热量，按三者的热量比例等比分摊（即进度条上的「热量所需」刻度）",
+                fontSize = 11.sp, color = TextLo)
+            Spacer(Modifier.height(4.dp))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    Text(if (p.mode == 0) "增肌盈余" else "减脂赤字", fontSize = 14.sp, color = TextHi)
+                    Text(
+                        if (p.mode == 0) "每天多吃多少热量" else "每天少吃多少热量（赤字为负数）",
+                        fontSize = 11.sp, color = TextLo,
+                    )
+                }
+                SmallButton("−") {
+                    val range = if (p.mode == 0) 200.0..300.0 else -500.0..-300.0
+                    val v = (p.surplusKcal - 50).coerceIn(range.start, range.endInclusive)
+                    vm.updateProfile(p.copy(surplusKcal = v))
+                }
+                Text(
+                    if (p.surplusKcal < 0) "−${fmt0(-p.surplusKcal)}" else "+${fmt0(p.surplusKcal)}",
+                    fontSize = 15.sp, color = Accent,
+                    fontWeight = FontWeight.Bold, modifier = Modifier.padding(horizontal = 12.dp),
+                )
+                SmallButton("+") {
+                    val range = if (p.mode == 0) 200.0..300.0 else -500.0..-300.0
+                    val v = (p.surplusKcal + 50).coerceIn(range.start, range.endInclusive)
+                    vm.updateProfile(p.copy(surplusKcal = v))
+                }
+            }
+        }
+
         SectionTitle("身体档案")
         CardBox {
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -99,17 +156,11 @@ fun SettingsScreen(
             Spacer(Modifier.height(4.dp))
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
-                    Text("增肌盈余", fontSize = 14.sp, color = TextHi)
-                    Text("每天多吃多少热量，用于增重增肌", fontSize = 11.sp, color = TextLo)
+                    Text("饮水目标", fontSize = 14.sp, color = TextHi)
+                    Text("每日饮水目标 = 体重 × 35ml（固定系数）", fontSize = 11.sp, color = TextLo)
                 }
-                SmallButton("−") {
-                    if (p.surplusKcal > 200) vm.updateProfile(p.copy(surplusKcal = p.surplusKcal - 50))
-                }
-                Text("${fmt0(p.surplusKcal)}", fontSize = 15.sp, color = Accent,
-                    fontWeight = FontWeight.Bold, modifier = Modifier.padding(horizontal = 12.dp))
-                SmallButton("+") {
-                    if (p.surplusKcal < 600) vm.updateProfile(p.copy(surplusKcal = p.surplusKcal + 50))
-                }
+                Text("${fmt0(com.eelan.musclediary.domain.Calc.waterTargetMl(p.weightKg))} ml",
+                    fontSize = 15.sp, color = Accent, fontWeight = FontWeight.Bold)
             }
         }
 

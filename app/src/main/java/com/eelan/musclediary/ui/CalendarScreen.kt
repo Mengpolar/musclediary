@@ -9,8 +9,10 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ChevronLeft
 import androidx.compose.material.icons.filled.ChevronRight
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -27,76 +29,65 @@ import com.eelan.musclediary.ui.theme.*
 import java.time.LocalDate
 import java.time.YearMonth
 
-/** 日历页：月视图 + 达标标记，点击切换日期 */
+/** 点击日期弹出的日历选择面板（保留达标标记），选择后跳转对应日期 */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun CalendarScreen(vm: AppViewModel) {
+fun CalendarSheet(vm: AppViewModel, onDismiss: () -> Unit) {
     var month by remember { mutableStateOf(YearMonth.from(vm.selectedDate)) }
     val selected = vm.selectedDate
     val today = LocalDate.now()
 
-    Column(Modifier.padding(horizontal = 16.dp)) {
-        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
-            IconButton(onClick = { month = month.minusMonths(1) }) {
-                Icon(Icons.Default.ChevronLeft, "上个月", tint = TextLo)
+    ModalBottomSheet(onDismissRequest = onDismiss, containerColor = Ink1) {
+        Column(Modifier.padding(horizontal = 16.dp).padding(bottom = 24.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+                IconButton(onClick = { month = month.minusMonths(1) }) {
+                    Icon(Icons.Default.ChevronLeft, "上个月", tint = TextLo)
+                }
+                Text(
+                    "${month.year}年${month.monthValue}月",
+                    fontSize = 17.sp, fontWeight = FontWeight.Bold, color = TextHi,
+                    modifier = Modifier.weight(1f), textAlign = TextAlign.Center,
+                )
+                IconButton(onClick = { month = month.plusMonths(1) }) {
+                    Icon(Icons.Default.ChevronRight, "下个月", tint = TextLo)
+                }
             }
-            Text(
-                "${month.year}年${month.monthValue}月",
-                fontSize = 17.sp, fontWeight = FontWeight.Bold, color = TextHi,
-                modifier = Modifier.weight(1f), textAlign = TextAlign.Center,
-            )
-            IconButton(onClick = { month = month.plusMonths(1) }) {
-                Icon(Icons.Default.ChevronRight, "下个月", tint = TextLo)
+
+            Spacer(Modifier.height(8.dp))
+            Row(Modifier.fillMaxWidth()) {
+                listOf("一", "二", "三", "四", "五", "六", "日").forEach {
+                    Text(it, fontSize = 12.sp, color = TextLo, textAlign = TextAlign.Center,
+                        modifier = Modifier.weight(1f))
+                }
             }
-        }
+            Spacer(Modifier.height(4.dp))
 
-        Spacer(Modifier.height(8.dp))
-        Row(Modifier.fillMaxWidth()) {
-            listOf("一", "二", "三", "四", "五", "六", "日").forEach {
-                Text(it, fontSize = 12.sp, color = TextLo, textAlign = TextAlign.Center,
-                    modifier = Modifier.weight(1f))
-            }
-        }
-        Spacer(Modifier.height(4.dp))
+            val lead = (month.atDay(1).dayOfWeek.value + 6) % 7 // 周一开头
+            val cells: List<LocalDate?> =
+                List(lead) { null } + (1..month.lengthOfMonth()).map { month.atDay(it) }
 
-        val lead = (month.atDay(1).dayOfWeek.value + 6) % 7 // 周一开头
-        val cells: List<LocalDate?> =
-            List(lead) { null } + (1..month.lengthOfMonth()).map { month.atDay(it) }
-
-        cells.chunked(7).forEach { week ->
-            Row(
-                Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(4.dp),
-            ) {
-                week.forEach { d ->
-                    Box(Modifier.weight(1f)) {
-                        if (d != null) {
-                            DayCell(
-                                date = d, isToday = d == today,
-                                isSelected = d == selected,
-                                status = dayStatus(vm, d),
-                                onClick = { vm.selectDate(d) },
-                            )
+            cells.chunked(7).forEach { week ->
+                Row(
+                    Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                ) {
+                    week.forEach { d ->
+                        Box(Modifier.weight(1f)) {
+                            if (d != null) {
+                                DayCell(
+                                    date = d, isToday = d == today,
+                                    isSelected = d == selected,
+                                    status = dayStatus(vm, d),
+                                    onClick = { vm.selectDate(d); onDismiss() },
+                                )
+                            }
                         }
                     }
+                    if (week.size < 7) repeat(7 - week.size) { Spacer(Modifier.weight(1f)) }
                 }
-                if (week.size < 7) repeat(7 - week.size) { Spacer(Modifier.weight(1f)) }
+                Spacer(Modifier.height(4.dp))
             }
-            Spacer(Modifier.height(4.dp))
-        }
 
-        Spacer(Modifier.height(12.dp))
-        CardBox {
-            val d = selected
-            val food = vm.foodOn(d)
-            val ex = vm.exerciseOn(d)
-            val t = Calc.targets(vm.profile, ex.sumOf { it.calories })
-            Text("${d.monthValue}月${d.dayOfMonth}日 · 摄入 ${fmt0(food.sumOf { it.kcal })} / 目标 ${fmt0(t.tdee)} kcal",
-                fontSize = 14.sp, color = TextHi, fontWeight = FontWeight.Medium)
-            Spacer(Modifier.height(4.dp))
-            Text(
-                "蛋白质 ${fmt1(food.sumOf { it.protein })} / ${fmt0(t.protein)}g · 锻炼 ${ex.size} 项消耗 ${fmt0(ex.sumOf { it.calories })} kcal",
-                fontSize = 12.sp, color = TextLo,
-            )
             Spacer(Modifier.height(8.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 LegendDot(Good, "全部达标")

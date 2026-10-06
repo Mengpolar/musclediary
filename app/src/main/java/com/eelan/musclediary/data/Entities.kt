@@ -10,8 +10,9 @@ data class Profile(
     val age: Int = 25,
     val heightCm: Double = 172.0,
     val weightKg: Double = 65.0,
-    val surplusKcal: Double = 400.0,
+    val surplusKcal: Double = 250.0,
     val seedVersion: Int = 1,
+    val mode: Int = 0, // 0 增肌期 / 1 减脂期
 )
 
 /** 每日体重记录（每天最多一条，不必天天记） */
@@ -20,6 +21,15 @@ data class WeightEntry(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
     val date: String, // yyyy-MM-dd
     val weightKg: Double,
+    val createdAt: Long = System.currentTimeMillis(),
+)
+
+/** 每日饮水量（当天累计，一条记录） */
+@Entity(tableName = "water_entries", indices = [Index(value = ["date"], unique = true)])
+data class WaterEntry(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val date: String, // yyyy-MM-dd
+    val ml: Double,
     val createdAt: Long = System.currentTimeMillis(),
 )
 
@@ -177,12 +187,27 @@ interface AppDao {
 
     @Query("DELETE FROM food_templates WHERE isCustom = 0")
     suspend fun clearBuiltinFoodTemplates()
+
+    @Query("SELECT * FROM water_entries ORDER BY date")
+    suspend fun allWaterEntries(): List<WaterEntry>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertWaterEntry(e: WaterEntry): Long
+
+    @Delete
+    suspend fun deleteWaterEntry(e: WaterEntry)
+
+    @Update
+    suspend fun updateFoodEntry(e: FoodEntry)
+
+    @Update
+    suspend fun updateExerciseEntry(e: ExerciseEntry)
 }
 
 @Database(
     entities = [Profile::class, FoodTemplate::class, FoodEntry::class,
-        ExerciseTemplate::class, ExerciseEntry::class, WeightEntry::class],
-    version = 2,
+        ExerciseTemplate::class, ExerciseEntry::class, WeightEntry::class, WaterEntry::class],
+    version = 3,
     exportSchema = false,
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -202,11 +227,22 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        val MIGRATION_2_3 = object : androidx.room.migration.Migration(2, 3) {
+            override fun migrate(db: androidx.sqlite.db.SupportSQLiteDatabase) {
+                db.execSQL(
+                    "CREATE TABLE IF NOT EXISTS `water_entries` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, " +
+                            "`date` TEXT NOT NULL, `ml` REAL NOT NULL, `createdAt` INTEGER NOT NULL)"
+                )
+                db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS `index_water_entries_date` ON `water_entries` (`date`)")
+                db.execSQL("ALTER TABLE `profile` ADD COLUMN `mode` INTEGER NOT NULL DEFAULT 0")
+            }
+        }
+
         fun get(ctx: Context): AppDatabase =
             inst ?: synchronized(this) {
                 inst ?: Room.databaseBuilder(
                     ctx.applicationContext, AppDatabase::class.java, "musclediary.db"
-                ).addMigrations(MIGRATION_1_2).build().also { inst = it }
+                ).addMigrations(MIGRATION_1_2, MIGRATION_2_3).build().also { inst = it }
             }
     }
 }

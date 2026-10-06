@@ -5,8 +5,11 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
@@ -15,6 +18,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.eelan.musclediary.AppViewModel
 import com.eelan.musclediary.data.WeightEntry
+import com.eelan.musclediary.domain.Calc
 import com.eelan.musclediary.ui.theme.*
 import java.time.LocalDate
 
@@ -71,6 +75,65 @@ fun WeightCard(vm: AppViewModel) {
             onDismiss = { recordOpen = false },
             onConfirm = { vm.addWeight(it); recordOpen = false },
         )
+    }
+}
+
+/** BMI 条：偏瘦 <18.5 / 正常 18.5~24 / 超重 24~28 / 肥胖 ≥28（中国标准），展示当前位置 */
+@Composable
+fun BmiBar(bmi: Double, weightKg: Double, heightCm: Double) {
+    val zone = Calc.bmiZone(bmi)
+    val zoneNames = listOf("偏瘦", "正常", "超重", "肥胖")
+    val zoneColors = listOf(Protein, Good, Warn, Color(0xFFEF5350))
+    val bmiMin = 14.0
+    val bmiMax = 36.0
+    val pos = ((bmi - bmiMin) / (bmiMax - bmiMin)).coerceIn(0.0, 1.0)
+
+    Column {
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                "BMI ${fmt1(bmi)}",
+                fontSize = 16.sp, fontWeight = FontWeight.Bold, color = zoneColors[zone],
+            )
+            Spacer(Modifier.width(8.dp))
+            Text(
+                "「${zoneNames[zone]}」",
+                fontSize = 13.sp, color = zoneColors[zone],
+            )
+            Spacer(Modifier.weight(1f))
+            Text("体重 ${fmt1(weightKg)}kg · 身高 ${fmt1(heightCm)}cm",
+                fontSize = 11.sp, color = TextLo)
+        }
+        Spacer(Modifier.height(6.dp))
+        Canvas(Modifier.fillMaxWidth().height(14.dp)) {
+            val w = size.width
+            val h = size.height
+            val r = androidx.compose.ui.geometry.CornerRadius(h / 2, h / 2)
+            // 四段区间底色
+            fun zoneX(b: Double) = ((b - bmiMin) / (bmiMax - bmiMin) * w).toFloat()
+            val segs = listOf(
+                14.0 to 18.5, 18.5 to 24.0, 24.0 to 28.0, 28.0 to 36.0)
+            segs.forEachIndexed { i, (a, b) ->
+                drawRoundRect(
+                    zoneColors[i].copy(alpha = 0.30f),
+                    topLeft = Offset(zoneX(a), 0f),
+                    size = Size(zoneX(b) - zoneX(a), h),
+                    cornerRadius = r,
+                )
+            }
+            // 当前 BMI 指针
+            val x = (pos * w).toFloat()
+            drawLine(Color.White, Offset(x, -3f), Offset(x, h + 3f), strokeWidth = 3f)
+            drawCircle(Color.White, 4f, Offset(x, h / 2))
+        }
+        Spacer(Modifier.height(2.dp))
+        Row(Modifier.fillMaxWidth()) {
+            Text("18.5", fontSize = 10.sp, color = TextLo)
+            Spacer(Modifier.weight(1f))
+            Text("24", fontSize = 10.sp, color = TextLo)
+            Spacer(Modifier.weight(0.76f))
+            Text("28", fontSize = 10.sp, color = TextLo)
+            Spacer(Modifier.weight(1.14f))
+        }
     }
 }
 

@@ -29,6 +29,8 @@ fun DietScreen(vm: AppViewModel) {
     var pickOpen by remember { mutableStateOf(false) }
     var pendingTemplate by remember { mutableStateOf<FoodTemplate?>(null) }
     var customOpen by remember { mutableStateOf(false) }
+    var editingEntry by remember { mutableStateOf<FoodEntry?>(null) }
+    var showCalendar by remember { mutableStateOf(false) }
 
     val date = vm.selectedDate
     val entries = vm.foodOn(date).sortedBy { it.createdAt }
@@ -46,7 +48,7 @@ fun DietScreen(vm: AppViewModel) {
         },
     ) { pad ->
         Column(Modifier.padding(pad).padding(horizontal = 16.dp)) {
-            DateHeader(vm)
+            DateHeader(vm, onOpenCalendar = { showCalendar = true })
             Spacer(Modifier.height(8.dp))
             CardBox {
                 Row(verticalAlignment = Alignment.CenterVertically) {
@@ -61,7 +63,7 @@ fun DietScreen(vm: AppViewModel) {
                     }
                 }
             }
-            SectionTitle("饮食记录（${entries.size}）")
+            SectionTitle("饮食记录（${entries.size}） · 左滑可修改/删除")
             if (entries.isEmpty()) {
                 EmptyCard("还没有记录，点右下角 + 从模板快速添加")
             } else {
@@ -70,10 +72,11 @@ fun DietScreen(vm: AppViewModel) {
                     contentPadding = PaddingValues(bottom = 80.dp),
                 ) {
                     items(entries, key = { it.id }) { f ->
-                        EntryRow(
+                        SwipeEntryRow(
                             f.name,
                             "${fmt0(f.grams)}g · 蛋白${fmt1(f.protein)} 碳水${fmt1(f.carb)} 脂肪${fmt1(f.fat)}",
                             "${fmt0(f.kcal)} kcal",
+                            onEdit = { editingEntry = f },
                             onDelete = { vm.deleteFood(f) },
                         )
                     }
@@ -102,6 +105,14 @@ fun DietScreen(vm: AppViewModel) {
         )
     }
 
+    editingEntry?.let { e ->
+        NumberDialog(
+            title = "修改「${e.name}」", label = "克数", initial = fmt1(e.grams),
+            onDismiss = { editingEntry = null },
+            onConfirm = { grams -> vm.updateFoodEntry(e, grams); editingEntry = null },
+        )
+    }
+
     if (customOpen) {
         CustomFoodDialog(
             onDismiss = { customOpen = false },
@@ -112,6 +123,10 @@ fun DietScreen(vm: AppViewModel) {
                 customOpen = false
             },
         )
+    }
+
+    if (showCalendar) {
+        CalendarSheet(vm, onDismiss = { showCalendar = false })
     }
 }
 
