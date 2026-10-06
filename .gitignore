@@ -13,3 +13,4 @@ keystore.properties
 *.keystore
 .kotlin/
 /*.apk
+需求.md

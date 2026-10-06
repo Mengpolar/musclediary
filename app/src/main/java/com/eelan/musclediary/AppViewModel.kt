@@ -34,16 +34,26 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         private set
     var exerciseEntries by mutableStateOf<List<ExerciseEntry>>(emptyList())
         private set
+    var weightEntries by mutableStateOf<List<WeightEntry>>(emptyList())
+        private set
 
     init {
         viewModelScope.launch(Dispatchers.IO) {
             if (dao.foodTemplateCount() == 0) dao.insertFoodTemplates(FoodSeed.items)
             if (dao.exerciseTemplateCount() == 0) dao.insertExerciseTemplates(ExerciseSeed.items)
             profile = dao.getProfile() ?: Profile().also { dao.upsertProfile(it) }
+            // 内置食物数据源升级：重建内置模板（自定义模板与历史记录不受影响）
+            if (profile.seedVersion < FoodSeed.version) {
+                dao.clearBuiltinFoodTemplates()
+                dao.insertFoodTemplates(FoodSeed.items)
+                profile = profile.copy(seedVersion = FoodSeed.version)
+                dao.upsertProfile(profile)
+            }
             foodTemplates = dao.foodTemplates()
             exerciseTemplates = dao.exerciseTemplates()
             foodEntries = dao.allFoodEntries()
             exerciseEntries = dao.allExerciseEntries()
+            weightEntries = dao.allWeightEntries()
             withContext(Dispatchers.Main) { loaded = true }
         }
     }
@@ -57,6 +67,24 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     fun updateProfile(p: Profile) {
         profile = p
         viewModelScope.launch(Dispatchers.IO) { dao.upsertProfile(p) }
+    }
+
+    /** 记录今日体重，并同步到身体档案用于目标计算 */
+    fun addWeight(weightKg: Double) {
+        val today = LocalDate.now().toString()
+        val e = WeightEntry(date = today, weightKg = weightKg)
+        val updated = profile.copy(weightKg = weightKg)
+        viewModelScope.launch(Dispatchers.IO) {
+            dao.insertWeightEntry(e)
+            dao.upsertProfile(updated)
+            val list = dao.allWeightEntries()
+            withContext(Dispatchers.Main) { weightEntries = list; profile = updated }
+        }
+    }
+
+    fun deleteWeight(e: WeightEntry) {
+        viewModelScope.launch(Dispatchers.IO) { dao.deleteWeightEntry(e) }
+        weightEntries = weightEntries.filterNot { it.id == e.id }
     }
 
     fun addFood(t: FoodTemplate, grams: Double, date: LocalDate) {

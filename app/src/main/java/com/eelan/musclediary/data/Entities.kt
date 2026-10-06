@@ -11,6 +11,16 @@ data class Profile(
     val heightCm: Double = 172.0,
     val weightKg: Double = 65.0,
     val surplusKcal: Double = 400.0,
+    val seedVersion: Int = 1,
+)
+
+/** 每日体重记录（每天最多一条，不必天天记） */
+@Entity(tableName = "weight_entries", indices = [Index(value = ["date"], unique = true)])
+data class WeightEntry(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val date: String, // yyyy-MM-dd
+    val weightKg: Double,
+    val createdAt: Long = System.currentTimeMillis(),
 )
 
 /** 营养数值均为每 100g 含量 */
@@ -155,12 +165,24 @@ interface AppDao {
 
     @Insert
     suspend fun insertExerciseTemplatesGetIds(list: List<ExerciseTemplate>): List<Long>
+
+    @Query("SELECT * FROM weight_entries ORDER BY date")
+    suspend fun allWeightEntries(): List<WeightEntry>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertWeightEntry(e: WeightEntry): Long
+
+    @Delete
+    suspend fun deleteWeightEntry(e: WeightEntry)
+
+    @Query("DELETE FROM food_templates WHERE isCustom = 0")
+    suspend fun clearBuiltinFoodTemplates()
 }
 
 @Database(
     entities = [Profile::class, FoodTemplate::class, FoodEntry::class,
-        ExerciseTemplate::class, ExerciseEntry::class],
-    version = 1,
+        ExerciseTemplate::class, ExerciseEntry::class, WeightEntry::class],
+    version = 2,
     exportSchema = false,
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -168,11 +190,23 @@ abstract class AppDatabase : RoomDatabase() {
 
     companion object {
         @Volatile private var inst: AppDatabase? = null
+
+        val MIGRATION_1_2 = object : androidx.room.migration.Migration(1, 2) {
+            override fun migrate(db: androidx.sqlite.db.SupportSQLiteDatabase) {
+                db.execSQL(
+                    "CREATE TABLE IF NOT EXISTS `weight_entries` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, " +
+                            "`date` TEXT NOT NULL, `weightKg` REAL NOT NULL, `createdAt` INTEGER NOT NULL)"
+                )
+                db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS `index_weight_entries_date` ON `weight_entries` (`date`)")
+                db.execSQL("ALTER TABLE `profile` ADD COLUMN `seedVersion` INTEGER NOT NULL DEFAULT 1")
+            }
+        }
+
         fun get(ctx: Context): AppDatabase =
             inst ?: synchronized(this) {
                 inst ?: Room.databaseBuilder(
                     ctx.applicationContext, AppDatabase::class.java, "musclediary.db"
-                ).build().also { inst = it }
+                ).addMigrations(MIGRATION_1_2).build().also { inst = it }
             }
     }
 }

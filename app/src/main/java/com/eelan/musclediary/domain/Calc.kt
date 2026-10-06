@@ -21,7 +21,7 @@ data class Targets(
  * - BMR：Mifflin-St Jeor，男 10w+6.25h-5a+5 / 女 -161
  * - 活动系数：1.2（久坐基础）+ 当日运动消耗/BMR，上限 1.6
  * - 热量目标 = BMR × 活动系数 + 增肌盈余（默认 400）
- * - 蛋白质 = 2.0 g/kg；脂肪 = 25% 热量 ÷ 9；碳水 = 剩余热量 ÷ 4（自然落在 4~6g/kg）
+ * - 蛋白质 = 2.0 g/kg；脂肪 = 25% 热量 ÷ 9（下限 0.8 g/kg）；碳水 = 剩余热量 ÷ 4（自然落在 4~6g/kg）
  */
 object Calc {
 
@@ -37,7 +37,8 @@ object Calc {
         val af = 1.2 + bonus
         val tdee = b * af + p.surplusKcal
         val protein = 2.0 * p.weightKg
-        val fat = tdee * 0.25 / 9
+        // 脂肪：25% 热量，但不低于 0.8 g/kg（激素合成需要）
+        val fat = maxOf(tdee * 0.25 / 9, 0.8 * p.weightKg)
         val carb = (tdee - protein * 4 - fat * 9) / 4
         return Targets(b, bonus, af, p.surplusKcal, tdee, protein, carb, fat)
     }

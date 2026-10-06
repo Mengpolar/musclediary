@@ -60,11 +60,11 @@ fun DerivationSheet(
                 "BMR × 活动系数 + 增肌盈余（设置中可调，当前 ${fmt0(t.surplus)}）",
                 "${fmt0(t.bmr)} × ${fmt2(t.activityFactor)} + ${fmt0(t.surplus)} = ${fmt0(t.tdee)} kcal")
             FormulaRow("蛋白质目标",
-                "2.0 g × 体重",
+                "2.0 g × 体重（增肌建议区间 1.6~2.2 g/kg）",
                 "2.0 × ${w} = ${fmt0(t.protein)} g")
             FormulaRow("脂肪目标",
-                "热量目标 × 25% ÷ 9",
-                "${fmt0(t.tdee)} × 0.25 ÷ 9 = ${fmt0(t.fat)} g")
+                "热量目标 × 25% ÷ 9，不低于 0.8 g × 体重（激素合成需要）",
+                "max(${fmt0(t.tdee)} × 0.25 ÷ 9, 0.8 × ${w}) = ${fmt0(t.fat)} g")
             FormulaRow("碳水目标",
                 "(热量目标 − 蛋白×4 − 脂肪×9) ÷ 4，自然落在 4~6 g/kg 区间",
                 "(${fmt0(t.tdee)} − ${fmt0(t.protein)}×4 − ${fmt0(t.fat)}×9) ÷ 4 = ${fmt0(t.carb)} g")
