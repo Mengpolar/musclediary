@@ -32,6 +32,8 @@ fun WorkoutScreen(vm: AppViewModel) {
     var pickOpen by remember { mutableStateOf(false) }
     var pendingTemplate by remember { mutableStateOf<ExerciseTemplate?>(null) }
     var customOpen by remember { mutableStateOf(false) }
+    var editingEntry by remember { mutableStateOf<com.eelan.musclediary.data.ExerciseEntry?>(null) }
+    var showCalendar by remember { mutableStateOf(false) }
 
     val date = vm.selectedDate
     val entries = vm.exerciseOn(date).sortedBy { it.createdAt }
@@ -60,14 +62,25 @@ fun WorkoutScreen(vm: AppViewModel) {
             Modifier.padding(pad).padding(horizontal = 16.dp)
                 .verticalScroll(rememberScrollState())
         ) {
-            DateHeader(vm)
+            DateHeader(vm, onOpenCalendar = { showCalendar = true })
             Spacer(Modifier.height(8.dp))
             CardBox {
                 Text("肌肉概览", fontSize = 15.sp, fontWeight = FontWeight.Bold, color = TextHi)
                 Spacer(Modifier.height(4.dp))
                 MuscleMap(scores, { Calc.intensity(it) }, onPick = { })
             }
-            SectionTitle("锻炼记录（${entries.size}） · 共消耗 ${fmt0(entries.sumOf { it.calories })} kcal")
+            Spacer(Modifier.height(12.dp))
+            CardBox {
+                Text("体重与 BMI", fontSize = 15.sp, fontWeight = FontWeight.Bold, color = TextHi)
+                Spacer(Modifier.height(4.dp))
+                BmiBar(Calc.bmi(vm.profile.weightKg, vm.profile.heightCm),
+                    vm.profile.weightKg, vm.profile.heightCm)
+                Spacer(Modifier.height(8.dp))
+                WeightChart(vm.weightEntries.sortedBy { it.date })
+                Spacer(Modifier.height(4.dp))
+                Text("体重记录在「我的」页录入，曲线随记录自动延伸", fontSize = 11.sp, color = TextLo)
+            }
+            SectionTitle("锻炼记录（${entries.size}） · 共消耗 ${fmt0(entries.sumOf { it.calories })} kcal · 左滑可修改/删除")
             if (entries.isEmpty()) {
                 Text(
                     "还没有锻炼记录，点右下角 + 开始记录", fontSize = 13.sp, color = TextLo,
@@ -77,10 +90,11 @@ fun WorkoutScreen(vm: AppViewModel) {
             } else {
                 Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     entries.forEach { e ->
-                        EntryRow(
+                        SwipeEntryRow(
                             e.name,
                             workoutDetail(e),
                             "${fmt0(e.calories)} kcal",
+                            onEdit = { editingEntry = e },
                             onDelete = { vm.deleteExercise(e) },
                         )
                     }
@@ -88,6 +102,10 @@ fun WorkoutScreen(vm: AppViewModel) {
             }
             Spacer(Modifier.height(80.dp))
         }
+    }
+
+    if (showCalendar) {
+        CalendarSheet(vm, onDismiss = { showCalendar = false })
     }
 
     if (pickOpen) {
@@ -107,6 +125,14 @@ fun WorkoutScreen(vm: AppViewModel) {
                 vm.addExercise(t, qty, weight, vm.selectedDate)
                 pendingTemplate = null
             },
+        )
+    }
+
+    editingEntry?.let { e ->
+        NumberDialog(
+            title = "修改「${e.name}」", label = "数量", initial = fmt1(e.qty),
+            onDismiss = { editingEntry = null },
+            onConfirm = { qty -> vm.updateExerciseEntry(e, qty); editingEntry = null },
         )
     }
 
