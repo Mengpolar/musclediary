@@ -1,0 +1,178 @@
+package com.eelan.musclediary.data
+
+import androidx.room.*
+import android.content.Context
+
+@Entity(tableName = "profile")
+data class Profile(
+    @PrimaryKey val id: Int = 1,
+    val male: Boolean = true,
+    val age: Int = 25,
+    val heightCm: Double = 172.0,
+    val weightKg: Double = 65.0,
+    val surplusKcal: Double = 400.0,
+)
+
+/** 营养数值均为每 100g 含量 */
+@Entity(tableName = "food_templates")
+data class FoodTemplate(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val name: String,
+    val protein: Double,
+    val carb: Double,
+    val fat: Double,
+    val isCustom: Boolean = false,
+) {
+    val kcal: Double get() = protein * 4 + carb * 4 + fat * 9
+}
+
+/** 营养数值为当日进食总量 */
+@Entity(tableName = "food_entries")
+data class FoodEntry(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val date: String, // yyyy-MM-dd
+    val name: String,
+    val grams: Double,
+    val protein: Double,
+    val carb: Double,
+    val fat: Double,
+    val createdAt: Long = System.currentTimeMillis(),
+) {
+    val kcal: Double get() = protein * 4 + carb * 4 + fat * 9
+}
+
+enum class QtyType { REPS, DISTANCE, SECONDS }
+
+@Entity(tableName = "exercise_templates")
+data class ExerciseTemplate(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val name: String,
+    val qtyType: QtyType,
+    val met: Double,
+    val perRepSeconds: Double = 0.0,  // REPS 类型：单次耗时（秒）
+    val paceMinPerKm: Double = 0.0,   // DISTANCE 类型：配速（分钟/公里）
+    val primaryMuscle: String,        // Muscle.id
+    val secondaryMuscles: String = "",// 逗号分隔的 Muscle.id
+    val isCustom: Boolean = false,
+)
+
+@Entity(tableName = "exercise_entries")
+data class ExerciseEntry(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val date: String,
+    val templateId: Long,
+    val name: String,
+    val qty: Double,
+    val weightKg: Double = 0.0, // 哑铃类附加重量
+    val calories: Double,
+    val minutes: Double,
+    val musclesJson: String, // {"chest":12.5,...} 当次各肌群刺激分
+    val createdAt: Long = System.currentTimeMillis(),
+)
+
+@Dao
+interface AppDao {
+    @Query("SELECT * FROM profile WHERE id = 1")
+    suspend fun getProfile(): Profile?
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun upsertProfile(p: Profile)
+
+    @Query("SELECT COUNT(*) FROM food_templates")
+    suspend fun foodTemplateCount(): Int
+
+    @Query("SELECT COUNT(*) FROM exercise_templates")
+    suspend fun exerciseTemplateCount(): Int
+
+    @Insert
+    suspend fun insertFoodTemplates(list: List<FoodTemplate>)
+
+    @Insert
+    suspend fun insertExerciseTemplates(list: List<ExerciseTemplate>)
+
+    @Query("SELECT * FROM food_templates ORDER BY isCustom, name")
+    suspend fun foodTemplates(): List<FoodTemplate>
+
+    @Query("SELECT * FROM exercise_templates ORDER BY isCustom, name")
+    suspend fun exerciseTemplates(): List<ExerciseTemplate>
+
+    @Insert
+    suspend fun insertFoodTemplate(t: FoodTemplate): Long
+
+    @Insert
+    suspend fun insertExerciseTemplate(t: ExerciseTemplate): Long
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun upsertFoodTemplate(t: FoodTemplate)
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun upsertExerciseTemplate(t: ExerciseTemplate)
+
+    @Delete
+    suspend fun deleteFoodTemplate(t: FoodTemplate)
+
+    @Delete
+    suspend fun deleteExerciseTemplate(t: ExerciseTemplate)
+
+    @Query("SELECT * FROM food_entries ORDER BY createdAt")
+    suspend fun allFoodEntries(): List<FoodEntry>
+
+    @Query("SELECT * FROM exercise_entries ORDER BY createdAt")
+    suspend fun allExerciseEntries(): List<ExerciseEntry>
+
+    @Insert
+    suspend fun insertFoodEntry(e: FoodEntry): Long
+
+    @Insert
+    suspend fun insertExerciseEntry(e: ExerciseEntry): Long
+
+    @Delete
+    suspend fun deleteFoodEntry(e: FoodEntry)
+
+    @Delete
+    suspend fun deleteExerciseEntry(e: ExerciseEntry)
+
+    @Query("DELETE FROM food_entries")
+    suspend fun clearFoodEntries()
+
+    @Query("DELETE FROM exercise_entries")
+    suspend fun clearExerciseEntries()
+
+    @Insert
+    suspend fun insertFoodEntries(list: List<FoodEntry>)
+
+    @Insert
+    suspend fun insertExerciseEntries(list: List<ExerciseEntry>)
+
+    @Query("DELETE FROM food_templates WHERE isCustom = 1")
+    suspend fun clearCustomFoodTemplates()
+
+    @Query("DELETE FROM exercise_templates WHERE isCustom = 1")
+    suspend fun clearCustomExerciseTemplates()
+
+    @Insert
+    suspend fun insertFoodTemplatesGetIds(list: List<FoodTemplate>): List<Long>
+
+    @Insert
+    suspend fun insertExerciseTemplatesGetIds(list: List<ExerciseTemplate>): List<Long>
+}
+
+@Database(
+    entities = [Profile::class, FoodTemplate::class, FoodEntry::class,
+        ExerciseTemplate::class, ExerciseEntry::class],
+    version = 1,
+    exportSchema = false,
+)
+abstract class AppDatabase : RoomDatabase() {
+    abstract fun dao(): AppDao
+
+    companion object {
+        @Volatile private var inst: AppDatabase? = null
+        fun get(ctx: Context): AppDatabase =
+            inst ?: synchronized(this) {
+                inst ?: Room.databaseBuilder(
+                    ctx.applicationContext, AppDatabase::class.java, "musclediary.db"
+                ).build().also { inst = it }
+            }
+    }
+}
