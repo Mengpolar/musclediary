@@ -1,0 +1,98 @@
+package com.eelan.musclediary.data
+
+import com.eelan.musclediary.domain.Muscle
+
+/** 内置食物模板：数值为每 100g 的蛋白质/碳水/脂肪（克） */
+object FoodSeed {
+    val items = listOf(
+        FoodTemplate(name = "米饭(熟)", protein = 2.6, carb = 25.9, fat = 0.3),
+        FoodTemplate(name = "糙米饭(熟)", protein = 2.7, carb = 23.5, fat = 0.7),
+        FoodTemplate(name = "馒头", protein = 7.0, carb = 47.0, fat = 1.1),
+        FoodTemplate(name = "全麦面包", protein = 9.0, carb = 45.0, fat = 3.4),
+        FoodTemplate(name = "面条(熟)", protein = 3.9, carb = 22.8, fat = 0.4),
+        FoodTemplate(name = "意面(干)", protein = 12.5, carb = 74.0, fat = 1.5),
+        FoodTemplate(name = "燕麦片", protein = 15.0, carb = 61.0, fat = 7.0),
+        FoodTemplate(name = "红薯(熟)", protein = 1.6, carb = 23.1, fat = 0.2),
+        FoodTemplate(name = "土豆(熟)", protein = 2.0, carb = 17.2, fat = 0.2),
+        FoodTemplate(name = "玉米", protein = 4.0, carb = 22.8, fat = 1.2),
+        FoodTemplate(name = "鸡蛋", protein = 13.3, carb = 2.8, fat = 8.8),
+        FoodTemplate(name = "鸡胸肉", protein = 24.6, carb = 0.6, fat = 3.4),
+        FoodTemplate(name = "鸡腿肉(去皮)", protein = 20.0, carb = 0.0, fat = 7.5),
+        FoodTemplate(name = "牛里脊", protein = 20.2, carb = 1.2, fat = 2.3),
+        FoodTemplate(name = "猪里脊", protein = 20.2, carb = 0.7, fat = 7.9),
+        FoodTemplate(name = "三文鱼", protein = 20.0, carb = 0.0, fat = 13.0),
+        FoodTemplate(name = "鲈鱼", protein = 18.6, carb = 0.0, fat = 3.4),
+        FoodTemplate(name = "虾仁", protein = 18.6, carb = 0.0, fat = 0.8),
+        FoodTemplate(name = "豆腐(北)", protein = 8.1, carb = 3.8, fat = 7.6),
+        FoodTemplate(name = "豆浆(无糖)", protein = 1.8, carb = 1.1, fat = 0.7),
+        FoodTemplate(name = "牛奶", protein = 3.2, carb = 4.8, fat = 3.6),
+        FoodTemplate(name = "希腊酸奶", protein = 9.0, carb = 3.6, fat = 5.0),
+        FoodTemplate(name = "乳清蛋白粉", protein = 75.0, carb = 10.0, fat = 6.0),
+        FoodTemplate(name = "花生", protein = 24.8, carb = 13.3, fat = 44.3),
+        FoodTemplate(name = "核桃", protein = 14.9, carb = 9.6, fat = 58.8),
+        FoodTemplate(name = "香蕉", protein = 1.4, carb = 22.0, fat = 0.2),
+        FoodTemplate(name = "苹果", protein = 0.4, carb = 13.7, fat = 0.2),
+        FoodTemplate(name = "西蓝花", protein = 2.8, carb = 3.7, fat = 0.4),
+        FoodTemplate(name = "菠菜", protein = 2.6, carb = 4.5, fat = 0.3),
+        FoodTemplate(name = "生菜", protein = 1.3, carb = 2.0, fat = 0.3),
+        FoodTemplate(name = "番茄", protein = 0.9, carb = 4.0, fat = 0.2),
+        FoodTemplate(name = "黄瓜", protein = 0.8, carb = 2.9, fat = 0.2),
+        FoodTemplate(name = "胡萝卜", protein = 1.0, carb = 8.8, fat = 0.2),
+        FoodTemplate(name = "水饺(猪肉白菜)", protein = 6.5, carb = 17.0, fat = 5.0),
+    )
+}
+
+/** 内置锻炼模板 */
+object ExerciseSeed {
+    val items = listOf(
+        // 按次数：perRepSeconds 为单次耗时
+        ExerciseTemplate(name = "俯卧撑", qtyType = QtyType.REPS, met = 8.0, perRepSeconds = 3.0,
+            primaryMuscle = Muscle.CHEST.id, secondaryMuscles = "triceps,shoulders"),
+        ExerciseTemplate(name = "仰卧起坐", qtyType = QtyType.REPS, met = 6.0, perRepSeconds = 3.0,
+            primaryMuscle = Muscle.ABS.id, secondaryMuscles = ""),
+        ExerciseTemplate(name = "卷腹", qtyType = QtyType.REPS, met = 5.5, perRepSeconds = 2.5,
+            primaryMuscle = Muscle.ABS.id, secondaryMuscles = ""),
+        ExerciseTemplate(name = "深蹲(徒手)", qtyType = QtyType.REPS, met = 5.5, perRepSeconds = 3.5,
+            primaryMuscle = Muscle.QUADS.id, secondaryMuscles = "glutes,calves"),
+        ExerciseTemplate(name = "弓步蹲", qtyType = QtyType.REPS, met = 5.0, perRepSeconds = 4.0,
+            primaryMuscle = Muscle.QUADS.id, secondaryMuscles = "glutes,hamstrings"),
+        ExerciseTemplate(name = "引体向上", qtyType = QtyType.REPS, met = 8.0, perRepSeconds = 4.0,
+            primaryMuscle = Muscle.LATS.id, secondaryMuscles = "biceps,traps"),
+        ExerciseTemplate(name = "双杠臂屈伸", qtyType = QtyType.REPS, met = 8.0, perRepSeconds = 3.5,
+            primaryMuscle = Muscle.TRICEPS.id, secondaryMuscles = "chest,shoulders"),
+        ExerciseTemplate(name = "哑铃卧推", qtyType = QtyType.REPS, met = 6.0, perRepSeconds = 4.0,
+            primaryMuscle = Muscle.CHEST.id, secondaryMuscles = "triceps,shoulders"),
+        ExerciseTemplate(name = "哑铃飞鸟", qtyType = QtyType.REPS, met = 5.0, perRepSeconds = 3.5,
+            primaryMuscle = Muscle.CHEST.id, secondaryMuscles = "shoulders"),
+        ExerciseTemplate(name = "哑铃推肩", qtyType = QtyType.REPS, met = 6.0, perRepSeconds = 3.5,
+            primaryMuscle = Muscle.SHOULDERS.id, secondaryMuscles = "triceps"),
+        ExerciseTemplate(name = "哑铃侧平举", qtyType = QtyType.REPS, met = 4.0, perRepSeconds = 2.5,
+            primaryMuscle = Muscle.SHOULDERS.id, secondaryMuscles = "traps"),
+        ExerciseTemplate(name = "哑铃弯举", qtyType = QtyType.REPS, met = 3.5, perRepSeconds = 3.0,
+            primaryMuscle = Muscle.BICEPS.id, secondaryMuscles = "forearms"),
+        ExerciseTemplate(name = "哑铃划船", qtyType = QtyType.REPS, met = 5.0, perRepSeconds = 4.0,
+            primaryMuscle = Muscle.LATS.id, secondaryMuscles = "biceps,traps"),
+        ExerciseTemplate(name = "哑铃颈后臂屈伸", qtyType = QtyType.REPS, met = 4.5, perRepSeconds = 3.5,
+            primaryMuscle = Muscle.TRICEPS.id, secondaryMuscles = ""),
+        ExerciseTemplate(name = "臀桥", qtyType = QtyType.REPS, met = 4.0, perRepSeconds = 3.0,
+            primaryMuscle = Muscle.GLUTES.id, secondaryMuscles = "hamstrings"),
+        ExerciseTemplate(name = "山羊挺身", qtyType = QtyType.REPS, met = 5.0, perRepSeconds = 3.5,
+            primaryMuscle = Muscle.LOWER_BACK.id, secondaryMuscles = "glutes,hamstrings"),
+        ExerciseTemplate(name = "波比跳", qtyType = QtyType.REPS, met = 8.0, perRepSeconds = 5.0,
+            primaryMuscle = Muscle.CHEST.id, secondaryMuscles = "quads,abs,shoulders"),
+        // 按公里：paceMinPerKm 为默认配速
+        ExerciseTemplate(name = "步行", qtyType = QtyType.DISTANCE, met = 3.5, paceMinPerKm = 12.0,
+            primaryMuscle = Muscle.CALVES.id, secondaryMuscles = "quads"),
+        ExerciseTemplate(name = "跑步", qtyType = QtyType.DISTANCE, met = 9.8, paceMinPerKm = 6.0,
+            primaryMuscle = Muscle.QUADS.id, secondaryMuscles = "calves,hamstrings"),
+        ExerciseTemplate(name = "骑行", qtyType = QtyType.DISTANCE, met = 7.5, paceMinPerKm = 4.0,
+            primaryMuscle = Muscle.QUADS.id, secondaryMuscles = "calves"),
+        // 按秒
+        ExerciseTemplate(name = "平板支撑", qtyType = QtyType.SECONDS, met = 4.0,
+            primaryMuscle = Muscle.ABS.id, secondaryMuscles = "shoulders,lower_back"),
+        ExerciseTemplate(name = "跳绳", qtyType = QtyType.SECONDS, met = 11.0,
+            primaryMuscle = Muscle.CALVES.id, secondaryMuscles = "quads,forearms"),
+        ExerciseTemplate(name = "游泳", qtyType = QtyType.SECONDS, met = 8.3,
+            primaryMuscle = Muscle.LATS.id, secondaryMuscles = "chest,shoulders,quads"),
+    )
+}
