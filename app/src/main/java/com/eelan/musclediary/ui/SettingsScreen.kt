@@ -153,6 +153,21 @@ fun SettingsScreen(
             Spacer(Modifier.height(4.dp))
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
+                    Text("每日锻炼目标", fontSize = 14.sp, color = TextHi)
+                    Text("今日页锻炼消耗环的目标值", fontSize = 11.sp, color = TextLo)
+                }
+                SmallButton("−") {
+                    if (p.exerciseGoalKcal > 100) vm.updateProfile(p.copy(exerciseGoalKcal = p.exerciseGoalKcal - 50))
+                }
+                Text("${fmt0(p.exerciseGoalKcal)}", fontSize = 15.sp, color = Accent,
+                    fontWeight = FontWeight.Bold, modifier = Modifier.padding(horizontal = 12.dp))
+                SmallButton("+") {
+                    if (p.exerciseGoalKcal < 1000) vm.updateProfile(p.copy(exerciseGoalKcal = p.exerciseGoalKcal + 50))
+                }
+            }
+            Spacer(Modifier.height(4.dp))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
                     Text("饮水目标", fontSize = 14.sp, color = TextHi)
                     Text("每日饮水目标 = 体重 × 35ml（固定系数）", fontSize = 11.sp, color = TextLo)
                 }

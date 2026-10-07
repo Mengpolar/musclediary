@@ -19,9 +19,9 @@ import com.eelan.musclediary.domain.Calc
 import com.eelan.musclediary.ui.theme.*
 import java.time.LocalDate
 
-/** 今日总览：目标环（可点击看推导）+ 饮水环；点日期弹日历选择 */
+/** 今日总览：目标环（可点击看推导）+ 饮水环 + 锻炼消耗环；点日期弹日历选择 */
 @Composable
-fun TodayScreen(vm: AppViewModel) {
+fun TodayScreen(vm: AppViewModel, onGoWorkout: () -> Unit = {}) {
     val date = vm.selectedDate
     val food = vm.foodOn(date)
     val exKcal = vm.exerciseKcalOn(date)
@@ -67,41 +67,34 @@ fun TodayScreen(vm: AppViewModel) {
         Spacer(Modifier.height(12.dp))
         CardBox {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                ProgressRing(
-                    progress = if (waterTarget > 0) (water / waterTarget).toFloat() else 0f,
-                    color = Protein, size = 110.dp, stroke = 10.dp,
-                    centerLabel = "饮水", centerValue = "${fmt0(water)}",
-                    subValue = "目标 ${fmt0(waterTarget)}",
-                    onClick = { showWater = true },
-                )
-                Spacer(Modifier.width(16.dp))
-                Column(Modifier.weight(1f)) {
-                    Text("今日饮水", fontSize = 15.sp, fontWeight = androidx.compose.ui.text.font.FontWeight.Bold, color = TextHi)
-                    Spacer(Modifier.height(4.dp))
-                    Text(
-                        "${fmt0(water)} / ${fmt0(waterTarget)} ml",
-                        fontSize = 14.sp, color = Protein, fontWeight = androidx.compose.ui.text.font.FontWeight.Medium,
+                // 饮水环
+                Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.weight(1f)) {
+                    ProgressRing(
+                        progress = if (waterTarget > 0) (water / waterTarget).toFloat() else 0f,
+                        color = Protein, size = 100.dp, stroke = 9.dp,
+                        centerLabel = "饮水", centerValue = "${fmt0(water)}",
+                        subValue = "目标 ${fmt0(waterTarget)}",
+                        onClick = { showWater = true },
                     )
-                    Spacer(Modifier.height(4.dp))
-                    Text(
-                        "目标 = 体重 ${fmt1(p.weightKg)}kg × 35ml；多次记录会累加",
-                        fontSize = 11.sp, color = TextLo,
-                    )
-                    Spacer(Modifier.height(4.dp))
-                    if (date != LocalDate.now()) {
-                        Text("当前查看的是 ${date.monthValue}月${date.dayOfMonth}日 的饮水记录", fontSize = 11.sp, color = Warn)
-                        Spacer(Modifier.height(4.dp))
-                    }
-                    Spacer(Modifier.height(8.dp))
-                    Text(
-                        "＋ 记录饮水", fontSize = 13.sp, color = Accent,
-                        fontWeight = androidx.compose.ui.text.font.FontWeight.Medium,
-                        modifier = Modifier
-                            .background(Ink2, RoundedCornerShape(8.dp))
-                            .clickable { showWater = true }
-                            .padding(horizontal = 12.dp, vertical = 6.dp),
-                    )
+                    Spacer(Modifier.height(6.dp))
+                    Text("饮水 · 体重×35ml", fontSize = 11.sp, color = TextLo)
                 }
+                // 锻炼消耗环
+                Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.weight(1f)) {
+                    ProgressRing(
+                        progress = if (p.exerciseGoalKcal > 0) (exKcal / p.exerciseGoalKcal).toFloat() else 0f,
+                        color = Warn, size = 100.dp, stroke = 9.dp,
+                        centerLabel = "锻炼", centerValue = "${fmt0(exKcal)}",
+                        subValue = "目标 ${fmt0(p.exerciseGoalKcal)}",
+                        onClick = onGoWorkout,
+                    )
+                    Spacer(Modifier.height(6.dp))
+                    Text("锻炼消耗 · 点环去记录", fontSize = 11.sp, color = TextLo)
+                }
+            }
+            if (date != LocalDate.now()) {
+                Spacer(Modifier.height(6.dp))
+                Text("当前查看 ${date.monthValue}月${date.dayOfMonth}日 的数据", fontSize = 11.sp, color = Warn)
             }
         }
     }
