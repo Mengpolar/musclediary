@@ -44,6 +44,7 @@ fun ProgressRing(
     centerValue: String,
     subValue: String,
     onClick: () -> Unit,
+    valueColor: Color = TextHi,
 ) {
     val track = Ink3
     val animProgress by animateFloatAsState(
@@ -71,7 +72,7 @@ fun ProgressRing(
         }
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             Text(centerLabel, fontSize = 11.sp, color = TextLo)
-            Text(centerValue, fontSize = 16.sp, fontWeight = FontWeight.Bold, color = TextHi)
+            Text(centerValue, fontSize = 16.sp, fontWeight = FontWeight.Bold, color = valueColor)
             Text(subValue, fontSize = 10.sp, color = TextLo)
         }
     }

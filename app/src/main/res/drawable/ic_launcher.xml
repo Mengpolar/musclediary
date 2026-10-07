@@ -8,37 +8,37 @@
     <path
         android:fillColor="#000000"
         android:pathData="M0,0h108v108h-108z" />
-    <!-- 白色哑铃轮廓：横杆 -->
+    <!-- 横杆 -->
     <path
         android:strokeColor="#FFFFFF"
-        android:strokeWidth="4"
+        android:strokeWidth="4.5"
         android:strokeLineCap="round"
         android:fillColor="#00000000"
-        android:pathData="M41,54H67" />
-    <!-- 内侧配重片 -->
+        android:pathData="M38,54H70" />
+    <!-- 内侧配重片（加粗） -->
     <path
         android:strokeColor="#FFFFFF"
-        android:strokeWidth="4"
+        android:strokeWidth="6.5"
         android:strokeLineCap="round"
         android:fillColor="#00000000"
-        android:pathData="M46,47V61" />
+        android:pathData="M47,46.5V61.5" />
     <path
         android:strokeColor="#FFFFFF"
-        android:strokeWidth="4"
+        android:strokeWidth="6.5"
         android:strokeLineCap="round"
         android:fillColor="#00000000"
-        android:pathData="M62,47V61" />
-    <!-- 外侧配重片 -->
+        android:pathData="M61,46.5V61.5" />
+    <!-- 外侧配重片（更粗） -->
     <path
         android:strokeColor="#FFFFFF"
-        android:strokeWidth="4"
+        android:strokeWidth="8.5"
         android:strokeLineCap="round"
         android:fillColor="#00000000"
-        android:pathData="M37,42V66" />
+        android:pathData="M37.5,42V66" />
     <path
         android:strokeColor="#FFFFFF"
-        android:strokeWidth="4"
+        android:strokeWidth="8.5"
         android:strokeLineCap="round"
         android:fillColor="#00000000"
-        android:pathData="M71,42V66" />
+        android:pathData="M70.5,42V66" />
 </vector>

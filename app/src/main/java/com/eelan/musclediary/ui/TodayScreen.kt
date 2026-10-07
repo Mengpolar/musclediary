@@ -75,6 +75,7 @@ fun TodayScreen(vm: AppViewModel, onGoWorkout: () -> Unit = {}) {
                         centerLabel = "饮水", centerValue = "${fmt0(water)}",
                         subValue = "目标 ${fmt0(waterTarget)}",
                         onClick = { showWater = true },
+                        valueColor = if (water >= waterTarget) Good else TextHi,
                     )
                     Spacer(Modifier.height(6.dp))
                     Text("饮水 · 体重×35ml", fontSize = 11.sp, color = TextLo)
@@ -87,6 +88,7 @@ fun TodayScreen(vm: AppViewModel, onGoWorkout: () -> Unit = {}) {
                         centerLabel = "锻炼", centerValue = "${fmt0(exKcal)}",
                         subValue = "目标 ${fmt0(p.exerciseGoalKcal)}",
                         onClick = onGoWorkout,
+                        valueColor = if (p.exerciseGoalKcal > 0 && exKcal >= p.exerciseGoalKcal) Good else TextHi,
                     )
                     Spacer(Modifier.height(6.dp))
                     Text("锻炼消耗 · 点环去记录", fontSize = 11.sp, color = TextLo)
