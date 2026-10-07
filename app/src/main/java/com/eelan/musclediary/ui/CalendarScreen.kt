@@ -52,6 +52,15 @@ fun CalendarSheet(vm: AppViewModel, onDismiss: () -> Unit) {
                     Icon(Icons.Default.ChevronRight, "下个月", tint = TextLo)
                 }
             }
+            if (selected != today) {
+                Text(
+                    "回到今天（${today.monthValue}月${today.dayOfMonth}日）",
+                    fontSize = 13.sp, color = Accent,
+                    modifier = Modifier
+                        .clickable { vm.selectDate(today); onDismiss() }
+                        .padding(vertical = 4.dp),
+                )
+            }
 
             Spacer(Modifier.height(8.dp))
             Row(Modifier.fillMaxWidth()) {

@@ -13,6 +13,8 @@ data class Profile(
     val surplusKcal: Double = 250.0,
     val seedVersion: Int = 1,
     val mode: Int = 0, // 0 增肌期 / 1 减脂期
+    val exerciseGoalKcal: Double = 300.0,
+    val setupDone: Int = 0, // 0 未完成首次引导
 )
 
 /** 每日体重记录（每天最多一条，不必天天记） */
@@ -42,6 +44,7 @@ data class FoodTemplate(
     val carb: Double,
     val fat: Double,
     val isCustom: Boolean = false,
+    val lastUsedAt: Long = 0,
 ) {
     val kcal: Double get() = protein * 4 + carb * 4 + fat * 9
 }
@@ -74,6 +77,7 @@ data class ExerciseTemplate(
     val primaryMuscle: String,        // Muscle.id
     val secondaryMuscles: String = "",// 逗号分隔的 Muscle.id
     val isCustom: Boolean = false,
+    val lastUsedAt: Long = 0,
 )
 
 @Entity(tableName = "exercise_entries")
@@ -207,7 +211,7 @@ interface AppDao {
 @Database(
     entities = [Profile::class, FoodTemplate::class, FoodEntry::class,
         ExerciseTemplate::class, ExerciseEntry::class, WeightEntry::class, WaterEntry::class],
-    version = 3,
+    version = 4,
     exportSchema = false,
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -238,11 +242,20 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        val MIGRATION_3_4 = object : androidx.room.migration.Migration(3, 4) {
+            override fun migrate(db: androidx.sqlite.db.SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE `profile` ADD COLUMN `exerciseGoalKcal` REAL NOT NULL DEFAULT 300")
+                db.execSQL("ALTER TABLE `profile` ADD COLUMN `setupDone` INTEGER NOT NULL DEFAULT 1")
+                db.execSQL("ALTER TABLE `food_templates` ADD COLUMN `lastUsedAt` INTEGER NOT NULL DEFAULT 0")
+                db.execSQL("ALTER TABLE `exercise_templates` ADD COLUMN `lastUsedAt` INTEGER NOT NULL DEFAULT 0")
+            }
+        }
+
         fun get(ctx: Context): AppDatabase =
             inst ?: synchronized(this) {
                 inst ?: Room.databaseBuilder(
                     ctx.applicationContext, AppDatabase::class.java, "musclediary.db"
-                ).addMigrations(MIGRATION_1_2, MIGRATION_2_3).build().also { inst = it }
+                ).addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4).build().also { inst = it }
             }
     }
 }

@@ -53,8 +53,10 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 profile = profile.copy(seedVersion = FoodSeed.version)
                 dao.upsertProfile(profile)
             }
-            foodTemplates = dao.foodTemplates()
-            exerciseTemplates = dao.exerciseTemplates()
+            foodTemplates = dao.foodTemplates().sortedWith(
+                compareByDescending<FoodTemplate> { it.lastUsedAt }.thenBy { it.name })
+            exerciseTemplates = dao.exerciseTemplates().sortedWith(
+                compareByDescending<ExerciseTemplate> { it.lastUsedAt }.thenBy { it.name })
             foodEntries = dao.allFoodEntries()
             exerciseEntries = dao.allExerciseEntries()
             weightEntries = dao.allWeightEntries()
@@ -161,10 +163,26 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             date = date.toString(), name = t.name, grams = grams,
             protein = t.protein * k, carb = t.carb * k, fat = t.fat * k,
         )
+        bumpFoodUsage(t)
         viewModelScope.launch(Dispatchers.IO) {
             val id = dao.insertFoodEntry(e)
             withContext(Dispatchers.Main) { foodEntries = foodEntries + e.copy(id = id) }
         }
+    }
+
+    /** 使用模板后记录时间并置顶排序 */
+    private fun bumpFoodUsage(t: FoodTemplate) {
+        val bumped = t.copy(lastUsedAt = System.currentTimeMillis())
+        viewModelScope.launch(Dispatchers.IO) { dao.upsertFoodTemplate(bumped) }
+        foodTemplates = (foodTemplates.filterNot { it.id == bumped.id } + bumped)
+            .sortedWith(compareByDescending<FoodTemplate> { it.lastUsedAt }.thenBy { it.name })
+    }
+
+    private fun bumpExerciseUsage(t: ExerciseTemplate) {
+        val bumped = t.copy(lastUsedAt = System.currentTimeMillis())
+        viewModelScope.launch(Dispatchers.IO) { dao.upsertExerciseTemplate(bumped) }
+        exerciseTemplates = (exerciseTemplates.filterNot { it.id == bumped.id } + bumped)
+            .sortedWith(compareByDescending<ExerciseTemplate> { it.lastUsedAt }.thenBy { it.name })
     }
 
     fun addCustomFood(name: String, protein: Double, carb: Double, fat: Double, onReady: (FoodTemplate) -> Unit) {
@@ -213,8 +231,10 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             val xNames = dao.exerciseTemplates().map { it.name }.toSet()
             val addX = ExerciseSeed.items.filter { it.name !in xNames }
             if (addX.isNotEmpty()) dao.insertExerciseTemplates(addX)
-            foodTemplates = dao.foodTemplates()
-            exerciseTemplates = dao.exerciseTemplates()
+            foodTemplates = dao.foodTemplates().sortedWith(
+                compareByDescending<FoodTemplate> { it.lastUsedAt }.thenBy { it.name })
+            exerciseTemplates = dao.exerciseTemplates().sortedWith(
+                compareByDescending<ExerciseTemplate> { it.lastUsedAt }.thenBy { it.name })
             withContext(Dispatchers.Main) { onDone() }
         }
     }
@@ -227,6 +247,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             date = date.toString(), templateId = t.id, name = t.name,
             qty = qty, weightKg = extraWeight, calories = kcal, minutes = minutes, musclesJson = json,
         )
+        bumpExerciseUsage(t)
         viewModelScope.launch(Dispatchers.IO) {
             val id = dao.insertExerciseEntry(e)
             withContext(Dispatchers.Main) { exerciseEntries = exerciseEntries + e.copy(id = id) }
@@ -331,8 +352,10 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             dao.clearCustomExerciseTemplates(); dao.insertExerciseTemplates(customsX)
             foodEntries = dao.allFoodEntries()
             exerciseEntries = dao.allExerciseEntries()
-            foodTemplates = dao.foodTemplates()
-            exerciseTemplates = dao.exerciseTemplates()
+            foodTemplates = dao.foodTemplates().sortedWith(
+                compareByDescending<FoodTemplate> { it.lastUsedAt }.thenBy { it.name })
+            exerciseTemplates = dao.exerciseTemplates().sortedWith(
+                compareByDescending<ExerciseTemplate> { it.lastUsedAt }.thenBy { it.name })
             profile = dao.getProfile() ?: profile
         } else summary = "文件中没有可导入的数据"
         withContext(Dispatchers.Main) { onDone(summary) }

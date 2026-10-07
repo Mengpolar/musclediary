@@ -33,6 +33,8 @@ class MainActivity : ComponentActivity() {
                         Modifier.fillMaxSize().background(Ink0),
                         contentAlignment = androidx.compose.ui.Alignment.Center,
                     ) { CircularProgressIndicator(color = Accent) }
+                } else if (vm.profile.setupDone == 0) {
+                    com.eelan.musclediary.ui.SetupScreen(vm)
                 } else {
                     AppRoot(vm)
                 }
@@ -80,7 +82,7 @@ fun AppRoot(vm: AppViewModel) {
         ) {
             Column(Modifier.fillMaxSize().padding(top = 12.dp)) {
                 when (tab) {
-                    0 -> TodayScreen(vm)
+                    0 -> TodayScreen(vm, onGoWorkout = { tab = 2 })
                     1 -> DietScreen(vm)
                     2 -> WorkoutScreen(vm)
                     3 -> when (manage) {

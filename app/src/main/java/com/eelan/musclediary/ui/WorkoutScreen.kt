@@ -78,6 +78,41 @@ fun WorkoutScreen(vm: AppViewModel) {
             }
             Spacer(Modifier.height(12.dp))
             WeightCard(vm)
+            SectionTitle("消耗统计（按消耗排序）")
+            if (entries.isEmpty()) {
+                Text("当天还没有锻炼记录", fontSize = 12.sp, color = TextLo)
+            } else {
+                CardBox {
+                    val maxKcal = entries.maxOf { it.calories }.coerceAtLeast(1.0)
+                    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                        entries.sortedByDescending { it.calories }.forEach { e ->
+                            Column {
+                                Row(Modifier.fillMaxWidth()) {
+                                    Text(e.name, fontSize = 13.sp, color = TextHi)
+                                    Spacer(Modifier.weight(1f))
+                                    Text("${fmt0(e.calories)} kcal", fontSize = 13.sp, color = Accent,
+                                        fontWeight = FontWeight.Bold)
+                                }
+                                Spacer(Modifier.height(3.dp))
+                                Box(
+                                    Modifier
+                                        .fillMaxWidth()
+                                        .height(8.dp)
+                                        .background(Ink2, RoundedCornerShape(4.dp))
+                                ) {
+                                    Box(
+                                        Modifier
+                                            .fillMaxWidth((e.calories / maxKcal).toFloat())
+                                            .fillMaxHeight()
+                                            .background(Accent, RoundedCornerShape(4.dp))
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
             SectionTitle("锻炼记录（${entries.size}） · 共消耗 ${fmt0(entries.sumOf { it.calories })} kcal · 左滑可修改/删除")
             if (entries.isEmpty()) {
                 Text(
