@@ -41,7 +41,7 @@ fun TodayScreen(vm: AppViewModel, onGoWorkout: () -> Unit = {}) {
     Column(Modifier.padding(horizontal = 16.dp)) {
         DateHeader(vm, onOpenCalendar = { showCalendar = true })
         Spacer(Modifier.height(8.dp))
-        CardBox {
+        CardBox(title = "今日目标（${if (targets.isCut) "减脂期" else "增肌期"}）") {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 ProgressRing(
                     progress = if (targets.tdee > 0) (kcal / targets.tdee).toFloat() else 0f,
@@ -65,7 +65,7 @@ fun TodayScreen(vm: AppViewModel, onGoWorkout: () -> Unit = {}) {
         }
 
         Spacer(Modifier.height(12.dp))
-        CardBox {
+        CardBox(title = "今日状态") {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 // 饮水环
                 Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.weight(1f)) {

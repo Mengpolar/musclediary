@@ -163,48 +163,24 @@ private fun ActionChip(label: String, color: Color, onClick: () -> Unit) {
 
 @Composable
 private fun FoodManageRow(t: FoodTemplate, onEdit: () -> Unit, onDelete: () -> Unit) {
-    Row(
-        Modifier.fillMaxWidth()
-            .background(Ink2, RoundedCornerShape(10.dp))
-            .padding(horizontal = 12.dp, vertical = 10.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Column(Modifier.weight(1f)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(t.name, fontSize = 14.sp, color = TextHi, fontWeight = FontWeight.Medium)
-                if (t.isCustom) Tag("自定义")
-            }
-            Text("蛋白${fmt1(t.protein)} 碳水${fmt1(t.carb)} 脂肪${fmt1(t.fat)} · ${fmt0(t.kcal)} kcal",
-                fontSize = 11.sp, color = TextLo)
-        }
-        ActionChip("编辑", Accent, onEdit)
-        Spacer(Modifier.width(6.dp))
-        ActionChip("删", MaterialTheme.colorScheme.error, onDelete)
-    }
+    SwipeEntryRow(
+        title = t.name + if (t.isCustom) " · 自定义" else "",
+        detail = "蛋白${fmt1(t.protein)} 碳水${fmt1(t.carb)} 脂肪${fmt1(t.fat)} · 左滑可修改/删除",
+        trailing = "${fmt0(t.kcal)} kcal",
+        onEdit = onEdit,
+        onDelete = onDelete,
+    )
 }
 
 @Composable
 private fun ExerciseManageRow(t: ExerciseTemplate, onEdit: () -> Unit, onDelete: () -> Unit) {
-    Row(
-        Modifier.fillMaxWidth()
-            .background(Ink2, RoundedCornerShape(10.dp))
-            .padding(horizontal = 12.dp, vertical = 10.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Column(Modifier.weight(1f)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(t.name, fontSize = 14.sp, color = TextHi, fontWeight = FontWeight.Medium)
-                if (t.isCustom) Tag("自定义")
-            }
-            Text(
-                "${Calc.unitLabel(t)} · MET ${fmt1(t.met)} · 主练${Muscle.labelOf(t.primaryMuscle)}",
-                fontSize = 11.sp, color = TextLo,
-            )
-        }
-        ActionChip("编辑", Accent, onEdit)
-        Spacer(Modifier.width(6.dp))
-        ActionChip("删", MaterialTheme.colorScheme.error, onDelete)
-    }
+    SwipeEntryRow(
+        title = t.name + if (t.isCustom) " · 自定义" else "",
+        detail = "${Calc.unitLabel(t)} · MET ${fmt1(t.met)} · 主练${Muscle.labelOf(t.primaryMuscle)} · 左滑可修改/删除",
+        trailing = "MET ${fmt1(t.met)}",
+        onEdit = onEdit,
+        onDelete = onDelete,
+    )
 }
 
 @Composable

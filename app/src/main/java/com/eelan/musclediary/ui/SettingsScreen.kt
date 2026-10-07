@@ -4,6 +4,7 @@ import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -305,12 +306,13 @@ private fun SettingRow(label: String, value: String, onClick: () -> Unit) {
     ) {
         Text(label, fontSize = 14.sp, color = TextHi, modifier = Modifier.weight(1f))
         Text(value, fontSize = 14.sp, color = Accent)
-        Spacer(Modifier.width(8.dp))
-        Text("改", fontSize = 12.sp, color = TextLo,
+        Spacer(Modifier.width(10.dp))
+        Text(
+            "修改", fontSize = 11.sp, color = TextLo,
             modifier = Modifier
-                .clip(androidx.compose.foundation.shape.RoundedCornerShape(6.dp))
-                .background(Ink3)
-                .padding(horizontal = 8.dp, vertical = 4.dp))
+                .border(1.dp, Ink3, androidx.compose.foundation.shape.RoundedCornerShape(6.dp))
+                .padding(horizontal = 8.dp, vertical = 4.dp),
+        )
     }
 }
 

@@ -94,6 +94,16 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         weightEntries = weightEntries.filterNot { it.id == e.id }
     }
 
+    /** 修改体重记录；若记录的是今天，同步更新身体档案 */
+    fun updateWeight(e: WeightEntry, newKg: Double) {
+        val upd = e.copy(weightKg = newKg)
+        viewModelScope.launch(Dispatchers.IO) { dao.insertWeightEntry(upd) }
+        weightEntries = weightEntries.map { if (it.id == e.id) upd else it }
+        if (e.date == LocalDate.now().toString() && profile.weightKg != newKg) {
+            updateProfile(profile.copy(weightKg = newKg))
+        }
+    }
+
     fun waterOn(date: LocalDate): WaterEntry? =
         waterEntries.firstOrNull { it.date == date.toString() }
 

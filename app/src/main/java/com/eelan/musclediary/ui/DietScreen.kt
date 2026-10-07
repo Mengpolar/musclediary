@@ -8,6 +8,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Restaurant
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -50,7 +51,7 @@ fun DietScreen(vm: AppViewModel) {
         Column(Modifier.padding(pad).padding(horizontal = 16.dp)) {
             DateHeader(vm, onOpenCalendar = { showCalendar = true })
             Spacer(Modifier.height(8.dp))
-            CardBox {
+            CardBox(title = "当日摄入") {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Column(Modifier.weight(1f)) {
                         Text("当日摄入", fontSize = 12.sp, color = TextLo)
@@ -65,7 +66,12 @@ fun DietScreen(vm: AppViewModel) {
             }
             SectionTitle("饮食记录（${entries.size}） · 左滑可修改/删除")
             if (entries.isEmpty()) {
-                EmptyCard("还没有记录，点右下角 + 从模板快速添加")
+                EmptyState(
+                    icon = Icons.Default.Restaurant,
+                    text = "还没有记录，从内置模板快速添加",
+                    actionText = "添加饮食",
+                    onAction = { pickOpen = true },
+                )
             } else {
                 LazyColumn(
                     verticalArrangement = Arrangement.spacedBy(6.dp),
