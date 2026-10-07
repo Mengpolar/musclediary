@@ -1,5 +1,7 @@
 package com.eelan.musclediary.ui
 
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -10,6 +12,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.FitnessCenter
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -78,19 +81,28 @@ fun WorkoutScreen(vm: AppViewModel) {
             }
             Spacer(Modifier.height(12.dp))
             WeightCard(vm)
-            SectionTitle("消耗统计（按消耗排序）")
+            SectionTitle("消耗统计（按动作合并 · 降序）")
             if (entries.isEmpty()) {
                 Text("当天还没有锻炼记录", fontSize = 12.sp, color = TextLo)
             } else {
                 CardBox {
-                    val maxKcal = entries.maxOf { it.calories }.coerceAtLeast(1.0)
+                    // 同名动作合并为一条统计项，n 为该动作当天记录条数
+                    val stats = entries.groupBy { it.name }
+                        .map { (name, es) -> Triple(name, es.sumOf { it.calories }, es.size) }
+                        .sortedByDescending { it.second }
+                    val maxKcal = stats.maxOf { it.second }.coerceAtLeast(1.0)
                     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                        entries.sortedByDescending { it.calories }.forEach { e ->
+                        stats.forEach { (name, kcal, count) ->
+                            val animBar by animateFloatAsState(
+                                targetValue = (kcal / maxKcal).toFloat(),
+                                animationSpec = tween(700), label = "statBar",
+                            )
                             Column {
                                 Row(Modifier.fillMaxWidth()) {
-                                    Text(e.name, fontSize = 13.sp, color = TextHi)
+                                    Text(if (count > 1) "$name ×$count" else name,
+                                        fontSize = 13.sp, color = TextHi)
                                     Spacer(Modifier.weight(1f))
-                                    Text("${fmt0(e.calories)} kcal", fontSize = 13.sp, color = Accent,
+                                    Text("${fmt0(kcal)} kcal", fontSize = 13.sp, color = Accent,
                                         fontWeight = FontWeight.Bold)
                                 }
                                 Spacer(Modifier.height(3.dp))
@@ -102,7 +114,7 @@ fun WorkoutScreen(vm: AppViewModel) {
                                 ) {
                                     Box(
                                         Modifier
-                                            .fillMaxWidth((e.calories / maxKcal).toFloat())
+                                            .fillMaxWidth(animBar.coerceIn(0.02f, 1f))
                                             .fillMaxHeight()
                                             .background(Accent, RoundedCornerShape(4.dp))
                                     )
@@ -115,10 +127,11 @@ fun WorkoutScreen(vm: AppViewModel) {
 
             SectionTitle("锻炼记录（${entries.size}） · 共消耗 ${fmt0(entries.sumOf { it.calories })} kcal · 左滑可修改/删除")
             if (entries.isEmpty()) {
-                Text(
-                    "还没有锻炼记录，点右下角 + 开始记录", fontSize = 13.sp, color = TextLo,
-                    modifier = Modifier.fillMaxWidth()
-                        .background(Ink1, RoundedCornerShape(12.dp)).padding(14.dp),
+                EmptyState(
+                    icon = Icons.Default.FitnessCenter,
+                    text = "今天还没练，选个动作开始记录",
+                    actionText = "添加锻炼",
+                    onAction = { pickOpen = true },
                 )
             } else {
                 Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {

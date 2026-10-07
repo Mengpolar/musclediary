@@ -4,37 +4,41 @@
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
-    <!-- 暗色圆角背景 -->
+    <!-- 纯黑底 -->
     <path
-        android:fillColor="#171A20"
+        android:fillColor="#000000"
         android:pathData="M0,0h108v108h-108z" />
+    <!-- 白色哑铃轮廓：横杆 -->
     <path
-        android:fillColor="#1F232B"
-        android:pathData="M54,6a48,48 0 1,0 0.001,0z" />
-    <!-- 哑铃横杆 -->
-    <path
-        android:fillColor="#E8EAED"
-        android:pathData="M36,52.5h36v3h-36z" />
-    <!-- 左侧配重片 -->
-    <path
-        android:fillColor="#FF7A45"
-        android:pathData="M28,44h5v20h-5z M34,48h3v12h-3z" />
-    <!-- 右侧配重片 -->
-    <path
-        android:fillColor="#FF7A45"
-        android:pathData="M75,44h5v20h-5z M71,48h3v12h-3z" />
-    <!-- 外侧把手 -->
-    <path
-        android:fillColor="#FF9A6B"
-        android:pathData="M22,48h4v12h-4z M82,48h4v12h-4z" />
-    <!-- 底部弧线：象征进步曲线 -->
-    <path
-        android:strokeColor="#4FC3F7"
-        android:strokeWidth="2.5"
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="4"
         android:strokeLineCap="round"
         android:fillColor="#00000000"
-        android:pathData="M30,78 Q54,68 78,76" />
+        android:pathData="M41,54H67" />
+    <!-- 内侧配重片 -->
     <path
-        android:fillColor="#4FC3F7"
-        android:pathData="M76,72.5l6,3.2 -5.2,4.3z" />
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="4"
+        android:strokeLineCap="round"
+        android:fillColor="#00000000"
+        android:pathData="M46,47V61" />
+    <path
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="4"
+        android:strokeLineCap="round"
+        android:fillColor="#00000000"
+        android:pathData="M62,47V61" />
+    <!-- 外侧配重片 -->
+    <path
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="4"
+        android:strokeLineCap="round"
+        android:fillColor="#00000000"
+        android:pathData="M37,42V66" />
+    <path
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="4"
+        android:strokeLineCap="round"
+        android:fillColor="#00000000"
+        android:pathData="M71,42V66" />
 </vector>

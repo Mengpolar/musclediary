@@ -1,6 +1,7 @@
 package com.eelan.musclediary.ui
 
 import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
@@ -32,7 +33,7 @@ import com.eelan.musclediary.ui.theme.*
 import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
 
-/** 环形进度，点击可弹推导面板 */
+/** 环形进度（数值变化带平滑动画），点击可弹推导面板 */
 @Composable
 fun ProgressRing(
     progress: Float,
@@ -45,6 +46,11 @@ fun ProgressRing(
     onClick: () -> Unit,
 ) {
     val track = Ink3
+    val animProgress by animateFloatAsState(
+        targetValue = progress.coerceIn(0f, 1f),
+        animationSpec = tween(700),
+        label = "ringProgress",
+    )
     Box(
         modifier = Modifier
             .size(size)
@@ -59,7 +65,7 @@ fun ProgressRing(
             )
             drawArc(
                 color = color, startAngle = -90f,
-                sweepAngle = (progress.coerceIn(0f, 1f) * 360f), useCenter = false,
+                sweepAngle = animProgress * 360f, useCenter = false,
                 style = Stroke(s, cap = StrokeCap.Round),
             )
         }
@@ -92,6 +98,11 @@ fun MacroBar(
         low > 0 && value >= low -> Good                  // 满足目标所需 → 绿
         else -> TextHi
     }
+    val animFill by animateFloatAsState(
+        targetValue = (value / scaleMax).toFloat(),
+        animationSpec = tween(700),
+        label = "macroFill",
+    )
     Column(
         Modifier
             .fillMaxWidth()
@@ -126,7 +137,7 @@ fun MacroBar(
             drawRoundRect(
                 color,
                 topLeft = Offset(0f, 0f),
-                size = Size((value / scaleMax * w).toFloat().coerceAtLeast(h), h),
+                size = Size((animFill * w).toFloat().coerceAtLeast(h), h),
                 cornerRadius = r,
             )
             // 刻度：目标所需（白）/ 热量所需（主色）
@@ -145,16 +156,48 @@ fun MacroBar(
     }
 }
 
+/** 统一卡片：可选标题栏 */
 @Composable
-fun CardBox(modifier: Modifier = Modifier, content: @Composable ColumnScope.() -> Unit) {
+fun CardBox(modifier: Modifier = Modifier, title: String? = null, content: @Composable ColumnScope.() -> Unit) {
     Column(
         modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(16.dp))
             .background(Ink1)
             .padding(16.dp),
-        content = content,
-    )
+    ) {
+        if (title != null) {
+            Text(title, fontSize = 15.sp, fontWeight = FontWeight.Bold, color = TextHi)
+            Spacer(Modifier.height(8.dp))
+        }
+        content()
+    }
+}
+
+/** 统一空状态：图标 + 文案 + 可选操作按钮 */
+@Composable
+fun EmptyState(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    text: String,
+    actionText: String? = null,
+    onAction: (() -> Unit)? = null,
+) {
+    Column(
+        Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(12.dp))
+            .background(Ink1)
+            .padding(vertical = 24.dp, horizontal = 16.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Icon(icon, null, tint = Ink3, modifier = Modifier.size(34.dp))
+        Spacer(Modifier.height(10.dp))
+        Text(text, fontSize = 13.sp, color = TextLo, textAlign = TextAlign.Center)
+        if (actionText != null && onAction != null) {
+            Spacer(Modifier.height(8.dp))
+            TextButton(onClick = onAction) { Text(actionText, color = Accent, fontSize = 13.sp) }
+        }
+    }
 }
 
 fun fmt1(v: Double): String = if (v >= 100) v.toInt().toString() else String.format("%.1f", v)
@@ -194,38 +237,6 @@ fun NumberDialog(
         },
         dismissButton = { TextButton(onClick = onDismiss) { Text("取消", color = TextLo) } },
     )
-}
-
-/** 通用列表项 */
-@Composable
-fun EntryRow(
-    title: String,
-    detail: String,
-    trailing: String,
-    onDelete: () -> Unit,
-) {
-    Row(
-        Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(10.dp))
-            .background(Ink2)
-            .padding(horizontal = 12.dp, vertical = 10.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Column(Modifier.weight(1f)) {
-            Text(title, fontSize = 14.sp, color = TextHi, fontWeight = FontWeight.Medium)
-            Text(detail, fontSize = 12.sp, color = TextLo)
-        }
-        Text(trailing, fontSize = 14.sp, color = Accent, fontWeight = FontWeight.Bold,
-            textAlign = TextAlign.End)
-        Spacer(Modifier.width(8.dp))
-        Text("删", fontSize = 12.sp, color = TextLo,
-            modifier = Modifier
-                .clip(RoundedCornerShape(6.dp))
-                .background(Ink3)
-                .clickable(onClick = onDelete)
-                .padding(horizontal = 8.dp, vertical = 4.dp))
-    }
 }
 
 /** 左滑显示「修改」「删」按钮的记录卡片 */

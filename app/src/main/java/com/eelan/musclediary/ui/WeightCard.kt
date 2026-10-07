@@ -26,17 +26,17 @@ import java.time.LocalDate
 @Composable
 fun WeightCard(vm: AppViewModel) {
     var recordOpen by remember { mutableStateOf(false) }
+    var editingEntry by remember { mutableStateOf<WeightEntry?>(null) }
     val entries = vm.weightEntries.sortedBy { it.date }
     val latest = entries.lastOrNull()
 
-    CardBox {
+    CardBox(title = "体重记录") {
         Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
-                Text("体重曲线", fontSize = 15.sp, fontWeight = FontWeight.Bold, color = TextHi)
                 Text(
                     latest?.let { "最近 ${it.date.substring(5)} · ${fmt1(it.weightKg)} kg（共 ${entries.size} 条记录）" }
                         ?: "还没有记录",
-                    fontSize = 11.sp, color = TextLo,
+                    fontSize = 12.sp, color = TextLo,
                 )
             }
             Text(
@@ -52,10 +52,11 @@ fun WeightCard(vm: AppViewModel) {
             Spacer(Modifier.height(8.dp))
             Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 entries.takeLast(4).reversed().forEach { e ->
-                    EntryRow(
+                    SwipeEntryRow(
                         title = e.date,
-                        detail = "体重记录",
+                        detail = "体重记录 · 左滑可修改/删除",
                         trailing = "${fmt1(e.weightKg)} kg",
+                        onEdit = { editingEntry = e },
                         onDelete = { vm.deleteWeight(e) },
                     )
                 }
@@ -74,6 +75,13 @@ fun WeightCard(vm: AppViewModel) {
             initial = vm.profile.let { fmt1(it.weightKg) },
             onDismiss = { recordOpen = false },
             onConfirm = { vm.addWeight(it); recordOpen = false },
+        )
+    }
+    editingEntry?.let { e ->
+        NumberDialog(
+            title = "修改 ${e.date} 体重", label = "公斤", initial = fmt1(e.weightKg),
+            onDismiss = { editingEntry = null },
+            onConfirm = { vm.updateWeight(e, it); editingEntry = null },
         )
     }
 }

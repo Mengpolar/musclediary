@@ -35,7 +35,31 @@ private val Scheme = darkColorScheme(
     error = Color(0xFFEF5350),
 )
 
+private val Base = androidx.compose.material3.Typography()
+
+/** 全局数字等宽（tnum）：数值变化时宽度稳定，对齐感更强 */
+private fun withTabular(style: androidx.compose.ui.text.TextStyle) =
+    style.copy(fontFeatureSettings = "tnum")
+
+private val AppTypography = androidx.compose.material3.Typography(
+    displayLarge = withTabular(Base.displayLarge),
+    displayMedium = withTabular(Base.displayMedium),
+    displaySmall = withTabular(Base.displaySmall),
+    headlineLarge = withTabular(Base.headlineLarge),
+    headlineMedium = withTabular(Base.headlineMedium),
+    headlineSmall = withTabular(Base.headlineSmall),
+    titleLarge = withTabular(Base.titleLarge),
+    titleMedium = withTabular(Base.titleMedium),
+    titleSmall = withTabular(Base.titleSmall),
+    bodyLarge = withTabular(Base.bodyLarge),
+    bodyMedium = withTabular(Base.bodyMedium),
+    bodySmall = withTabular(Base.bodySmall),
+    labelLarge = withTabular(Base.labelLarge),
+    labelMedium = withTabular(Base.labelMedium),
+    labelSmall = withTabular(Base.labelSmall),
+)
+
 @Composable
 fun MuscleDiaryTheme(content: @Composable () -> Unit) {
-    MaterialTheme(colorScheme = Scheme, content = content)
+    MaterialTheme(colorScheme = Scheme, typography = AppTypography, content = content)
 }
