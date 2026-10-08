@@ -48,6 +48,7 @@ fun WorkoutSessionScreen(
     var said80 by remember { mutableStateOf(false) }
     var countedDownTo by remember { mutableIntStateOf(Int.MAX_VALUE) }
     var lastTick by remember { mutableIntStateOf(Int.MAX_VALUE) }
+    var countdownPending by remember { mutableStateOf(false) }
 
     // 屏幕常亮
     DisposableEffect(Unit) {
@@ -68,16 +69,19 @@ fun WorkoutSessionScreen(
         countedDownTo = Int.MAX_VALUE
         when (s.kind) {
             WorkoutStep.Kind.READY -> {
-                // 「第一组第一个动作：仰卧起坐」/「20个/45秒」→ 3,2,1 由秒循环播报
+                // 「第N组·第M个动作」+动作名+数量 → 3,2,1 全部进同一语音队列，
+                // 播放器按序连播；播到「3」时屏幕倒计时同步重置为 3 秒。
                 voice.speak("di", "n_${s.setIndex + 1}", "set_word",
                     "n_${s.actionIndex + 1}", "ge_word")
                 voice.speakText(s.item?.name ?: "")
                 val qty = when (s.item?.qtyType) {
                     "REPS" -> listOf("n_${fmtQtyCn(s.reps)}", "rep_word")
-                    "DISTANCE" -> listOf("hai_you", "n_${fmtQtyCn(s.reps)}", "km_word")
+                    "DISTANCE" -> listOf("n_${fmtQtyCn(s.reps)}", "km_word")
                     else -> listOf("n_${fmtQtyCn(s.reps)}", "sec_word")
                 }
                 voice.speak(*qty.toTypedArray())
+                voice.speak("n_3", "n_2", "n_1")
+                countdownPending = true
             }
             WorkoutStep.Kind.WORK -> {
                 // 进入训练倒计时前的一声提示
@@ -103,11 +107,17 @@ fun WorkoutSessionScreen(
                 val total = s.durationSec.toFloat()
                 when (s.kind) {
                     WorkoutStep.Kind.READY -> {
-                        // 3,2,1 倒数（READY 4 秒：第 1 秒播报占用，后 3 秒报 3,2,1，归零叮）
-                        val n = remainSec.toInt()
-                        if (n in 1..3 && n < countedDownTo) {
-                            countedDownTo = n
-                            voice.speak("n_$n")
+                        // 屏幕倒计时跟随语音：听到「3」才开始倒数 3 秒
+                        if (countdownPending && !voice.isSpeaking()) {
+                            countdownPending = false
+                            remainSec = WorkoutSession.READY_COUNTDOWN_SEC.toFloat()
+                            countedDownTo = Int.MAX_VALUE
+                        }
+                        if (!countdownPending) {
+                            val n = remainSec.toInt()
+                            if (n in 1..2 && n < countedDownTo) {
+                                countedDownTo = n
+                            }
                         }
                     }
                     WorkoutStep.Kind.WORK -> {
