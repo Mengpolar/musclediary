@@ -164,8 +164,10 @@ fun WorkoutScreen(vm: AppViewModel) {
     }
 
     pendingTemplate?.let { t ->
+        val last = vm.lastExerciseQty(t)
         WorkoutQtyDialog(
             template = t, bodyWeight = vm.profile.weightKg,
+            lastQty = last?.first, lastWeight = last?.second,
             onDismiss = { pendingTemplate = null },
             onConfirm = { qty, weight ->
                 vm.addExercise(t, qty, weight, vm.selectedDate)
@@ -263,12 +265,17 @@ private fun ExercisePickerDialog(
 private fun WorkoutQtyDialog(
     template: ExerciseTemplate,
     bodyWeight: Double,
+    lastQty: Double?,
+    lastWeight: Double?,
     onDismiss: () -> Unit,
     onConfirm: (Double, Double) -> Unit,
 ) {
     val unitLabel = Calc.unitLabel(template)
-    var qty by remember { mutableStateOf("") }
-    var weight by remember { mutableStateOf(if (template.name.contains("哑铃")) "10" else "") }
+    var qty by remember { mutableStateOf(lastQty?.let { fmt1(it) } ?: "") }
+    var weight by remember {
+        mutableStateOf(lastWeight?.takeIf { it > 0 }?.let { fmt1(it) }
+            ?: if (template.name.contains("哑铃")) "10" else "")
+    }
     val q = qty.toDoubleOrNull()
     val valid = q != null && q > 0
     val preview = if (q != null) Calc.exerciseCalories(template, q, bodyWeight) else null

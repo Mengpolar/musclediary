@@ -53,6 +53,14 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 profile = profile.copy(seedVersion = FoodSeed.version)
                 dao.upsertProfile(profile)
             }
+            // 旧内置模板没有标签：按名称补上
+            val tagByName = FoodSeed.items.associate { it.name to it.tag }
+            dao.foodTemplates().filter { !it.isCustom && it.tag.isEmpty() }
+                .forEach { old ->
+                    tagByName[old.name]?.takeIf { it.isNotEmpty() }?.let { tag ->
+                        dao.upsertFoodTemplate(old.copy(tag = tag))
+                    }
+                }
             foodTemplates = dao.foodTemplates().sortedWith(
                 compareByDescending<FoodTemplate> { it.lastUsedAt }.thenBy { it.name })
             exerciseTemplates = dao.exerciseTemplates().sortedWith(
@@ -195,9 +203,9 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             .sortedWith(compareByDescending<ExerciseTemplate> { it.lastUsedAt }.thenBy { it.name })
     }
 
-    fun addCustomFood(name: String, protein: Double, carb: Double, fat: Double, onReady: (FoodTemplate) -> Unit) {
+    fun addCustomFood(name: String, protein: Double, carb: Double, fat: Double, tag: String = "", onReady: (FoodTemplate) -> Unit = {}) {
         viewModelScope.launch(Dispatchers.IO) {
-            val t = FoodTemplate(name = name, protein = protein, carb = carb, fat = fat, isCustom = true)
+            val t = FoodTemplate(name = name, protein = protein, carb = carb, fat = fat, tag = tag, isCustom = true)
             val id = dao.insertFoodTemplate(t)
             val saved = t.copy(id = id)
             withContext(Dispatchers.Main) {
@@ -211,6 +219,16 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch(Dispatchers.IO) { dao.deleteFoodEntry(e) }
         foodEntries = foodEntries.filterNot { it.id == e.id }
     }
+
+    /** 某食物最近一次记录的克数（用于预填输入框） */
+    fun lastFoodGrams(template: FoodTemplate): Double? =
+        foodEntries.filter { it.name == template.name }
+            .maxByOrNull { it.createdAt }?.grams
+
+    /** 某动作最近一次记录的数量与重量（用于预填输入框） */
+    fun lastExerciseQty(template: ExerciseTemplate): Pair<Double, Double>? =
+        exerciseEntries.filter { it.templateId == template.id || it.name == template.name }
+            .maxByOrNull { it.createdAt }?.let { it.qty to it.weightKg }
 
     fun saveFoodTemplate(t: FoodTemplate) {
         viewModelScope.launch(Dispatchers.IO) { dao.upsertFoodTemplate(t) }

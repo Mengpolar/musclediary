@@ -96,11 +96,11 @@ fun ManageTemplatesScreen(vm: AppViewModel, kind: Int, onClose: () -> Unit) {
         CustomFoodDialog(
             initial = editFood,
             onDismiss = { editFood = null; addFood = false },
-            onConfirm = { name, p, c, f ->
+            onConfirm = { name, p, c, f, tag ->
                 if (editFood != null) {
-                    vm.saveFoodTemplate(editFood!!.copy(name = name, protein = p, carb = c, fat = f))
+                    vm.saveFoodTemplate(editFood!!.copy(name = name, protein = p, carb = c, fat = f, tag = tag))
                 } else {
-                    vm.addCustomFood(name, p, c, f) { }
+                    vm.addCustomFood(name, p, c, f, tag) { }
                 }
                 editFood = null; addFood = false
             },
