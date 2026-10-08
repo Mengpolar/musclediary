@@ -203,6 +203,13 @@ class VoicePlayer private constructor(private val context: Context) {
         }
     }
 
+    /** 停止当前队列（离开训练页时调用）；保留 SoundPool/TTS 供下次复用 */
+    fun stopQueue() {
+        queue.clear()
+        speaking = false
+        runCatching { tts?.stop() }
+    }
+
     fun release() {
         soundPool?.release()
         soundPool = null
