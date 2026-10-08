@@ -43,7 +43,7 @@ fun WorkoutSessionScreen(
     var stepIdx by remember { mutableIntStateOf(0) }
     var remainSec by remember { mutableFloatStateOf(steps.firstOrNull()?.durationSec?.toFloat() ?: 1f) }
     var paused by remember { mutableStateOf(false) }
-    var running by remember { mutableStateOf(true) }
+    var running by remember { mutableStateOf(items.isNotEmpty() && steps.isNotEmpty()) }
     // 已播报标记：当前步骤的 80% 提示 / 倒数播到哪
     var said80 by remember { mutableStateOf(false) }
     var countedDownTo by remember { mutableIntStateOf(Int.MAX_VALUE) }
@@ -90,7 +90,7 @@ fun WorkoutSessionScreen(
         while (running && stepIdx < steps.size) {
             delay(100)
             val now = System.currentTimeMillis()
-            if (!paused) {
+            if (!paused && stepIdx < steps.size) {
                 remainSec -= (now - last) / 1000f
                 val s = steps[stepIdx]
                 val total = s.durationSec.toFloat()
@@ -138,14 +138,12 @@ fun WorkoutSessionScreen(
                         // 汇总写库
                         val summary = items.map { it2 ->
                             val kcal = WorkoutSession.setCalories(it2, vm.profile.weightKg) * it2.sets
-                            val totalQty = if (it2.qtyType == "SECONDS") it2.reps * it2.sets
-                                else if (it2.qtyType == "REPS") it2.reps * it2.sets
-                                else it2.reps * it2.sets
+                            val totalQty = it2.reps * it2.sets
                             Triple(it2.name, totalQty, kcal)
                         }
                         onFinished(summary)
                         return@LaunchedEffect
-                    } else {
+                    } else if (stepIdx + 1 < steps.size) {
                         if (steps[stepIdx].kind == WorkoutStep.Kind.REST) voice.speak("rest_over")
                         stepIdx += 1
                         remainSec = steps[stepIdx].durationSec.toFloat()
