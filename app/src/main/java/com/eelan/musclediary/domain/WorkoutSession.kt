@@ -10,30 +10,38 @@ data class WorkoutStep(
     val kind: Kind,
     val item: PlanItem?,     // 动作步骤所属编排
     val setIndex: Int,       // 第几组（0 起）
-    val durationSec: Int,    // 动作组：每组时长（REPS 换算为秒用于进度）；休息：秒
+    val actionIndex: Int,    // 本组是队列里第几个动作（0 起，用于「第N个动作」播报）
+    val durationSec: Int,    // 动作组：每组时长（REPS 换算为秒用于进度）；休息/准备：秒
     val reps: Double,        // 动作组：每组数量（REPS 个数 / DISTANCE 公里 / SECONDS 秒）
 ) {
-    enum class Kind { WORK, REST, DONE }
+    enum class Kind { READY, WORK, REST, DONE }
 }
 
 object WorkoutSession {
 
-    /** 展开步骤队列 */
+// 每组开始前的准备播报时长（秒）
+private const val READY_SEC = 4
+
+    /** 展开步骤队列：每个动作组前插入 READY 准备阶段 */
     fun buildSteps(items: List<PlanItem>): List<WorkoutStep> {
         val steps = mutableListOf<WorkoutStep>()
-        items.forEach { item ->
+        items.forEachIndexed { itemIdx, item ->
             repeat(item.sets) { s ->
                 steps += WorkoutStep(
+                    kind = WorkoutStep.Kind.READY, item = item, setIndex = s,
+                    actionIndex = itemIdx, durationSec = READY_SEC, reps = item.reps,
+                )
+                steps += WorkoutStep(
                     kind = WorkoutStep.Kind.WORK, item = item, setIndex = s,
-                    durationSec = setSeconds(item).toInt().coerceAtLeast(1),
+                    actionIndex = itemIdx, durationSec = setSeconds(item).toInt().coerceAtLeast(1),
                     reps = item.reps,
                 )
                 val isLastOfItem = s == item.sets - 1
-                val isLastOverall = item === items.last()
+                val isLastOverall = itemIdx == items.lastIndex
                 if (!isLastOfItem || !isLastOverall) {
                     steps += WorkoutStep(
                         kind = WorkoutStep.Kind.REST, item = item, setIndex = s,
-                        durationSec = item.restSec.coerceAtLeast(5),
+                        actionIndex = itemIdx, durationSec = item.restSec.coerceAtLeast(5),
                         reps = 0.0,
                     )
                 }
@@ -61,7 +69,7 @@ object WorkoutSession {
     fun totalSeconds(items: List<PlanItem>): Double =
         items.sumOf { setSeconds(it) * it.sets + it.restSec * (it.sets - 1).coerceAtLeast(0) }
 
-    /** 完成某步骤后累计消耗（kcal） */
+    /** 完成某步骤后累计消耗（kcal）：READY/REST 不计消耗 */
     fun caloriesUpTo(steps: List<WorkoutStep>, index: Int, bodyWeight: Double): Double {
         var sum = 0.0
         for (i in 0..index.coerceAtMost(steps.lastIndex)) {
