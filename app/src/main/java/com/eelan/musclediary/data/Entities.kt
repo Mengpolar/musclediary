@@ -16,6 +16,7 @@ data class Profile(
     val exerciseGoalKcal: Double = 300.0,
     val setupDone: Int = 0, // 0 未完成首次引导
     val waterReminder: Int = 1, // 0 关 / 1 开（需系统通知权限）
+    val voiceId: String = "default", // 训练语音音色
 )
 
 /** 每日体重记录（每天最多一条，不必天天记） */
@@ -80,6 +81,34 @@ data class ExerciseTemplate(
     val secondaryMuscles: String = "",// 逗号分隔的 Muscle.id
     val isCustom: Boolean = false,
     val lastUsedAt: Long = 0,
+    val voiceKey: String = "",        // 训练模式动作名语音 key（如 ex_pushup），空则用提示音
+)
+
+/** 训练计划：编排好的动作队列，JSON 存储明细 */
+@Entity(tableName = "workout_plans")
+data class WorkoutPlan(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val name: String,
+    val itemsJson: String, // [{templateId,name,qtyType,sets,reps,weightKg,restSec,voiceKey,met,perRepSeconds,paceMinPerKm,primaryMuscle,secondaryMuscles}]
+    val lastUsedAt: Long = 0,
+    val createdAt: Long = System.currentTimeMillis(),
+)
+
+/** 计划中的单个动作编排 */
+data class PlanItem(
+    val templateId: Long,
+    val name: String,
+    val qtyType: String,      // REPS / DISTANCE / SECONDS
+    val sets: Int,            // 组数
+    val reps: Double,         // 每组数量（个/公里/秒）
+    val weightKg: Double = 0.0,
+    val restSec: Int = 60,    // 组间休息
+    val voiceKey: String = "",
+    val met: Double,
+    val perRepSeconds: Double = 0.0,
+    val paceMinPerKm: Double = 0.0,
+    val primaryMuscle: String,
+    val secondaryMuscles: String = "",
 )
 
 @Entity(tableName = "exercise_entries")
@@ -208,12 +237,22 @@ interface AppDao {
 
     @Update
     suspend fun updateExerciseEntry(e: ExerciseEntry)
+
+    @Query("SELECT * FROM workout_plans ORDER BY lastUsedAt DESC, createdAt DESC")
+    suspend fun allPlans(): List<WorkoutPlan>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun upsertPlan(p: WorkoutPlan): Long
+
+    @Delete
+    suspend fun deletePlan(p: WorkoutPlan)
 }
 
 @Database(
     entities = [Profile::class, FoodTemplate::class, FoodEntry::class,
-        ExerciseTemplate::class, ExerciseEntry::class, WeightEntry::class, WaterEntry::class],
-    version = 5,
+        ExerciseTemplate::class, ExerciseEntry::class, WeightEntry::class, WaterEntry::class,
+        WorkoutPlan::class],
+    version = 6,
     exportSchema = false,
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -260,11 +299,24 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        val MIGRATION_5_6 = object : androidx.room.migration.Migration(5, 6) {
+            override fun migrate(db: androidx.sqlite.db.SupportSQLiteDatabase) {
+                db.execSQL(
+                    "CREATE TABLE IF NOT EXISTS `workout_plans` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, " +
+                            "`name` TEXT NOT NULL, `itemsJson` TEXT NOT NULL, " +
+                            "`lastUsedAt` INTEGER NOT NULL DEFAULT 0, `createdAt` INTEGER NOT NULL)"
+                )
+                db.execSQL("ALTER TABLE `exercise_templates` ADD COLUMN `voiceKey` TEXT NOT NULL DEFAULT ''")
+                db.execSQL("ALTER TABLE `profile` ADD COLUMN `voiceId` TEXT NOT NULL DEFAULT 'default'")
+            }
+        }
+
         fun get(ctx: Context): AppDatabase =
             inst ?: synchronized(this) {
                 inst ?: Room.databaseBuilder(
                     ctx.applicationContext, AppDatabase::class.java, "musclediary.db"
-                ).addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5).build().also { inst = it }
+                ).addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6)
+                    .build().also { inst = it }
             }
     }
 }

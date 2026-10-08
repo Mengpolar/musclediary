@@ -13,6 +13,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.FitnessCenter
+import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -37,6 +38,9 @@ fun WorkoutScreen(vm: AppViewModel) {
     var customOpen by remember { mutableStateOf(false) }
     var editingEntry by remember { mutableStateOf<com.eelan.musclediary.data.ExerciseEntry?>(null) }
     var showCalendar by remember { mutableStateOf(false) }
+    var builderOpen by remember { mutableStateOf(false) }
+    var sessionOpen by remember { mutableStateOf(false) }
+    var sessionItems by remember { mutableStateOf<List<com.eelan.musclediary.data.PlanItem>>(emptyList()) }
 
     val date = vm.selectedDate
     val entries = vm.exerciseOn(date).sortedBy { it.createdAt }
@@ -67,6 +71,17 @@ fun WorkoutScreen(vm: AppViewModel) {
         ) {
             DateHeader(vm, onOpenCalendar = { showCalendar = true })
             Spacer(Modifier.height(8.dp))
+            // 开始训练入口
+            Button(
+                onClick = { builderOpen = true },
+                colors = ButtonDefaults.buttonColors(containerColor = Accent, contentColor = Ink0),
+                modifier = Modifier.fillMaxWidth().height(48.dp),
+            ) {
+                Icon(Icons.Default.PlayArrow, null)
+                Spacer(Modifier.width(6.dp))
+                Text("开始训练（编排动作组 · 语音陪练）", fontWeight = FontWeight.Bold, fontSize = 14.sp)
+            }
+            Spacer(Modifier.height(12.dp))
             CardBox {
                 Text("肌肉概览", fontSize = 15.sp, fontWeight = FontWeight.Bold, color = TextHi)
                 Spacer(Modifier.height(4.dp))
@@ -152,6 +167,46 @@ fun WorkoutScreen(vm: AppViewModel) {
 
     if (showCalendar) {
         CalendarSheet(vm, onDismiss = { showCalendar = false })
+    }
+
+    if (builderOpen) {
+        WorkoutBuilderScreen(
+            vm = vm,
+            initialItems = emptyList(),
+            onDismiss = { builderOpen = false },
+            onStart = { planItems ->
+                builderOpen = false
+                sessionItems = planItems
+                sessionOpen = true
+            },
+        )
+    }
+
+    if (sessionOpen) {
+        WorkoutSessionScreen(
+            vm = vm,
+            items = sessionItems,
+            onFinished = { summary ->
+                // 每个动作一条记录写入当天
+                summary.forEach { (name, totalQty, kcal) ->
+                    val t = vm.exerciseTemplates.firstOrNull { it.name == name }
+                    if (t != null) {
+                        val per = if (t.qtyType == com.eelan.musclediary.data.QtyType.REPS) 1.0 else 1.0
+                        val minutes = when (t.qtyType) {
+                            com.eelan.musclediary.data.QtyType.REPS ->
+                                totalQty * t.perRepSeconds / 60.0
+                            com.eelan.musclediary.data.QtyType.DISTANCE ->
+                                totalQty * t.paceMinPerKm
+                            com.eelan.musclediary.data.QtyType.SECONDS ->
+                                totalQty / 60.0
+                        }
+                        vm.addWorkoutResult(t, totalQty, kcal, minutes, vm.selectedDate)
+                    }
+                }
+                sessionOpen = false
+            },
+            onQuit = { sessionOpen = false },
+        )
     }
 
     if (pickOpen) {

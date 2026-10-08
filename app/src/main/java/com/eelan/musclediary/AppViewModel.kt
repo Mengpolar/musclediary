@@ -38,6 +38,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         private set
     var waterEntries by mutableStateOf<List<WaterEntry>>(emptyList())
         private set
+    var workoutPlans by mutableStateOf<List<WorkoutPlan>>(emptyList())
+        private set
 
     init {
         viewModelScope.launch(Dispatchers.IO) {
@@ -69,6 +71,15 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             exerciseEntries = dao.allExerciseEntries()
             weightEntries = dao.allWeightEntries()
             waterEntries = dao.allWaterEntries()
+            workoutPlans = dao.allPlans()
+            // 补齐旧内置动作的语音 key
+            val vkByName = ExerciseSeed.items.associate { it.name to it.voiceKey }
+            dao.exerciseTemplates().filter { !it.isCustom && it.voiceKey.isEmpty() }
+                .forEach { old ->
+                    vkByName[old.name]?.takeIf { it.isNotEmpty() }?.let { vk ->
+                        dao.upsertExerciseTemplate(old.copy(voiceKey = vk))
+                    }
+                }
             withContext(Dispatchers.Main) { loaded = true }
         }
     }
@@ -101,6 +112,77 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch(Dispatchers.IO) { dao.deleteWeightEntry(e) }
         weightEntries = weightEntries.filterNot { it.id == e.id }
     }
+
+    /** 训练模式完成：直接按预计算的热量/时长写入一条锻炼记录 */
+    fun addWorkoutResult(t: ExerciseTemplate, totalQty: Double, kcal: Double, minutes: Double, date: LocalDate) {
+        val perSetScores = Calc.muscleScores(t, totalQty, 0.0)
+        val json = org.json.JSONObject().apply { perSetScores.forEach { (k, v) -> put(k, v) } }.toString()
+        val e = ExerciseEntry(
+            date = date.toString(), templateId = t.id, name = t.name,
+            qty = totalQty, weightKg = 0.0, calories = kcal, minutes = minutes, musclesJson = json,
+        )
+        bumpExerciseUsage(t)
+        viewModelScope.launch(Dispatchers.IO) {
+            val id = dao.insertExerciseEntry(e)
+            withContext(Dispatchers.Main) { exerciseEntries = exerciseEntries + e.copy(id = id) }
+        }
+    }
+
+    /** 保存训练计划 */
+    fun savePlan(name: String, items: List<PlanItem>, onDone: () -> Unit = {}) {
+        viewModelScope.launch(Dispatchers.IO) {
+            val arr = org.json.JSONArray()
+            items.forEach { i ->
+                arr.put(org.json.JSONObject().apply {
+                    put("templateId", i.templateId); put("name", i.name)
+                    put("qtyType", i.qtyType); put("sets", i.sets); put("reps", i.reps)
+                    put("weightKg", i.weightKg); put("restSec", i.restSec)
+                    put("voiceKey", i.voiceKey); put("met", i.met)
+                    put("perRepSeconds", i.perRepSeconds); put("paceMinPerKm", i.paceMinPerKm)
+                    put("primaryMuscle", i.primaryMuscle); put("secondaryMuscles", i.secondaryMuscles)
+                })
+            }
+            dao.upsertPlan(WorkoutPlan(name = name, itemsJson = arr.toString(), lastUsedAt = System.currentTimeMillis()))
+            workoutPlans = dao.allPlans()
+            withContext(Dispatchers.Main) { onDone() }
+        }
+    }
+
+    fun parsePlanItems(p: WorkoutPlan): List<PlanItem> = runCatching {
+        val arr = org.json.JSONArray(p.itemsJson)
+        (0 until arr.length()).map {
+            val o = arr.getJSONObject(it)
+            PlanItem(
+                templateId = o.optLong("templateId"), name = o.getString("name"),
+                qtyType = o.getString("qtyType"), sets = o.getInt("sets"), reps = o.getDouble("reps"),
+                weightKg = o.optDouble("weightKg", 0.0), restSec = o.optInt("restSec", 60),
+                voiceKey = o.optString("voiceKey"), met = o.getDouble("met"),
+                perRepSeconds = o.optDouble("perRepSeconds", 0.0),
+                paceMinPerKm = o.optDouble("paceMinPerKm", 0.0),
+                primaryMuscle = o.getString("primaryMuscle"),
+                secondaryMuscles = o.optString("secondaryMuscles"),
+            )
+        }
+    }.getOrDefault(emptyList())
+
+    fun touchPlan(p: WorkoutPlan) {
+        viewModelScope.launch(Dispatchers.IO) {
+            dao.upsertPlan(p.copy(lastUsedAt = System.currentTimeMillis()))
+            workoutPlans = dao.allPlans()
+        }
+    }
+
+    fun deletePlan(p: WorkoutPlan) {
+        viewModelScope.launch(Dispatchers.IO) {
+            dao.deletePlan(p)
+            workoutPlans = dao.allPlans()
+        }
+    }
+
+    /** 计划列表：超过 5 个时按最近使用排序展示 */
+    fun sortedPlans(): List<WorkoutPlan> =
+        if (workoutPlans.size <= 5) workoutPlans
+        else workoutPlans.sortedByDescending { it.lastUsedAt }
 
     /** 修改体重记录；若记录的是今天，同步更新身体档案 */
     fun updateWeight(e: WeightEntry, newKg: Double) {
