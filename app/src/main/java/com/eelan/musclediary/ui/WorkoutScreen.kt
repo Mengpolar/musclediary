@@ -73,7 +73,15 @@ fun WorkoutScreen(vm: AppViewModel) {
             Spacer(Modifier.height(8.dp))
             // 开始训练入口
             Button(
-                onClick = { builderOpen = true },
+                onClick = {
+                    runCatching { builderOpen = true }
+                        .onFailure {
+                            android.widget.Toast.makeText(
+                                vm.getApplication(), "打开失败: ${it.message}",
+                                android.widget.Toast.LENGTH_LONG,
+                            ).show()
+                        }
+                },
                 colors = ButtonDefaults.buttonColors(containerColor = Accent, contentColor = Ink0),
                 modifier = Modifier.fillMaxWidth().height(48.dp),
             ) {

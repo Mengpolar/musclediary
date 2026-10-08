@@ -51,7 +51,8 @@ fun WorkoutBuilderScreen(
     val totalMin = WorkoutSession.totalSeconds(items) / 60.0
 
     Column(
-        Modifier.fillMaxSize().padding(horizontal = 16.dp).verticalScroll(rememberScrollState())
+        Modifier.fillMaxSize().background(Ink0)
+            .padding(horizontal = 16.dp).verticalScroll(rememberScrollState())
     ) {
         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
             Text("编排训练", fontSize = 20.sp, fontWeight = FontWeight.Bold, color = TextHi,
