@@ -30,17 +30,62 @@ import com.eelan.musclediary.domain.Muscle
 import com.eelan.musclediary.ui.theme.*
 import org.json.JSONObject
 
+/** 编排页全屏覆盖层：由 MainActivity 以 Box 覆盖方式挂载（修复被父 Column 顶出屏幕的 bug） */
+@Composable
+fun WorkoutBuilderOverlay(
+    vm: AppViewModel,
+    onDismiss: () -> Unit,
+    onStart: (List<com.eelan.musclediary.data.PlanItem>) -> Unit,
+) {
+    Box(Modifier.fillMaxSize().background(Ink0)) {
+        WorkoutBuilderScreen(
+            vm = vm,
+            initialItems = emptyList(),
+            onDismiss = onDismiss,
+            onStart = onStart,
+        )
+    }
+}
+
+/** 训练进行中全屏覆盖层 */
+@Composable
+fun WorkoutSessionOverlay(
+    vm: AppViewModel,
+    items: List<com.eelan.musclediary.data.PlanItem>,
+    onFinished: () -> Unit,
+    onQuit: () -> Unit,
+) {
+    Box(Modifier.fillMaxSize().background(Ink0)) {
+        WorkoutSessionScreen(
+            vm = vm,
+            items = items,
+            onFinished = { summary ->
+                summary.forEach { (name, totalQty, kcal) ->
+                    val t = vm.exerciseTemplates.firstOrNull { it.name == name }
+                    if (t != null) {
+                        val minutes = when (t.qtyType) {
+                            QtyType.REPS -> totalQty * t.perRepSeconds / 60.0
+                            QtyType.DISTANCE -> totalQty * t.paceMinPerKm
+                            QtyType.SECONDS -> totalQty / 60.0
+                        }
+                        vm.addWorkoutResult(t, totalQty, kcal, minutes, vm.selectedDate)
+                    }
+                }
+                onFinished()
+            },
+            onQuit = onQuit,
+        )
+    }
+}
+
 /** 锻炼页：肌肉概览图 + 当日记录 + 模板快速添加 */
 @Composable
-fun WorkoutScreen(vm: AppViewModel) {
+fun WorkoutScreen(vm: AppViewModel, onStartTraining: () -> Unit = {}) {
     var pickOpen by remember { mutableStateOf(false) }
     var pendingTemplate by remember { mutableStateOf<ExerciseTemplate?>(null) }
     var customOpen by remember { mutableStateOf(false) }
     var editingEntry by remember { mutableStateOf<com.eelan.musclediary.data.ExerciseEntry?>(null) }
     var showCalendar by remember { mutableStateOf(false) }
-    var builderOpen by remember { mutableStateOf(false) }
-    var sessionOpen by remember { mutableStateOf(false) }
-    var sessionItems by remember { mutableStateOf<List<com.eelan.musclediary.data.PlanItem>>(emptyList()) }
 
     val date = vm.selectedDate
     val entries = vm.exerciseOn(date).sortedBy { it.createdAt }
@@ -73,15 +118,7 @@ fun WorkoutScreen(vm: AppViewModel) {
             Spacer(Modifier.height(8.dp))
             // 开始训练入口
             Button(
-                onClick = {
-                    runCatching { builderOpen = true }
-                        .onFailure {
-                            android.widget.Toast.makeText(
-                                vm.getApplication(), "打开失败: ${it.message}",
-                                android.widget.Toast.LENGTH_LONG,
-                            ).show()
-                        }
-                },
+                onClick = onStartTraining,
                 colors = ButtonDefaults.buttonColors(containerColor = Accent, contentColor = Ink0),
                 modifier = Modifier.fillMaxWidth().height(48.dp),
             ) {
@@ -175,46 +212,6 @@ fun WorkoutScreen(vm: AppViewModel) {
 
     if (showCalendar) {
         CalendarSheet(vm, onDismiss = { showCalendar = false })
-    }
-
-    if (builderOpen) {
-        WorkoutBuilderScreen(
-            vm = vm,
-            initialItems = emptyList(),
-            onDismiss = { builderOpen = false },
-            onStart = { planItems ->
-                builderOpen = false
-                sessionItems = planItems
-                sessionOpen = true
-            },
-        )
-    }
-
-    if (sessionOpen) {
-        WorkoutSessionScreen(
-            vm = vm,
-            items = sessionItems,
-            onFinished = { summary ->
-                // 每个动作一条记录写入当天
-                summary.forEach { (name, totalQty, kcal) ->
-                    val t = vm.exerciseTemplates.firstOrNull { it.name == name }
-                    if (t != null) {
-                        val per = if (t.qtyType == com.eelan.musclediary.data.QtyType.REPS) 1.0 else 1.0
-                        val minutes = when (t.qtyType) {
-                            com.eelan.musclediary.data.QtyType.REPS ->
-                                totalQty * t.perRepSeconds / 60.0
-                            com.eelan.musclediary.data.QtyType.DISTANCE ->
-                                totalQty * t.paceMinPerKm
-                            com.eelan.musclediary.data.QtyType.SECONDS ->
-                                totalQty / 60.0
-                        }
-                        vm.addWorkoutResult(t, totalQty, kcal, minutes, vm.selectedDate)
-                    }
-                }
-                sessionOpen = false
-            },
-            onQuit = { sessionOpen = false },
-        )
     }
 
     if (pickOpen) {
