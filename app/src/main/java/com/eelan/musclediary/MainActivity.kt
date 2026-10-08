@@ -73,6 +73,10 @@ private data class Tab(val label: String, val icon: ImageVector)
 fun AppRoot(vm: AppViewModel) {
     var tab by remember { mutableIntStateOf(0) }
     var manage by remember { mutableIntStateOf(-1) } // -1 无；0 食物模板管理；1 锻炼模板管理
+    var builderOrSession by remember { mutableIntStateOf(0) } // 0 无；1 编排页；2 训练进行中
+    var sessionItems by remember {
+        mutableStateOf<List<com.eelan.musclediary.data.PlanItem>>(emptyList())
+    }
     val tabs = listOf(
         Tab("今日", Icons.Default.Home),
         Tab("饮食", Icons.Default.Restaurant),
@@ -104,21 +108,43 @@ fun AppRoot(vm: AppViewModel) {
                 .fillMaxSize()
                 .background(Ink0)
         ) {
-            Column(Modifier.fillMaxSize().padding(top = 12.dp)) {
-                when (tab) {
-                    0 -> TodayScreen(vm, onGoWorkout = { tab = 2 })
-                    1 -> DietScreen(vm)
-                    2 -> WorkoutScreen(vm)
-                    3 -> when (manage) {
-                        0 -> ManageTemplatesScreen(vm, 0, onClose = { manage = -1 })
-                        1 -> ManageTemplatesScreen(vm, 1, onClose = { manage = -1 })
-                        else -> SettingsScreen(
+            // 训练模式为全屏覆盖层：编排/进行中时盖住底部导航和页面内容
+            if (builderOrSession == 0) {
+                Column(Modifier.fillMaxSize().padding(top = 12.dp)) {
+                    when (tab) {
+                        0 -> TodayScreen(vm, onGoWorkout = { tab = 2 })
+                        1 -> DietScreen(vm)
+                        2 -> WorkoutScreen(
                             vm,
-                            onManageFood = { manage = 0 },
-                            onManageExercise = { manage = 1 },
+                            onStartTraining = { builderOrSession = 1 },
                         )
+                        3 -> when (manage) {
+                            0 -> ManageTemplatesScreen(vm, 0, onClose = { manage = -1 })
+                            1 -> ManageTemplatesScreen(vm, 1, onClose = { manage = -1 })
+                            else -> SettingsScreen(
+                                vm,
+                                onManageFood = { manage = 0 },
+                                onManageExercise = { manage = 1 },
+                            )
+                        }
                     }
                 }
+            } else if (builderOrSession == 1) {
+                WorkoutBuilderOverlay(
+                    vm = vm,
+                    onDismiss = { builderOrSession = 0 },
+                    onStart = { planItems ->
+                        sessionItems = planItems
+                        builderOrSession = 2
+                    },
+                )
+            } else {
+                WorkoutSessionOverlay(
+                    vm = vm,
+                    items = sessionItems,
+                    onFinished = { builderOrSession = 0 },
+                    onQuit = { builderOrSession = 0 },
+                )
             }
         }
     }
