@@ -15,3 +15,5 @@ keystore.properties
 /*.apk
 需求.md
 语音文件准备指南.md
+
+assets/voices/
