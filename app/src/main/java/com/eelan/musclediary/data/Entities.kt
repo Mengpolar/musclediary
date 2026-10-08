@@ -15,6 +15,7 @@ data class Profile(
     val mode: Int = 0, // 0 增肌期 / 1 减脂期
     val exerciseGoalKcal: Double = 300.0,
     val setupDone: Int = 0, // 0 未完成首次引导
+    val waterReminder: Int = 1, // 0 关 / 1 开（需系统通知权限）
 )
 
 /** 每日体重记录（每天最多一条，不必天天记） */
@@ -45,6 +46,7 @@ data class FoodTemplate(
     val fat: Double,
     val isCustom: Boolean = false,
     val lastUsedAt: Long = 0,
+    val tag: String = "", // 标签：高质量蛋白 / 优质碳水 / 健康脂肪 / 果蔬 等，空为无标签
 ) {
     val kcal: Double get() = protein * 4 + carb * 4 + fat * 9
 }
@@ -211,7 +213,7 @@ interface AppDao {
 @Database(
     entities = [Profile::class, FoodTemplate::class, FoodEntry::class,
         ExerciseTemplate::class, ExerciseEntry::class, WeightEntry::class, WaterEntry::class],
-    version = 4,
+    version = 5,
     exportSchema = false,
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -251,11 +253,18 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        val MIGRATION_4_5 = object : androidx.room.migration.Migration(4, 5) {
+            override fun migrate(db: androidx.sqlite.db.SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE `food_templates` ADD COLUMN `tag` TEXT NOT NULL DEFAULT ''")
+                db.execSQL("ALTER TABLE `profile` ADD COLUMN `waterReminder` INTEGER NOT NULL DEFAULT 1")
+            }
+        }
+
         fun get(ctx: Context): AppDatabase =
             inst ?: synchronized(this) {
                 inst ?: Room.databaseBuilder(
                     ctx.applicationContext, AppDatabase::class.java, "musclediary.db"
-                ).addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4).build().also { inst = it }
+                ).addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5).build().also { inst = it }
             }
     }
 }

@@ -105,7 +105,9 @@ fun DietScreen(vm: AppViewModel) {
 
     pendingTemplate?.let { t ->
         NumberDialog(
-            title = t.name, label = "吃了多少克？", initial = "100",
+            title = t.name, label = "吃了多少克？",
+            // 预填上次记录的克数，没有则默认 100
+            initial = fmt0(vm.lastFoodGrams(t) ?: 100.0),
             onDismiss = { pendingTemplate = null },
             onConfirm = { grams -> vm.addFood(t, grams, vm.selectedDate); pendingTemplate = null },
         )
@@ -122,8 +124,8 @@ fun DietScreen(vm: AppViewModel) {
     if (customOpen) {
         CustomFoodDialog(
             onDismiss = { customOpen = false },
-            onConfirm = { name, p, c, f ->
-                vm.addCustomFood(name, p, c, f) { saved ->
+            onConfirm = { name, p, c, f, tag ->
+                vm.addCustomFood(name, p, c, f, tag) { saved ->
                     pendingTemplate = saved
                 }
                 customOpen = false
@@ -161,6 +163,7 @@ fun TemplatePickerDialog(
     onDismiss: () -> Unit,
 ) {
     var search by remember { mutableStateOf("") }
+    var tagFilter by remember { mutableStateOf<String?>(null) }
     AlertDialog(
         onDismissRequest = onDismiss,
         containerColor = Ink2,
@@ -173,8 +176,26 @@ fun TemplatePickerDialog(
                     singleLine = true,
                     colors = fieldColors(),
                 )
-                Spacer(Modifier.height(8.dp))
-                val filtered = templates.filter { it.name.contains(search, ignoreCase = true) }
+                Spacer(Modifier.height(6.dp))
+                // 标签筛选行
+                Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                    com.eelan.musclediary.data.ALL_TAGS.forEach { tag ->
+                        FilterChip(
+                            selected = tagFilter == tag,
+                            onClick = { tagFilter = if (tagFilter == tag) null else tag },
+                            label = { Text(tag, fontSize = 10.sp) },
+                            colors = FilterChipDefaults.filterChipColors(
+                                selectedContainerColor = Accent.copy(alpha = 0.35f),
+                                selectedLabelColor = Accent,
+                            ),
+                        )
+                    }
+                }
+                Spacer(Modifier.height(4.dp))
+                val filtered = templates.filter {
+                    it.name.contains(search, ignoreCase = true) &&
+                            (tagFilter == null || it.tag.contains(tagFilter!!))
+                }
                 LazyColumn(modifier = Modifier.height(300.dp)) {
                     items(filtered, key = { it.id }) { t ->
                         Row(
@@ -185,7 +206,22 @@ fun TemplatePickerDialog(
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
                             Column(Modifier.weight(1f)) {
-                                Text(t.name, color = TextHi, fontSize = 14.sp)
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Text(t.name, color = TextHi, fontSize = 14.sp)
+                                    if (t.tag.isNotBlank()) {
+                                        Spacer(Modifier.width(6.dp))
+                                        t.tag.split(',').filter { it.isNotBlank() }.forEach { tg ->
+                                            Text(
+                                                tg, fontSize = 9.sp, color = Accent,
+                                                modifier = Modifier
+                                                    .padding(end = 4.dp)
+                                                    .background(Accent.copy(alpha = 0.15f),
+                                                        RoundedCornerShape(4.dp))
+                                                    .padding(horizontal = 4.dp, vertical = 1.dp),
+                                            )
+                                        }
+                                    }
+                                }
                                 Text(detail(t), color = TextLo, fontSize = 11.sp)
                             }
                             Text(trailing(t), color = Accent, fontSize = 13.sp, fontWeight = FontWeight.Bold)
@@ -215,12 +251,13 @@ fun fieldColors() = TextFieldDefaults.colors(
 fun CustomFoodDialog(
     initial: FoodTemplate? = null,
     onDismiss: () -> Unit,
-    onConfirm: (String, Double, Double, Double) -> Unit,
+    onConfirm: (String, Double, Double, Double, String) -> Unit,
 ) {
     var name by remember { mutableStateOf(initial?.name ?: "") }
     var p by remember { mutableStateOf(initial?.let { fmt1(it.protein) } ?: "") }
     var c by remember { mutableStateOf(initial?.let { fmt1(it.carb) } ?: "") }
     var f by remember { mutableStateOf(initial?.let { fmt1(it.fat) } ?: "") }
+    var tag by remember { mutableStateOf(initial?.tag ?: "") }
     val pd = p.toDoubleOrNull(); val cd = c.toDoubleOrNull(); val fd = f.toDoubleOrNull()
     val valid = name.isNotBlank() && pd != null && cd != null && fd != null
     AlertDialog(
@@ -245,6 +282,42 @@ fun CustomFoodDialog(
                         keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
                             keyboardType = KeyboardType.Decimal), modifier = Modifier.weight(1f), colors = fieldColors())
                 }
+                // 标签选择（可多选）
+                Text("标签（可多选）", fontSize = 12.sp, color = TextLo)
+                Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                    com.eelan.musclediary.data.ALL_TAGS.take(3).forEach { tg ->
+                        FilterChip(
+                            selected = tag.split(',').contains(tg),
+                            onClick = {
+                                val cur = tag.split(',').filter { it.isNotBlank() }.toMutableSet()
+                                if (tg in cur) cur.remove(tg) else cur.add(tg)
+                                tag = cur.joinToString(",")
+                            },
+                            label = { Text(tg, fontSize = 10.sp) },
+                            colors = FilterChipDefaults.filterChipColors(
+                                selectedContainerColor = Accent.copy(alpha = 0.35f),
+                                selectedLabelColor = Accent,
+                            ),
+                        )
+                    }
+                }
+                Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                    com.eelan.musclediary.data.ALL_TAGS.drop(3).forEach { tg ->
+                        FilterChip(
+                            selected = tag.split(',').contains(tg),
+                            onClick = {
+                                val cur = tag.split(',').filter { it.isNotBlank() }.toMutableSet()
+                                if (tg in cur) cur.remove(tg) else cur.add(tg)
+                                tag = cur.joinToString(",")
+                            },
+                            label = { Text(tg, fontSize = 10.sp) },
+                            colors = FilterChipDefaults.filterChipColors(
+                                selectedContainerColor = Accent.copy(alpha = 0.35f),
+                                selectedLabelColor = Accent,
+                            ),
+                        )
+                    }
+                }
                 if (pd != null && cd != null && fd != null) {
                     Text("热量 ≈ ${fmt0(pd * 4 + cd * 4 + fd * 9)} kcal/100g",
                         color = Accent, fontSize = 13.sp)
@@ -253,7 +326,7 @@ fun CustomFoodDialog(
         },
         confirmButton = {
             TextButton(enabled = valid, onClick = {
-                onConfirm(name.trim(), pd!!, cd!!, fd!!)
+                onConfirm(name.trim(), pd!!, cd!!, fd!!, tag)
             }) { Text("保存", color = if (valid) Accent else TextLo) }
         },
         dismissButton = { TextButton(onClick = onDismiss) { Text("取消", color = TextLo) } },

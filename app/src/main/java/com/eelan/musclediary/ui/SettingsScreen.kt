@@ -55,6 +55,18 @@ fun SettingsScreen(
             }
         }
     }
+    val notifPermission = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        if (granted) {
+            com.eelan.musclediary.reminder.WaterReminder.scheduleNext(ctx)
+            Toast.makeText(ctx, "提醒已开启", Toast.LENGTH_SHORT).show()
+        } else {
+            // 未授权则关闭功能开关
+            vm.updateProfile(vm.profile.copy(waterReminder = 0))
+            Toast.makeText(ctx, "未授予通知权限，提醒保持关闭", Toast.LENGTH_LONG).show()
+        }
+    }
     val importLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.OpenDocument()
     ) { uri ->
@@ -174,6 +186,38 @@ fun SettingsScreen(
                 }
                 Text("${fmt0(com.eelan.musclediary.domain.Calc.waterTargetMl(p.weightKg))} ml",
                     fontSize = 15.sp, color = Accent, fontWeight = FontWeight.Bold)
+            }
+            Spacer(Modifier.height(4.dp))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    Text("喝水提醒", fontSize = 14.sp, color = TextHi)
+                    Text(
+                        if (p.waterReminder == 1) "分时段检查饮水量，落后时通知（11/15/19/22点）"
+                        else "已关闭",
+                        fontSize = 11.sp, color = TextLo,
+                    )
+                }
+                Switch(
+                    checked = p.waterReminder == 1,
+                    onCheckedChange = { on ->
+                        if (on) {
+                            if (com.eelan.musclediary.reminder.WaterReminder.hasPermission(ctx)) {
+                                vm.updateProfile(p.copy(waterReminder = 1))
+                                com.eelan.musclediary.reminder.WaterReminder.scheduleNext(ctx)
+                            } else {
+                                // 主动申请通知权限，授予后再开启
+                                notifPermission.launch(android.Manifest.permission.POST_NOTIFICATIONS)
+                            }
+                        } else {
+                            vm.updateProfile(p.copy(waterReminder = 0))
+                            com.eelan.musclediary.reminder.WaterReminder.cancel(ctx)
+                        }
+                    },
+                    colors = SwitchDefaults.colors(
+                        checkedTrackColor = Accent,
+                        uncheckedTrackColor = Ink3,
+                    ),
+                )
             }
         }
 

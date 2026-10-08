@@ -4,6 +4,7 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
@@ -17,14 +18,37 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.eelan.musclediary.ui.*
 import com.eelan.musclediary.ui.theme.*
+import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
+
+    private val requestPermissionLauncher =
+        registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+            if (granted) {
+                com.eelan.musclediary.reminder.WaterReminder.scheduleNext(applicationContext)
+            }
+            // 未授权：提醒功能保持关闭（设置页可重新开启）
+        }
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+        // 饮水提醒：已开启且未授权时主动申请权限；安排下一个时段检查
+        val reminder = com.eelan.musclediary.reminder.WaterReminder
+        lifecycleScope.launch {
+            val dao = com.eelan.musclediary.data.AppDatabase.get(applicationContext).dao()
+            val p = dao.getProfile()
+            if (p?.waterReminder == 1) {
+                if (com.eelan.musclediary.reminder.WaterReminder.hasPermission(applicationContext)) {
+                    com.eelan.musclediary.reminder.WaterReminder.scheduleNext(applicationContext)
+                } else if (android.os.Build.VERSION.SDK_INT >= 33) {
+                    requestPermissionLauncher.launch(android.Manifest.permission.POST_NOTIFICATIONS)
+                }
+            }
+        }
         setContent {
             MuscleDiaryTheme {
                 val vm: AppViewModel = viewModel()
