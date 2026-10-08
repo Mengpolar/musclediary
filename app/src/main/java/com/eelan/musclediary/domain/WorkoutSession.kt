@@ -19,8 +19,11 @@ data class WorkoutStep(
 
 object WorkoutSession {
 
-// 每组开始前的准备播报时长（秒）
-private const val READY_SEC = 4
+    /** 3,2,1 倒数秒数（语音播报完成后才开始计） */
+    const val READY_COUNTDOWN_SEC = 3
+
+    /** READY 窗口上限（秒）：会话页在倒数真正开始时重置 remainSec，此值仅为兜底 */
+    const val READY_MAX_SEC = 15
 
     /** 展开步骤队列：每个动作组前插入 READY 准备阶段 */
     fun buildSteps(items: List<PlanItem>): List<WorkoutStep> {
@@ -29,7 +32,7 @@ private const val READY_SEC = 4
             repeat(item.sets) { s ->
                 steps += WorkoutStep(
                     kind = WorkoutStep.Kind.READY, item = item, setIndex = s,
-                    actionIndex = itemIdx, durationSec = READY_SEC, reps = item.reps,
+                    actionIndex = itemIdx, durationSec = READY_MAX_SEC, reps = item.reps,
                 )
                 steps += WorkoutStep(
                     kind = WorkoutStep.Kind.WORK, item = item, setIndex = s,

@@ -34,6 +34,40 @@ class VoicePlayer private constructor(private val context: Context) {
     private val queue = ArrayDeque<MutableList<String>>()
     private var speaking = false
 
+    /** 代码生成的电子提示音（1kHz 正弦，120ms），供 beep 键使用 */
+    private fun synthBeep(sp: SoundPool): Int {
+        val sampleRate = 44100
+        val ms = 120
+        val samples = sampleRate * ms / 1000
+        val pcm = ShortArray(samples)
+        for (i in 0 until samples) {
+            val t = i.toDouble() / sampleRate
+            val envelope = if (i < samples / 10 || i > samples * 9 / 10) {
+                (i.coerceAtMost(samples - i)).toDouble() / (samples / 10.0) // 防爆音淡入淡出
+            } else 1.0
+            pcm[i] = (Math.sin(2 * Math.PI * 1000 * t) * 32767 * 0.6 * envelope).toInt().toShort()
+        }
+        // AudioTrack 需要写文件；SoundPool 支持 short[] via load() overload on API 21+ using ByteData
+        // 简化方案：写临时 WAV 再 load
+        val wav = java.io.ByteArrayOutputStream()
+        val dataSize = samples * 2
+        val wr = java.io.DataOutputStream(wav)
+        fun le16(v: Int) { wr.write(v and 0xFF); wr.write((v shr 8) and 0xFF) }
+        fun le32(v: Int) { le16(v and 0xFFFF); le16((v shr 16) and 0xFFFF) }
+        wr.write("RIFF".toByteArray()); le32(36 + dataSize); wr.write("WAVE".toByteArray())
+        wr.write("fmt ".toByteArray()); le32(16); le16(1); le16(1)
+        le32(sampleRate); le32(sampleRate * 2); le16(2); le16(16)
+        wr.write("data".toByteArray()); le32(dataSize)
+        pcm.forEach { le16(it.toInt() and 0xFFFF) }
+        wr.flush()
+        val wavBytes = wav.toByteArray()
+        val tmp = java.io.File(context.cacheDir, "beep.wav")
+        tmp.writeBytes(wavBytes)
+        val id = sp.load(tmp.absolutePath, 1)
+        tmp.delete()
+        return id
+    }
+
     init {
         tts = TextToSpeech(context) { st ->
             ttsReady = st == TextToSpeech.SUCCESS
@@ -72,6 +106,14 @@ class VoicePlayer private constructor(private val context: Context) {
                     }
                 }
             }
+            // 电子嘀声：代码生成 1kHz/120ms 正弦，替代口播「嘀」
+            if ("beep" !in soundIds) {
+                runCatching {
+                    val sid = synthBeep(sp)
+                    soundIds["beep"] = sid
+                    durations["beep"] = 120
+                }
+            }
             // 加载完成后回填精确时长
             sp.setOnLoadCompleteListener { _, sampleId, status ->
                 if (status == 0) {
@@ -90,6 +132,10 @@ class VoicePlayer private constructor(private val context: Context) {
     }
 
     val loadedCount: Int get() = soundIds.size
+
+    /** 语音队列是否仍在播报（含 TTS）——READY 倒数等它排空后再开始 */
+    fun isSpeaking(): Boolean = speaking ||
+            (ttsReady && (runCatching { tts?.isSpeaking }.getOrDefault(false) == true))
 
     /** 播放一句：keys 按序连播；未加载完成的 key 延迟重试（不再跳过） */
     fun speak(vararg keys: String) {
