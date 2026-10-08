@@ -47,7 +47,7 @@ fun WorkoutSessionScreen(
     // 已播报标记：当前步骤的 80% 提示 / 倒数播到哪
     var said80 by remember { mutableStateOf(false) }
     var countedDownTo by remember { mutableIntStateOf(Int.MAX_VALUE) }
-    var announcedStep by remember { mutableIntStateOf(-1) }
+    var lastTick by remember { mutableIntStateOf(Int.MAX_VALUE) }
 
     // 屏幕常亮
     DisposableEffect(Unit) {
@@ -67,14 +67,21 @@ fun WorkoutSessionScreen(
         said80 = false
         countedDownTo = Int.MAX_VALUE
         when (s.kind) {
-            WorkoutStep.Kind.WORK -> {
-                if (announcedStep != stepIdx) {
-                    voice.speak("next")
-                    val vk = s.item?.voiceKey.orEmpty()
-                    if (vk.isNotEmpty()) voice.speak(vk) else voice.speakText(s.item?.name ?: "")
-                    announcedStep = stepIdx
+            WorkoutStep.Kind.READY -> {
+                // 「第一组第一个动作：仰卧起坐」/「20个/45秒」→ 3,2,1 由秒循环播报
+                voice.speak("di", "n_${s.setIndex + 1}", "set_word",
+                    "n_${s.actionIndex + 1}", "ge_word")
+                voice.speakText(s.item?.name ?: "")
+                val qty = when (s.item?.qtyType) {
+                    "REPS" -> listOf("n_${fmtQtyCn(s.reps)}", "rep_word")
+                    "DISTANCE" -> listOf("hai_you", "n_${fmtQtyCn(s.reps)}", "km_word")
+                    else -> listOf("n_${fmtQtyCn(s.reps)}", "sec_word")
                 }
-                voice.speak("di", "n_${s.setIndex + 1}", "set_word")
+                voice.speak(*qty.toTypedArray())
+            }
+            WorkoutStep.Kind.WORK -> {
+                // 进入训练倒计时前的一声提示
+                voice.speak("ready_go")
             }
             WorkoutStep.Kind.REST -> {
                 voice.speak("rest")
@@ -94,42 +101,43 @@ fun WorkoutSessionScreen(
                 remainSec -= (now - last) / 1000f
                 val s = steps[stepIdx]
                 val total = s.durationSec.toFloat()
-                if (s.kind == WorkoutStep.Kind.WORK) {
-                    val progress = 1f - (remainSec / total)
-                    // 80% 提示
-                    if (!said80 && progress >= 0.8f) {
-                        said80 = true
-                        val remain = (remainSec.toInt() + 1)
-                        if (s.item?.qtyType == "SECONDS") {
-                            voice.speak("hai_you", "n_${remain.coerceIn(1, 100)}", "sec_word",
-                                if ((1..2).random() == 1) "jiayou" else "hold_on")
-                        } else {
-                            voice.speak("hai_you", "n_${remain.coerceIn(1, 100)}", "rep_word",
-                                if ((1..2).random() == 1) "jiayou" else "hold_on")
+                when (s.kind) {
+                    WorkoutStep.Kind.READY -> {
+                        // 3,2,1 倒数（READY 4 秒：第 1 秒播报占用，后 3 秒报 3,2,1，归零叮）
+                        val n = remainSec.toInt()
+                        if (n in 1..3 && n < countedDownTo) {
+                            countedDownTo = n
+                            voice.speak("n_$n")
                         }
                     }
-                    // 倒数最后 5（秒或个数）
-                    if (s.item?.qtyType == "SECONDS") {
+                    WorkoutStep.Kind.WORK -> {
+                        // 每秒嘀一声
+                        val tick = remainSec.toInt()
+                        if (tick < lastTick) {
+                            lastTick = tick
+                            if (tick >= 0) voice.speak("beep")
+                        }
+                        val progress = 1f - (remainSec / total)
+                        // 剩余 10 秒整句提示（只报一次）
+                        if (!said80 && (total - remainSec) >= total - 10f) {
+                            said80 = true
+                            voice.speak("hold_10s")
+                        }
+                        // 最后 5 秒报数替代嘀声
                         val n = remainSec.toInt()
                         if (n in 1..5 && n < countedDownTo) {
                             countedDownTo = n
                             voice.speak("n_$n")
                         }
-                    } else {
-                        // 次数类：按时间比例推算还剩几个
-                        val totalReps = s.reps
-                        val remainReps = (totalReps * (remainSec / total)).toInt()
-                        if (remainReps in 1..5 && remainReps < countedDownTo) {
-                            countedDownTo = remainReps
-                            voice.speak("n_$remainReps")
+                    }
+                    WorkoutStep.Kind.REST -> {
+                        val n = remainSec.toInt()
+                        if (n in 1..3 && n < countedDownTo) {
+                            countedDownTo = n
+                            voice.speak("n_$n")
                         }
                     }
-                } else if (s.kind == WorkoutStep.Kind.REST) {
-                    val n = remainSec.toInt()
-                    if (n in 1..3 && n < countedDownTo) {
-                        countedDownTo = n
-                        voice.speak("n_$n")
-                    }
+                    else -> {}
                 }
                 if (remainSec <= 0f) {
                     if (stepIdx == steps.lastIndex) {
@@ -144,7 +152,12 @@ fun WorkoutSessionScreen(
                         onFinished(summary)
                         return@LaunchedEffect
                     } else if (stepIdx + 1 < steps.size) {
-                        if (steps[stepIdx].kind == WorkoutStep.Kind.REST) voice.speak("rest_over")
+                        val cur = steps[stepIdx]
+                        val nxt = steps[stepIdx + 1]
+                        if (cur.kind == WorkoutStep.Kind.WORK && nxt.kind == WorkoutStep.Kind.READY) {
+                            // 组完成 → 准备下一组，先夸再报休息
+                        }
+                        if (cur.kind == WorkoutStep.Kind.READY) voice.speak("ding")
                         stepIdx += 1
                         remainSec = steps[stepIdx].durationSec.toFloat()
                     }
@@ -177,7 +190,11 @@ fun WorkoutSessionScreen(
     }
 
     val isWork = s.kind == WorkoutStep.Kind.WORK
-    val color = if (isWork) Accent else Protein
+    val color = when (s.kind) {
+        WorkoutStep.Kind.WORK -> Accent
+        WorkoutStep.Kind.READY -> Warn
+        else -> Protein
+    }
     val progress = 1f - (remainSec / s.durationSec.toFloat()).coerceIn(0f, 1f)
     val burnedKcal = WorkoutSession.caloriesUpTo(steps, stepIdx - 1, vm.profile.weightKg)
     val totalKcal = WorkoutSession.totalCalories(items, vm.profile.weightKg)
@@ -203,20 +220,31 @@ fun WorkoutSessionScreen(
         )
         Spacer(Modifier.weight(1f))
 
-        if (isWork) {
-            Text("第 ${s.setIndex + 1} 组 · ${s.item?.name.orEmpty()}",
+        val isReady = s.kind == WorkoutStep.Kind.READY
+        if (isWork || isReady) {
+            val setNo = s.setIndex + 1
+            val actionNo = s.actionIndex + 1
+            Text("第 $setNo 组 第 $actionNo 个动作 · ${s.item?.name.orEmpty()}",
                 fontSize = 22.sp, fontWeight = FontWeight.Bold, color = TextHi)
+            if (isReady) {
+                Spacer(Modifier.height(6.dp))
+                val qtyLabel = when (s.item?.qtyType) {
+                    "REPS" -> "${fmt1(s.reps)} 个"
+                    "DISTANCE" -> "${fmt1(s.reps)} 公里"
+                    else -> "${fmt1(s.reps)} 秒"
+                }
+                Text("准备 · $qtyLabel", fontSize = 18.sp, color = Warn)
+            }
             Spacer(Modifier.height(8.dp))
             val remainReps = (s.reps * (remainSec / s.durationSec.toFloat())).toInt().coerceAtLeast(0)
-            val unit = when (s.item?.qtyType) { "SECONDS" -> "秒"; "DISTANCE" -> "公里"; else -> "个" }
             Text(
                 if (s.item?.qtyType == "DISTANCE") "剩余 ${fmt1(remainSec / s.item.paceMinPerKm / 60.0f * 60f)} km"
                 else if (s.item?.qtyType == "SECONDS") "${remainSec.toInt() + 1}"
-                else "$remainReps 个",
-                fontSize = if (s.item?.qtyType == "SECONDS") 88.sp else 64.sp,
+                else if (isReady) "${remainSec.toInt()}" else "$remainReps 个",
+                fontSize = if (s.item?.qtyType == "SECONDS" || isReady) 88.sp else 64.sp,
                 fontWeight = FontWeight.Bold, color = color,
             )
-            if (s.item?.qtyType != "SECONDS") {
+            if (s.item?.qtyType != "SECONDS" && !isReady) {
                 Text("${remainSec.toInt() + 1} 秒", fontSize = 20.sp, color = TextLo)
             }
         } else {
@@ -266,4 +294,10 @@ fun WorkoutSessionScreen(
         }
         Spacer(Modifier.height(16.dp))
     }
+}
+
+/** 数量转整数中文播报（20.0 -> 20） */
+private fun fmtQtyCn(v: Double): String {
+    val n = v.toInt()
+    return if (n in 0..100) n.toString() else v.toInt().toString()
 }
