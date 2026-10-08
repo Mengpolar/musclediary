@@ -17,3 +17,6 @@ keystore.properties
 语音文件准备指南.md
 
 assets/voices/
+scripts/
+语音文件准备指南.md
+app/src/main/assets/
