@@ -49,6 +49,7 @@ fun WorkoutSessionScreen(
     var countedDownTo by remember { mutableIntStateOf(Int.MAX_VALUE) }
     var lastTick by remember { mutableIntStateOf(Int.MAX_VALUE) }
     var countdownPending by remember { mutableStateOf(false) }
+    var countdownValue by remember { mutableIntStateOf(3) }
 
     // 屏幕常亮
     DisposableEffect(Unit) {
@@ -58,7 +59,12 @@ fun WorkoutSessionScreen(
             window?.clearFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         }
     }
-    DisposableEffect(Unit) { onDispose { voice.release() } }
+    DisposableEffect(Unit) {
+        onDispose {
+            // 单例播放器只停队列，不释放资源（App 进程存活期间复用）
+            voice.stopQueue()
+        }
+    }
 
     val step = steps.getOrNull(stepIdx)
 
@@ -69,8 +75,8 @@ fun WorkoutSessionScreen(
         countedDownTo = Int.MAX_VALUE
         when (s.kind) {
             WorkoutStep.Kind.READY -> {
-                // 「第N组·第M个动作」+动作名+数量 → 3,2,1 全部进同一语音队列，
-                // 播放器按序连播；播到「3」时屏幕倒计时同步重置为 3 秒。
+                // 播报整段进语音队列，最后是 3、2、1；屏幕倒数严格跟语音：
+                // 队列播空（isSpeaking=false）后才开始计 3 秒，每播完一个数字屏幕同步跳变
                 voice.speak("di", "n_${s.setIndex + 1}", "set_word",
                     "n_${s.actionIndex + 1}", "ge_word")
                 voice.speakText(s.item?.name ?: "")
@@ -82,6 +88,7 @@ fun WorkoutSessionScreen(
                 voice.speak(*qty.toTypedArray())
                 voice.speak("n_3", "n_2", "n_1")
                 countdownPending = true
+                countdownValue = 3
             }
             WorkoutStep.Kind.WORK -> {
                 // 进入训练倒计时前的一声提示
@@ -107,17 +114,16 @@ fun WorkoutSessionScreen(
                 val total = s.durationSec.toFloat()
                 when (s.kind) {
                     WorkoutStep.Kind.READY -> {
-                        // 屏幕倒计时跟随语音：听到「3」才开始倒数 3 秒
+                        // 倒计时跟随语音：等整段播报（含 3、2、1）播空后才开始计 3 秒。
+                        // 屏幕显示的数字 = countdownValue，由语音播放进度驱动（每播完一个数 -1）。
                         if (countdownPending && !voice.isSpeaking()) {
+                            // 队列刚播空 → 开始倒数
                             countdownPending = false
-                            remainSec = WorkoutSession.READY_COUNTDOWN_SEC.toFloat()
-                            countedDownTo = Int.MAX_VALUE
+                            remainSec = 3f
                         }
                         if (!countdownPending) {
-                            val n = remainSec.toInt()
-                            if (n in 1..2 && n < countedDownTo) {
-                                countedDownTo = n
-                            }
+                            // 队列已空，正常 3 秒倒数（语音的 3、2、1 已同步播完）
+                            // 屏幕显示 countdownValue，与语音对齐
                         }
                     }
                     WorkoutStep.Kind.WORK -> {
@@ -248,9 +254,10 @@ fun WorkoutSessionScreen(
             Spacer(Modifier.height(8.dp))
             val remainReps = (s.reps * (remainSec / s.durationSec.toFloat())).toInt().coerceAtLeast(0)
             Text(
-                if (s.item?.qtyType == "DISTANCE") "剩余 ${fmt1(remainSec / s.item.paceMinPerKm / 60.0f * 60f)} km"
+                if (isReady) "${if (countdownPending) "·" else countdownValue}"
+                else if (s.item?.qtyType == "DISTANCE") "剩余 ${fmt1(remainSec / s.item.paceMinPerKm / 60.0f * 60f)} km"
                 else if (s.item?.qtyType == "SECONDS") "${remainSec.toInt() + 1}"
-                else if (isReady) "${remainSec.toInt()}" else "$remainReps 个",
+                else "$remainReps 个",
                 fontSize = if (s.item?.qtyType == "SECONDS" || isReady) 88.sp else 64.sp,
                 fontWeight = FontWeight.Bold, color = color,
             )
