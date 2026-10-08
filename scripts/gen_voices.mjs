@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 
 const API = 'https://api.senseaudio.cn/v1/t2a_v2';
-const KEY = 'sk-g0otwxlVp8h60TCzQYhh0TdmPt2JFAdaCb2985DfE6Cb4aC5BbE50cB343B5A9E5';
+const KEY = process.env.TTS_API_KEY ?? '在此填入你的Key';
 const MODEL = 'sensenova-tts-2.0';
 const VOICE = 'firefly7';
 const OUT = 'app/src/main/assets/voices/default';
