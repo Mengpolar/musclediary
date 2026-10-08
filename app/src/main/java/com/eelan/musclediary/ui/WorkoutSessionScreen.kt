@@ -37,7 +37,7 @@ fun WorkoutSessionScreen(
     onQuit: () -> Unit,
 ) {
     val activity = LocalContext.current as? Activity
-    val voice = remember { VoicePlayer(vm.getApplication()) }
+    val voice = remember { com.eelan.musclediary.reminder.VoicePlayer.get(vm.getApplication()) }
 
     val steps = remember(items) { WorkoutSession.buildSteps(items) }
     var stepIdx by remember { mutableIntStateOf(0) }

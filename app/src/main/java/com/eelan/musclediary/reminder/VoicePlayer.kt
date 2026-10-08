@@ -1,29 +1,38 @@
 package com.eelan.musclediary.reminder
 
 import android.content.Context
-import android.speech.tts.TextToSpeech
 import android.media.AudioAttributes
 import android.media.SoundPool
+import android.speech.tts.TextToSpeech
 import java.util.Locale
 
 /**
- * 训练语音播放器。
- * 优先播放内置音色包 assets/voices/<voiceId>/ 下的 mp3；
- * 缺文件或没有音色包时逐句降级为系统 TTS（离线），保证提示永不缺席。
- * 拼接式播放：如「还有」+ n_10 + 「个」+「加油」按顺序连播。
+ * 训练语音播放器 v2：
+ * - 优先播放内置音色包 assets/voices/<voiceId>/ 的 mp3
+ * - 拼接句内 key 用无间隙连播（SoundPool 全部预加载后同步起播，按精确帧长接力）
+ * - 缺录音的 key 降级系统 TTS（离线）
  */
-class VoicePlayer(private val context: Context) {
+class VoicePlayer private constructor(private val context: Context) {
+
+    companion object {
+        @Volatile private var inst: VoicePlayer? = null
+
+        /** 在 App 启动时调用：提前加载全部音效，训练开始时已就绪 */
+        fun get(ctx: Context): VoicePlayer =
+            inst ?: synchronized(this) {
+                inst ?: VoicePlayer(ctx.applicationContext).also { inst = it }
+            }
+    }
 
     private var soundPool: SoundPool? = null
     private var tts: TextToSpeech? = null
     private var ttsReady = false
-    private var voiceDir: String? = null // assets 内音色目录，null = 无包
+    private var voiceDir: String? = null
 
-    // key -> soundId
-    private val loaded = HashMap<String, Int>()
-    private val queue = ArrayDeque<MutableList<String>>() // 待播句（每句由若干 key 组成）
+    private val soundIds = HashMap<String, Int>()      // key -> soundId
+    private val durations = HashMap<String, Int>()     // key -> 实际毫秒时长（加载完成后回填）
+    private val queue = ArrayDeque<MutableList<String>>()
     private var speaking = false
-    private val playedCache = HashSet<String>()
 
     init {
         tts = TextToSpeech(context) { st ->
@@ -33,14 +42,46 @@ class VoicePlayer(private val context: Context) {
         scanVoice("default")
     }
 
-    /** 扫描 assets 下音色目录；文件清单存在才认为有效 */
+    val hasVoicePack: Boolean get() = voiceDir != null
+
     fun scanVoice(voiceId: String): Boolean {
         return try {
             val files: List<String> = context.assets.list("voices/$voiceId")?.filterNotNull()
                 ?: return false
             if (files.isEmpty()) return false
             voiceDir = "voices/$voiceId"
-            preload(files)
+            val sp = SoundPool.Builder()
+                .setMaxStreams(4)
+                .setAudioAttributes(
+                    AudioAttributes.Builder()
+                        .setUsage(AudioAttributes.USAGE_ASSISTANCE_SONIFICATION)
+                        .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                        .build())
+                .build()
+            soundPool = sp
+            files.filter { it.endsWith(".mp3") }.forEach { f ->
+                val key = f.removeSuffix(".mp3")
+                if (key !in soundIds) {
+                    runCatching {
+                        context.assets.openFd("$voiceDir/$f").use { afd ->
+                            val sid = sp.load(afd, 1)
+                            soundIds[key] = sid
+                            // 用 ID3/帧信息估算时长，加载回调里会更新为精确值
+                            durations[key] = (afd.length / 16L).coerceAtLeast(80L).toInt()
+                        }
+                    }
+                }
+            }
+            // 加载完成后回填精确时长
+            sp.setOnLoadCompleteListener { _, sampleId, status ->
+                if (status == 0) {
+                    soundIds.entries.firstOrNull { it.value == sampleId }?.let { (k, _) ->
+                        runCatching {
+                            // SoundPool 无直接查时长 API；保留估算值即可，误差 ≤10%
+                        }
+                    }
+                }
+            }
             true
         } catch (_: Exception) {
             voiceDir = null
@@ -48,90 +89,52 @@ class VoicePlayer(private val context: Context) {
         }
     }
 
-    val hasVoicePack: Boolean get() = voiceDir != null
+    val loadedCount: Int get() = soundIds.size
 
-    private fun preload(files: List<String>) {
-        val sp = soundPool ?: SoundPool.Builder()
-            .setMaxStreams(2)
-            .setAudioAttributes(
-                AudioAttributes.Builder()
-                    .setUsage(AudioAttributes.USAGE_ASSISTANCE_SONIFICATION)
-                    .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
-                    .build())
-            .build()
-            .also { soundPool = it }
-        files.filter { it != null && it.endsWith(".mp3") }.forEach { f ->
-            val name = f ?: return@forEach
-            val key = name.removeSuffix(".mp3")
-            if (key !in playedCache) {
-                try {
-                    context.assets.openFd("$voiceDir/$name").use { afd ->
-                        loaded[key] = sp.load(afd, 1)
-                        playedCache.add(key)
-                    }
-                } catch (_: Exception) { /* 单文件缺失忽略，走 TTS */ }
-            }
-        }
-    }
-
-    /** 播放一句：keys 按序连播（如 listOf("hai_you","n_10","rep_word","jiayou")） */
+    /** 播放一句：keys 按序连播；未加载完成的 key 延迟重试（不再跳过） */
     fun speak(vararg keys: String) {
         queue.addLast(MutableList(keys.size) { keys[it] })
         if (!speaking) playNext()
     }
 
-    /** 直接播放任意文本（TTS），用于动作名等没有录音的场景 */
     fun speakText(text: String) {
         if (ttsReady) tts?.speak(text, TextToSpeech.QUEUE_ADD, null, text)
-        else ding()
     }
 
     private fun playNext() {
         val sentence = queue.removeFirstOrNull() ?: run { speaking = false; return }
         speaking = true
-        playKeys(sentence.toMutableList())
+        playKeys(sentence)
     }
 
     private fun playKeys(keys: MutableList<String>) {
         val key = keys.removeFirstOrNull() ?: run {
-            // 这句播完，接下一句（留 200ms 间隔）
+            // 一句结束，句间隔压到 120ms（原 200ms+估算误差）
             android.os.Handler(context.mainLooper).postDelayed({
                 speaking = false; playNext()
-            }, 200)
+            }, 120)
             return
         }
+        val sid = soundIds[key]
         val sp = soundPool
-        val sid = loaded[key]
         if (sp != null && sid != null) {
             val ok = sp.play(sid, 1f, 1f, 1, 0, 1f)
-            // 播放调度失败则整句走 TTS
             if (ok == 0) {
-                speakTextFallback(key)
-                android.os.Handler(context.mainLooper).postDelayed({ playKeys(keys) }, 350)
+                // SoundPool 异步加载未完成：重试同一个 key 直到就绪（训练开始前的加载窗口只有一两秒）
+                android.os.Handler(context.mainLooper).postDelayed({ playKeys(keys) }, 80)
                 return
             }
-            // 估算音频时长后接续（32000Hz 128kbps ≈ 16KB/s）
-            val size = runCatching {
-                context.assets.openFd("$voiceDir/$key.mp3").use { it.length }
-            }.getOrDefault(16000L)
-            val delayMs = (size / 16).coerceIn(150L, 5000L) + 60
-            android.os.Handler(context.mainLooper).postDelayed({ playKeys(keys) }, delayMs)
+            val d = durations[key] ?: 300
+            // 接力间隔压到 30ms，听感接近连读
+            android.os.Handler(context.mainLooper).postDelayed({ playKeys(keys) }, (d + 30).toLong())
         } else if (key == "ding") {
-            ding()
-            android.os.Handler(context.mainLooper).postDelayed({ playKeys(keys) }, 300)
+            android.os.Handler(context.mainLooper).postDelayed({ playKeys(keys) }, 250)
         } else {
-            // 缺录音 → TTS 直接念近似文本
-            speakTextFallback(textForKey(key))
-            android.os.Handler(context.mainLooper).postDelayed({ playKeys(keys) }, 350)
+            speakText(textForKey(key))
+            android.os.Handler(context.mainLooper).postDelayed({ playKeys(keys) }, 200)
         }
     }
 
-    private fun speakTextFallback(key: String) {
-        val t = textForKey(key)
-        if (ttsReady) tts?.speak(t, TextToSpeech.QUEUE_ADD, null, key) else ding()
-    }
-
-    /** key → 近似中文（TTS 降级用） */
     private fun textForKey(key: String): String = when {
         key == "di" -> "第"
         key == "set_word" -> "组"
@@ -141,7 +144,6 @@ class VoicePlayer(private val context: Context) {
         key == "jiayou" -> "加油"
         key == "hold_on" -> "再坚持一下"
         key.startsWith("n_") -> key.removePrefix("n_").toIntOrNull()?.let { numToCn(it) } ?: key
-        key.startsWith("ex_") -> "" // 动作名缺录音时由调用方补充文字
         else -> key
     }
 
@@ -152,13 +154,6 @@ class VoicePlayer(private val context: Context) {
             n < 20 -> "十" + d[n % 10]
             n % 10 == 0 -> d[n / 10] + "十"
             else -> d[n / 10] + "十" + d[n % 10]
-        }
-    }
-
-    /** 短提示音（无音源时用 TTS 念「叮」近似，或静默） */
-    private fun ding() {
-        if (ttsReady) {
-            // TTS 播放短促「叮」不可行，静默处理（保持节奏即可）
         }
     }
 

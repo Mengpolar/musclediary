@@ -52,6 +52,8 @@ class MainActivity : ComponentActivity() {
         setContent {
             MuscleDiaryTheme {
                 val vm: AppViewModel = viewModel()
+                // 启动即预热训练语音（后台加载 105 个音效，进入训练时已就绪）
+                com.eelan.musclediary.reminder.VoicePlayer.get(applicationContext)
                 if (!vm.loaded) {
                     Box(
                         Modifier.fillMaxSize().background(Ink0),
