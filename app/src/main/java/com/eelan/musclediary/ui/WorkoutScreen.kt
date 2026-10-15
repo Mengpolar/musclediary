@@ -13,7 +13,6 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.FitnessCenter
-import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -30,57 +29,9 @@ import com.eelan.musclediary.domain.Muscle
 import com.eelan.musclediary.ui.theme.*
 import org.json.JSONObject
 
-/** 编排页全屏覆盖层：由 MainActivity 以 Box 覆盖方式挂载（修复被父 Column 顶出屏幕的 bug） */
-@Composable
-fun WorkoutBuilderOverlay(
-    vm: AppViewModel,
-    onDismiss: () -> Unit,
-    onStart: (List<com.eelan.musclediary.data.PlanItem>) -> Unit,
-) {
-    Box(Modifier.fillMaxSize().background(Ink0)) {
-        WorkoutBuilderScreen(
-            vm = vm,
-            initialItems = emptyList(),
-            onDismiss = onDismiss,
-            onStart = onStart,
-        )
-    }
-}
-
-/** 训练进行中全屏覆盖层 */
-@Composable
-fun WorkoutSessionOverlay(
-    vm: AppViewModel,
-    items: List<com.eelan.musclediary.data.PlanItem>,
-    onFinished: () -> Unit,
-    onQuit: () -> Unit,
-) {
-    Box(Modifier.fillMaxSize().background(Ink0)) {
-        WorkoutSessionScreen(
-            vm = vm,
-            items = items,
-            onFinished = { summary ->
-                summary.forEach { (name, totalQty, kcal) ->
-                    val t = vm.exerciseTemplates.firstOrNull { it.name == name }
-                    if (t != null) {
-                        val minutes = when (t.qtyType) {
-                            QtyType.REPS -> totalQty * t.perRepSeconds / 60.0
-                            QtyType.DISTANCE -> totalQty * t.paceMinPerKm
-                            QtyType.SECONDS -> totalQty / 60.0
-                        }
-                        vm.addWorkoutResult(t, totalQty, kcal, minutes, vm.selectedDate)
-                    }
-                }
-                onFinished()
-            },
-            onQuit = onQuit,
-        )
-    }
-}
-
 /** 锻炼页：肌肉概览图 + 当日记录 + 模板快速添加 */
 @Composable
-fun WorkoutScreen(vm: AppViewModel, onStartTraining: () -> Unit = {}) {
+fun WorkoutScreen(vm: AppViewModel) {
     var pickOpen by remember { mutableStateOf(false) }
     var pendingTemplate by remember { mutableStateOf<ExerciseTemplate?>(null) }
     var customOpen by remember { mutableStateOf(false) }
@@ -116,17 +67,6 @@ fun WorkoutScreen(vm: AppViewModel, onStartTraining: () -> Unit = {}) {
         ) {
             DateHeader(vm, onOpenCalendar = { showCalendar = true })
             Spacer(Modifier.height(8.dp))
-            // 开始训练入口
-            Button(
-                onClick = onStartTraining,
-                colors = ButtonDefaults.buttonColors(containerColor = Accent, contentColor = Ink0),
-                modifier = Modifier.fillMaxWidth().height(48.dp),
-            ) {
-                Icon(Icons.Default.PlayArrow, null)
-                Spacer(Modifier.width(6.dp))
-                Text("开始训练（编排动作组 · 语音陪练）", fontWeight = FontWeight.Bold, fontSize = 14.sp)
-            }
-            Spacer(Modifier.height(12.dp))
             CardBox {
                 Text("肌肉概览", fontSize = 15.sp, fontWeight = FontWeight.Bold, color = TextHi)
                 Spacer(Modifier.height(4.dp))
@@ -224,10 +164,11 @@ fun WorkoutScreen(vm: AppViewModel, onStartTraining: () -> Unit = {}) {
     }
 
     pendingTemplate?.let { t ->
-        val last = vm.lastExerciseQty(t)
+        val recent = vm.recentExerciseQty(t)
         WorkoutQtyDialog(
             template = t, bodyWeight = vm.profile.weightKg,
-            lastQty = last?.first, lastWeight = last?.second,
+            lastQty = recent.firstOrNull()?.first, lastWeight = recent.firstOrNull()?.second,
+            recent = recent,
             onDismiss = { pendingTemplate = null },
             onConfirm = { qty, weight ->
                 vm.addExercise(t, qty, weight, vm.selectedDate)
@@ -327,6 +268,7 @@ private fun WorkoutQtyDialog(
     bodyWeight: Double,
     lastQty: Double?,
     lastWeight: Double?,
+    recent: List<Pair<Double, Double>> = emptyList(),
     onDismiss: () -> Unit,
     onConfirm: (Double, Double) -> Unit,
 ) {
@@ -361,6 +303,23 @@ private fun WorkoutQtyDialog(
                         colors = com.eelan.musclediary.ui.fieldColors(),
                     )
                 }
+                // 最近 3 次记录（去重）：点击直接填入
+                QuickChips(
+                    chips = recent.map { (qty0, w0) ->
+                        val base = if (unitLabel == "公里") "${fmt1(qty0)}公里"
+                            else if (unitLabel == "秒") "${fmt0(qty0)}秒"
+                            else "${fmt0(qty0)}个"
+                        if (w0 > 0) "$base（×${fmt1(w0)}kg）" else base
+                    },
+                    onPick = { c ->
+                        // 形如 "40个（×10kg）" / "40个" / "5公里"
+                        val w = Regex("×([0-9.]+)kg").find(c)?.groupValues?.get(1)?.toDoubleOrNull()
+                        val base = c.substringBefore("（")
+                        val num = Regex("^([0-9.]+)").find(base)?.groupValues?.get(1)?.toDoubleOrNull()
+                        num?.let { qty = fmt1(it) }
+                        if (w != null) weight = fmt1(w)
+                    },
+                )
                 if (preview != null) {
                     Text(
                         "预计消耗 ${fmt0(preview.first)} kcal · ${fmt1(preview.second)} 分钟 · 主练${Muscle.labelOf(template.primaryMuscle)}",

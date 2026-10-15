@@ -28,8 +28,8 @@ data class WeightEntry(
     val createdAt: Long = System.currentTimeMillis(),
 )
 
-/** 每日饮水量（当天累计，一条记录） */
-@Entity(tableName = "water_entries", indices = [Index(value = ["date"], unique = true)])
+/** 每次饮水的记录（按条记录，当天累计） */
+@Entity(tableName = "water_entries")
 data class WaterEntry(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
     val date: String, // yyyy-MM-dd
@@ -47,7 +47,9 @@ data class FoodTemplate(
     val fat: Double,
     val isCustom: Boolean = false,
     val lastUsedAt: Long = 0,
-    val tag: String = "", // 标签：高质量蛋白 / 优质碳水 / 健康脂肪 / 果蔬 等，空为无标签
+    val tag: String = "", // 标签：高质量蛋白 / 优质碳水 / 健康脂肪 / 果蔬纤维 等，空为无标签
+    val unitName: String = "", // 量词单位名：如「个」「盒」「碗」，空 = 按克
+    val unitGrams: Double = 0.0, // 1 个单位等于多少 g（牛奶等液体为 ml）
 ) {
     val kcal: Double get() = protein * 4 + carb * 4 + fat * 9
 }
@@ -82,33 +84,6 @@ data class ExerciseTemplate(
     val isCustom: Boolean = false,
     val lastUsedAt: Long = 0,
     val voiceKey: String = "",        // 训练模式动作名语音 key（如 ex_pushup），空则用提示音
-)
-
-/** 训练计划：编排好的动作队列，JSON 存储明细 */
-@Entity(tableName = "workout_plans")
-data class WorkoutPlan(
-    @PrimaryKey(autoGenerate = true) val id: Long = 0,
-    val name: String,
-    val itemsJson: String, // [{templateId,name,qtyType,sets,reps,weightKg,restSec,voiceKey,met,perRepSeconds,paceMinPerKm,primaryMuscle,secondaryMuscles}]
-    val lastUsedAt: Long = 0,
-    val createdAt: Long = System.currentTimeMillis(),
-)
-
-/** 计划中的单个动作编排 */
-data class PlanItem(
-    val templateId: Long,
-    val name: String,
-    val qtyType: String,      // REPS / DISTANCE / SECONDS
-    val sets: Int,            // 组数
-    val reps: Double,         // 每组数量（个/公里/秒）
-    val weightKg: Double = 0.0,
-    val restSec: Int = 60,    // 组间休息
-    val voiceKey: String = "",
-    val met: Double,
-    val perRepSeconds: Double = 0.0,
-    val paceMinPerKm: Double = 0.0,
-    val primaryMuscle: String,
-    val secondaryMuscles: String = "",
 )
 
 @Entity(tableName = "exercise_entries")
@@ -223,11 +198,14 @@ interface AppDao {
     @Query("DELETE FROM food_templates WHERE isCustom = 0")
     suspend fun clearBuiltinFoodTemplates()
 
-    @Query("SELECT * FROM water_entries ORDER BY date")
+    @Query("SELECT * FROM water_entries ORDER BY date, createdAt")
     suspend fun allWaterEntries(): List<WaterEntry>
 
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    @Insert
     suspend fun insertWaterEntry(e: WaterEntry): Long
+
+    @Query("SELECT * FROM water_entries WHERE date = :date ORDER BY createdAt")
+    suspend fun waterEntriesOn(date: String): List<WaterEntry>
 
     @Delete
     suspend fun deleteWaterEntry(e: WaterEntry)
@@ -237,22 +215,12 @@ interface AppDao {
 
     @Update
     suspend fun updateExerciseEntry(e: ExerciseEntry)
-
-    @Query("SELECT * FROM workout_plans ORDER BY lastUsedAt DESC, createdAt DESC")
-    suspend fun allPlans(): List<WorkoutPlan>
-
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun upsertPlan(p: WorkoutPlan): Long
-
-    @Delete
-    suspend fun deletePlan(p: WorkoutPlan)
 }
 
 @Database(
     entities = [Profile::class, FoodTemplate::class, FoodEntry::class,
-        ExerciseTemplate::class, ExerciseEntry::class, WeightEntry::class, WaterEntry::class,
-        WorkoutPlan::class],
-    version = 6,
+        ExerciseTemplate::class, ExerciseEntry::class, WeightEntry::class, WaterEntry::class],
+    version = 7,
     exportSchema = false,
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -311,11 +279,33 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        val MIGRATION_6_7 = object : androidx.room.migration.Migration(6, 7) {
+            override fun migrate(db: androidx.sqlite.db.SupportSQLiteDatabase) {
+                // 饮水改按条记录：去掉 date 唯一约束，重建表
+                db.execSQL("DROP TABLE IF EXISTS `water_entries_new`")
+                db.execSQL(
+                    "CREATE TABLE IF NOT EXISTS `water_entries_new` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, " +
+                            "`date` TEXT NOT NULL, `ml` REAL NOT NULL, `createdAt` INTEGER NOT NULL)"
+                )
+                db.execSQL(
+                    "INSERT INTO `water_entries_new` (`date`, `ml`, `createdAt`) " +
+                            "SELECT `date`, `ml`, `createdAt` FROM `water_entries`"
+                )
+                db.execSQL("DROP TABLE `water_entries`")
+                db.execSQL("ALTER TABLE `water_entries_new` RENAME TO `water_entries`")
+                // 移除训练模式：计划表不再使用
+                db.execSQL("DROP TABLE IF EXISTS `workout_plans`")
+                // 食物模板：量词单位（1个=多少g，液体为ml）
+                db.execSQL("ALTER TABLE `food_templates` ADD COLUMN `unitName` TEXT NOT NULL DEFAULT ''")
+                db.execSQL("ALTER TABLE `food_templates` ADD COLUMN `unitGrams` REAL NOT NULL DEFAULT 0")
+            }
+        }
+
         fun get(ctx: Context): AppDatabase =
             inst ?: synchronized(this) {
                 inst ?: Room.databaseBuilder(
                     ctx.applicationContext, AppDatabase::class.java, "musclediary.db"
-                ).addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6)
+                ).addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7)
                     .build().also { inst = it }
             }
     }

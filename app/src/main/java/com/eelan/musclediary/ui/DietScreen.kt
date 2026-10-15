@@ -104,10 +104,9 @@ fun DietScreen(vm: AppViewModel) {
     }
 
     pendingTemplate?.let { t ->
-        NumberDialog(
-            title = t.name, label = "吃了多少克？",
-            // 预填上次记录的克数，没有则默认 100
-            initial = fmt0(vm.lastFoodGrams(t) ?: 100.0),
+        FoodQtyDialog(
+            template = t,
+            recent = vm.recentFoodGrams(t),
             onDismiss = { pendingTemplate = null },
             onConfirm = { grams -> vm.addFood(t, grams, vm.selectedDate); pendingTemplate = null },
         )
@@ -124,8 +123,8 @@ fun DietScreen(vm: AppViewModel) {
     if (customOpen) {
         CustomFoodDialog(
             onDismiss = { customOpen = false },
-            onConfirm = { name, p, c, f, tag ->
-                vm.addCustomFood(name, p, c, f, tag) { saved ->
+            onConfirm = { name, p, c, f, tag, unitName, unitGrams ->
+                vm.addCustomFood(name, p, c, f, tag, unitName, unitGrams) { saved ->
                     pendingTemplate = saved
                 }
                 customOpen = false
@@ -136,6 +135,104 @@ fun DietScreen(vm: AppViewModel) {
     if (showCalendar) {
         CalendarSheet(vm, onDismiss = { showCalendar = false })
     }
+}
+
+/**
+ * 食物记录对话框：
+ * - 模板设了量词单位（如 1个=50g、1盒=250ml）时，可按「X 个/盒」或克数输入，二者联动
+ * - 输入框下方展示最近 3 次记录（去重）快捷标签，点击直接填入
+ */
+@Composable
+private fun FoodQtyDialog(
+    template: FoodTemplate,
+    recent: List<Double>,
+    onDismiss: () -> Unit,
+    onConfirm: (Double) -> Unit,
+) {
+    val hasUnit = template.unitName.isNotBlank() && template.unitGrams > 0
+    val unitName = template.unitName.ifBlank { "份" }
+
+    // grams 始终为真值来源；unitText 独立显示，仅在联动时更新
+    var gramsText by remember(template.id) {
+        mutableStateOf(fmt0(recent.firstOrNull() ?: 100.0))
+    }
+    var unitText by remember(template.id) {
+        mutableStateOf(
+            if (hasUnit) fmt1((recent.firstOrNull() ?: (template.unitGrams)) / template.unitGrams) else ""
+        )
+    }
+
+    val grams = gramsText.toDoubleOrNull()
+    val units = unitText.toDoubleOrNull()
+    val valid = grams != null && grams > 0
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = Ink2,
+        title = { Text(template.name, color = TextHi, fontSize = 16.sp) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                if (hasUnit) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                        OutlinedTextField(
+                            value = unitText, onValueChange = { v ->
+                                unitText = v
+                                v.toDoubleOrNull()?.let { u -> gramsText = fmt1(u * template.unitGrams) }
+                            },
+                            label = { Text("吃了多少$unitName？", color = TextLo) },
+                            singleLine = true,
+                            keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
+                                keyboardType = KeyboardType.Decimal),
+                            modifier = Modifier.weight(1f), colors = fieldColors(),
+                        )
+                        Text("$unitName = ${fmt0(template.unitGrams)}g",
+                            fontSize = 11.sp, color = TextLo)
+                    }
+                }
+                OutlinedTextField(
+                    value = gramsText, onValueChange = { v ->
+                        gramsText = v
+                        if (hasUnit) {
+                            v.toDoubleOrNull()?.let { g -> unitText = fmt1(g / template.unitGrams) }
+                        }
+                    },
+                    label = { Text(if (hasUnit) "或输入克数 g" else "吃了多少克？", color = TextLo) },
+                    singleLine = true,
+                    keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
+                        keyboardType = KeyboardType.Decimal),
+                    colors = fieldColors(),
+                )
+                QuickChips(
+                    chips = recent.map { g ->
+                        if (hasUnit) "${fmt1(g / template.unitGrams)}$unitName（${fmt0(g)}g）" else "${fmt0(g)}g"
+                    },
+                    onPick = { c ->
+                        // 从标签文本反解出克数：取括号里的数字，无括号取整体
+                        val g = Regex("（([0-9.]+)g）").find(c)?.groupValues?.get(1)?.toDoubleOrNull()
+                            ?: c.removeSuffix("g").toDoubleOrNull()
+                        g?.let {
+                            gramsText = fmt1(it)
+                            if (hasUnit) unitText = fmt1(it / template.unitGrams)
+                        }
+                    },
+                )
+                if (valid && grams != null) {
+                    val k = grams / 100.0
+                    Text(
+                        "蛋白${fmt1(template.protein * k)}g · 碳水${fmt1(template.carb * k)}g · " +
+                                "脂肪${fmt1(template.fat * k)}g · ${fmt0(template.kcal * k)} kcal",
+                        color = Accent, fontSize = 13.sp,
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(enabled = valid, onClick = {
+                onConfirm(grams!!); onDismiss()
+            }) { Text("记录", color = if (valid) Accent else TextLo) }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("取消", color = TextLo) } },
+    )
 }
 
 @Composable
@@ -251,15 +348,19 @@ fun fieldColors() = TextFieldDefaults.colors(
 fun CustomFoodDialog(
     initial: FoodTemplate? = null,
     onDismiss: () -> Unit,
-    onConfirm: (String, Double, Double, Double, String) -> Unit,
+    onConfirm: (String, Double, Double, Double, String, String, Double) -> Unit,
 ) {
     var name by remember { mutableStateOf(initial?.name ?: "") }
     var p by remember { mutableStateOf(initial?.let { fmt1(it.protein) } ?: "") }
     var c by remember { mutableStateOf(initial?.let { fmt1(it.carb) } ?: "") }
     var f by remember { mutableStateOf(initial?.let { fmt1(it.fat) } ?: "") }
     var tag by remember { mutableStateOf(initial?.tag ?: "") }
+    var unitName by remember { mutableStateOf(initial?.unitName ?: "") }
+    var unitGrams by remember { mutableStateOf(initial?.takeIf { it.unitGrams > 0 }?.let { fmt0(it.unitGrams) } ?: "") }
     val pd = p.toDoubleOrNull(); val cd = c.toDoubleOrNull(); val fd = f.toDoubleOrNull()
-    val valid = name.isNotBlank() && pd != null && cd != null && fd != null
+    val ug = unitGrams.toDoubleOrNull()
+    val unitInvalid = unitName.isNotBlank() && (ug == null || ug <= 0)
+    val valid = name.isNotBlank() && pd != null && cd != null && fd != null && !unitInvalid
     AlertDialog(
         onDismissRequest = onDismiss,
         containerColor = Ink2,
@@ -318,6 +419,19 @@ fun CustomFoodDialog(
                         )
                     }
                 }
+                // 量词单位（可选）：如名称填「个」、等于填 50，表示 1个=50g
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                    OutlinedTextField(value = unitName, onValueChange = { unitName = it },
+                        label = { Text("量词单位（可选，如：个/盒/碗）", color = TextLo, fontSize = 11.sp) },
+                        singleLine = true, modifier = Modifier.weight(1.4f), colors = fieldColors())
+                    OutlinedTextField(value = unitGrams, onValueChange = { unitGrams = it },
+                        label = { Text("1单位=?g", color = TextLo, fontSize = 11.sp) },
+                        singleLine = true,
+                        enabled = unitName.isNotBlank(),
+                        keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
+                            keyboardType = KeyboardType.Decimal),
+                        modifier = Modifier.weight(1f), colors = fieldColors())
+                }
                 if (pd != null && cd != null && fd != null) {
                     Text("热量 ≈ ${fmt0(pd * 4 + cd * 4 + fd * 9)} kcal/100g",
                         color = Accent, fontSize = 13.sp)
@@ -326,7 +440,8 @@ fun CustomFoodDialog(
         },
         confirmButton = {
             TextButton(enabled = valid, onClick = {
-                onConfirm(name.trim(), pd!!, cd!!, fd!!, tag)
+                onConfirm(name.trim(), pd!!, cd!!, fd!!, tag,
+                    unitName.trim(), if (unitName.isNotBlank()) (ug ?: 0.0) else 0.0)
             }) { Text("保存", color = if (valid) Accent else TextLo) }
         },
         dismissButton = { TextButton(onClick = onDismiss) { Text("取消", color = TextLo) } },

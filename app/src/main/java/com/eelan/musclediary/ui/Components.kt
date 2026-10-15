@@ -10,6 +10,8 @@ import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -328,4 +330,32 @@ fun SectionTitle(text: String, modifier: Modifier = Modifier) {
         text, modifier = modifier.padding(vertical = 8.dp),
         fontSize = 15.sp, fontWeight = FontWeight.Bold, color = TextHi,
     )
+}
+
+/** 快捷输入标签行：最近几次记录（已去重），点击直接填入 */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+fun QuickChips(
+    chips: List<String>,
+    modifier: Modifier = Modifier,
+    onPick: (String) -> Unit,
+) {
+    if (chips.isEmpty()) return
+    FlowRow(
+        modifier = modifier,
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        Text("最近：", fontSize = 11.sp, color = TextLo,
+            modifier = Modifier.align(Alignment.CenterVertically))
+        chips.forEach { c ->
+            Text(
+                c, fontSize = 11.sp, color = Accent,
+                modifier = Modifier
+                    .clip(RoundedCornerShape(14.dp))
+                    .background(Accent.copy(alpha = 0.15f))
+                    .clickable { onPick(c) }
+                    .padding(horizontal = 10.dp, vertical = 4.dp),
+            )
+        }
+    }
 }

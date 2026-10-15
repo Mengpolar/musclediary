@@ -38,8 +38,6 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         private set
     var waterEntries by mutableStateOf<List<WaterEntry>>(emptyList())
         private set
-    var workoutPlans by mutableStateOf<List<WorkoutPlan>>(emptyList())
-        private set
 
     init {
         viewModelScope.launch(Dispatchers.IO) {
@@ -71,7 +69,6 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             exerciseEntries = dao.allExerciseEntries()
             weightEntries = dao.allWeightEntries()
             waterEntries = dao.allWaterEntries()
-            workoutPlans = dao.allPlans()
             // 补齐旧内置动作的语音 key
             val vkByName = ExerciseSeed.items.associate { it.name to it.voiceKey }
             dao.exerciseTemplates().filter { !it.isCustom && it.voiceKey.isEmpty() }
@@ -113,77 +110,6 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         weightEntries = weightEntries.filterNot { it.id == e.id }
     }
 
-    /** 训练模式完成：直接按预计算的热量/时长写入一条锻炼记录 */
-    fun addWorkoutResult(t: ExerciseTemplate, totalQty: Double, kcal: Double, minutes: Double, date: LocalDate) {
-        val perSetScores = Calc.muscleScores(t, totalQty, 0.0)
-        val json = org.json.JSONObject().apply { perSetScores.forEach { (k, v) -> put(k, v) } }.toString()
-        val e = ExerciseEntry(
-            date = date.toString(), templateId = t.id, name = t.name,
-            qty = totalQty, weightKg = 0.0, calories = kcal, minutes = minutes, musclesJson = json,
-        )
-        bumpExerciseUsage(t)
-        viewModelScope.launch(Dispatchers.IO) {
-            val id = dao.insertExerciseEntry(e)
-            withContext(Dispatchers.Main) { exerciseEntries = exerciseEntries + e.copy(id = id) }
-        }
-    }
-
-    /** 保存训练计划 */
-    fun savePlan(name: String, items: List<PlanItem>, onDone: () -> Unit = {}) {
-        viewModelScope.launch(Dispatchers.IO) {
-            val arr = org.json.JSONArray()
-            items.forEach { i ->
-                arr.put(org.json.JSONObject().apply {
-                    put("templateId", i.templateId); put("name", i.name)
-                    put("qtyType", i.qtyType); put("sets", i.sets); put("reps", i.reps)
-                    put("weightKg", i.weightKg); put("restSec", i.restSec)
-                    put("voiceKey", i.voiceKey); put("met", i.met)
-                    put("perRepSeconds", i.perRepSeconds); put("paceMinPerKm", i.paceMinPerKm)
-                    put("primaryMuscle", i.primaryMuscle); put("secondaryMuscles", i.secondaryMuscles)
-                })
-            }
-            dao.upsertPlan(WorkoutPlan(name = name, itemsJson = arr.toString(), lastUsedAt = System.currentTimeMillis()))
-            workoutPlans = dao.allPlans()
-            withContext(Dispatchers.Main) { onDone() }
-        }
-    }
-
-    fun parsePlanItems(p: WorkoutPlan): List<PlanItem> = runCatching {
-        val arr = org.json.JSONArray(p.itemsJson)
-        (0 until arr.length()).map {
-            val o = arr.getJSONObject(it)
-            PlanItem(
-                templateId = o.optLong("templateId"), name = o.getString("name"),
-                qtyType = o.getString("qtyType"), sets = o.getInt("sets"), reps = o.getDouble("reps"),
-                weightKg = o.optDouble("weightKg", 0.0), restSec = o.optInt("restSec", 60),
-                voiceKey = o.optString("voiceKey"), met = o.getDouble("met"),
-                perRepSeconds = o.optDouble("perRepSeconds", 0.0),
-                paceMinPerKm = o.optDouble("paceMinPerKm", 0.0),
-                primaryMuscle = o.getString("primaryMuscle"),
-                secondaryMuscles = o.optString("secondaryMuscles"),
-            )
-        }
-    }.getOrDefault(emptyList())
-
-    fun touchPlan(p: WorkoutPlan) {
-        viewModelScope.launch(Dispatchers.IO) {
-            dao.upsertPlan(p.copy(lastUsedAt = System.currentTimeMillis()))
-            workoutPlans = dao.allPlans()
-        }
-    }
-
-    fun deletePlan(p: WorkoutPlan) {
-        viewModelScope.launch(Dispatchers.IO) {
-            dao.deletePlan(p)
-            workoutPlans = dao.allPlans()
-        }
-    }
-
-    /** 计划列表：超过 5 个时按最近使用排序展示 */
-    fun sortedPlans(): List<WorkoutPlan> =
-        if (workoutPlans.size <= 5) workoutPlans
-        else workoutPlans.sortedByDescending { it.lastUsedAt }
-
     /** 修改体重记录；若记录的是今天，同步更新身体档案 */
     fun updateWeight(e: WeightEntry, newKg: Double) {
         val upd = e.copy(weightKg = newKg)
@@ -194,39 +120,26 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    fun waterOn(date: LocalDate): WaterEntry? =
-        waterEntries.firstOrNull { it.date == date.toString() }
+    fun waterOn(date: LocalDate): Double =
+        waterEntries.filter { it.date == date.toString() }.sumOf { it.ml }
 
-    /** 记录饮水：在指定日期的累计值上追加 */
+    /** 某日期的饮水记录明细（按时间正序） */
+    fun waterListOn(date: LocalDate): List<WaterEntry> =
+        waterEntries.filter { it.date == date.toString() }.sortedBy { it.createdAt }
+
+    /** 记录一次饮水 */
     fun addWater(ml: Double, date: LocalDate) {
-        val key = date.toString()
-        val cur = waterEntries.firstOrNull { it.date == key }
-        val e = (cur ?: WaterEntry(date = key, ml = 0.0)).copy(ml = (cur?.ml ?: 0.0) + ml)
+        val e = WaterEntry(date = date.toString(), ml = ml)
         viewModelScope.launch(Dispatchers.IO) {
             dao.insertWaterEntry(e)
             waterEntries = dao.allWaterEntries()
         }
     }
 
-    /** 直接设定指定日期的饮水总量 */
-    fun setWaterTotal(ml: Double, date: LocalDate) {
-        val key = date.toString()
-        val cur = waterEntries.firstOrNull { it.date == key }
-        val e = (cur ?: WaterEntry(date = key, ml = 0.0)).copy(ml = ml)
-        viewModelScope.launch(Dispatchers.IO) {
-            dao.insertWaterEntry(e)
-            waterEntries = dao.allWaterEntries()
-        }
-    }
-
-    fun clearWater(date: LocalDate) {
-        val key = date.toString()
-        waterEntries.firstOrNull { it.date == key }?.let { e ->
-            viewModelScope.launch(Dispatchers.IO) {
-                dao.deleteWaterEntry(e)
-                waterEntries = dao.allWaterEntries()
-            }
-        }
+    /** 删除单条饮水记录 */
+    fun deleteWater(e: WaterEntry) {
+        viewModelScope.launch(Dispatchers.IO) { dao.deleteWaterEntry(e) }
+        waterEntries = waterEntries.filterNot { it.id == e.id }
     }
 
     /** 修改饮食记录克数：营养按克数比例重算 */
@@ -285,9 +198,11 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             .sortedWith(compareByDescending<ExerciseTemplate> { it.lastUsedAt }.thenBy { it.name })
     }
 
-    fun addCustomFood(name: String, protein: Double, carb: Double, fat: Double, tag: String = "", onReady: (FoodTemplate) -> Unit = {}) {
+    fun addCustomFood(name: String, protein: Double, carb: Double, fat: Double, tag: String = "",
+                      unitName: String = "", unitGrams: Double = 0.0, onReady: (FoodTemplate) -> Unit = {}) {
         viewModelScope.launch(Dispatchers.IO) {
-            val t = FoodTemplate(name = name, protein = protein, carb = carb, fat = fat, tag = tag, isCustom = true)
+            val t = FoodTemplate(name = name, protein = protein, carb = carb, fat = fat, tag = tag,
+                isCustom = true, unitName = unitName, unitGrams = unitGrams)
             val id = dao.insertFoodTemplate(t)
             val saved = t.copy(id = id)
             withContext(Dispatchers.Main) {
@@ -307,10 +222,36 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         foodEntries.filter { it.name == template.name }
             .maxByOrNull { it.createdAt }?.grams
 
+    /** 某食物最近 3 次记录的克数（去重，新→旧），用于快捷标签 */
+    fun recentFoodGrams(template: FoodTemplate): List<Double> {
+        val seen = linkedSetOf<Double>()
+        foodEntries.filter { it.name == template.name }
+            .sortedByDescending { it.createdAt }
+            .forEach { e -> seen.add(e.grams) }
+        return seen.take(3).toList()
+    }
+
     /** 某动作最近一次记录的数量与重量（用于预填输入框） */
     fun lastExerciseQty(template: ExerciseTemplate): Pair<Double, Double>? =
         exerciseEntries.filter { it.templateId == template.id || it.name == template.name }
             .maxByOrNull { it.createdAt }?.let { it.qty to it.weightKg }
+
+    /** 某动作最近 3 次记录的「数量+附加重量」（去重，新→旧），用于快捷标签 */
+    fun recentExerciseQty(template: ExerciseTemplate): List<Pair<Double, Double>> {
+        val seen = linkedSetOf<Pair<Double, Double>>()
+        exerciseEntries.filter { it.templateId == template.id || it.name == template.name }
+            .sortedByDescending { it.createdAt }
+            .forEach { e -> seen.add(e.qty to e.weightKg) }
+        return seen.take(3).toList()
+    }
+
+    /** 某日期往前最近 3 次不同的饮水值（去重，新→旧，跨天），用于快捷标签 */
+    fun recentWaterMl(): List<Double> {
+        val seen = linkedSetOf<Double>()
+        waterEntries.sortedByDescending { it.createdAt }
+            .forEach { e -> seen.add(e.ml) }
+        return seen.take(3).toList()
+    }
 
     fun saveFoodTemplate(t: FoodTemplate) {
         viewModelScope.launch(Dispatchers.IO) { dao.upsertFoodTemplate(t) }

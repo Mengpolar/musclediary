@@ -73,7 +73,7 @@ object WaterReminder {
         runCatching { NotificationManagerCompat.from(ctx).notify(1001, n) }
     }
 
-    /** 计算当前应处的时段与达标情况；返回非 null 表示需要提醒 */
+    /** 计算当前应处的时段与达标情况；已过时段若落后则发提醒 */
     suspend fun checkNow(ctx: Context) {
         val db = AppDatabase.get(ctx)
         val profile = db.dao().getProfile() ?: return
@@ -84,8 +84,7 @@ object WaterReminder {
         val targetMl = profile.weightKg * 35.0
         val shouldMl = (targetMl * slot.ratio).toInt()
         val today = java.time.LocalDate.now().toString()
-        val actual = db.dao().allWaterEntries()
-            .firstOrNull { it.date == today }?.ml?.toInt() ?: 0
+        val actual = db.dao().waterEntriesOn(today).sumOf { it.ml }.toInt()
         if (actual < shouldMl) {
             val label = when (slot.endHour) {
                 11 -> "上午时段（起床~11点）"
@@ -99,20 +98,21 @@ object WaterReminder {
 
     class Receiver : BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent) {
-            if (intent.action != ACTION_CHECK) return
-            kotlinx.coroutines.runBlocking { checkNow(context) }
+            if (intent.action != ACTION_CHECK && intent.action != Intent.ACTION_BOOT_COMPLETED) return
+            kotlinx.coroutines.runBlocking { runCatching { checkNow(context) } }
             scheduleNext(context)
         }
     }
 
     private const val ALARM_REQUEST_CODE = 2001
 
-    /** 注册下一个时段的检查（幂等，覆盖式） */
+    /** 注册下一个时段的检查（幂等，覆盖式）。
+     *  广播用显式 Intent 指向接收器类：Android 8+ 隐式广播对清单接收器不可达，这是此前提醒不生效的主因。 */
     fun scheduleNext(ctx: Context) {
         val am = ctx.getSystemService(Context.ALARM_SERVICE) as android.app.AlarmManager
         val pi = PendingIntent.getBroadcast(
             ctx, ALARM_REQUEST_CODE,
-            Intent(ACTION_CHECK).setPackage(ctx.packageName),
+            Intent(ctx, Receiver::class.java).setAction(ACTION_CHECK),
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
         )
         val now = java.util.Calendar.getInstance()
@@ -137,7 +137,7 @@ object WaterReminder {
         val am = ctx.getSystemService(Context.ALARM_SERVICE) as android.app.AlarmManager
         am.cancel(PendingIntent.getBroadcast(
             ctx, ALARM_REQUEST_CODE,
-            Intent(ACTION_CHECK).setPackage(ctx.packageName),
+            Intent(ctx, Receiver::class.java).setAction(ACTION_CHECK),
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
         ))
     }

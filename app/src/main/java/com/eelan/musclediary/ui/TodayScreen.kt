@@ -31,7 +31,7 @@ fun TodayScreen(vm: AppViewModel, onGoWorkout: () -> Unit = {}) {
     val protein = food.sumOf { it.protein }
     val carb = food.sumOf { it.carb }
     val fat = food.sumOf { it.fat }
-    val water = vm.waterOn(date)?.ml ?: 0.0
+    val water = vm.waterOn(date)
     val waterTarget = Calc.waterTargetMl(p.weightKg)
 
     var showSheet by remember { mutableStateOf(false) }
@@ -116,17 +116,18 @@ fun TodayScreen(vm: AppViewModel, onGoWorkout: () -> Unit = {}) {
     }
 }
 
-/** 饮水记录对话框：追加到所选日期，可改总量、可清空 */
+/** 饮水记录对话框：按条记录本次饮水（可逐条删除），输入框下方展示最近 3 次记录值快捷标签 */
 @Composable
 fun WaterDialog(vm: AppViewModel, date: LocalDate, targetMl: Double, onDismiss: () -> Unit) {
     var text by remember { mutableStateOf("") }
-    var editMode by remember { mutableStateOf(false) }
-    val current = vm.waterOn(date)?.ml ?: 0.0
+    val current = vm.waterOn(date)
+    val records = vm.waterListOn(date)
+    val recent = vm.recentWaterMl()
     val dateLabel = if (date == LocalDate.now()) "今日" else "${date.monthValue}月${date.dayOfMonth}日"
     AlertDialog(
         onDismissRequest = onDismiss,
         containerColor = Ink2,
-        title = { Text(if (editMode) "设定${dateLabel}饮水总量" else "记录${dateLabel}饮水", color = TextHi, fontSize = 16.sp) },
+        title = { Text("记录${dateLabel}饮水", color = TextHi, fontSize = 16.sp) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text(
@@ -135,21 +136,45 @@ fun WaterDialog(vm: AppViewModel, date: LocalDate, targetMl: Double, onDismiss: 
                 )
                 OutlinedTextField(
                     value = text, onValueChange = { text = it },
-                    label = { Text(if (editMode) "设为总量 ml" else "本次喝了多少 ml", color = TextLo) },
+                    label = { Text("本次喝了多少 ml", color = TextLo) },
                     singleLine = true,
                     keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
                         keyboardType = androidx.compose.ui.text.input.KeyboardType.Number),
                     colors = fieldColors(),
                 )
+                QuickChips(
+                    chips = recent.map { "${fmt0(it)}ml" },
+                    onPick = { text = it.removeSuffix("ml") },
+                )
                 Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    listOf("250", "500").forEach { q ->
-                        OutlinedButton(onClick = { text = q }, enabled = !editMode) {
+                    listOf("100", "250", "500").forEach { q ->
+                        OutlinedButton(onClick = { text = q }) {
                             Text("${q}ml", fontSize = 12.sp, color = TextHi)
                         }
                     }
-                    if (current > 0) {
-                        TextButton(onClick = { vm.clearWater(date) }) {
-                            Text("清空", fontSize = 12.sp, color = MaterialTheme.colorScheme.error)
+                }
+                // 当日明细（按条，可删除）
+                if (records.isNotEmpty()) {
+                    Text("当日记录（${records.size} 条）", fontSize = 12.sp, color = TextLo)
+                    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                        records.reversed().take(8).forEach { r ->
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                val t = java.time.Instant.ofEpochMilli(r.createdAt)
+                                    .atZone(java.time.ZoneId.systemDefault())
+                                Text(
+                                    String.format("%02d:%02d", t.hour, t.minute),
+                                    fontSize = 11.sp, color = TextLo,
+                                    modifier = Modifier.width(40.dp),
+                                )
+                                Text("+${fmt0(r.ml)} ml", fontSize = 12.sp, color = TextHi,
+                                    modifier = Modifier.weight(1f))
+                                Text(
+                                    "删", fontSize = 11.sp, color = MaterialTheme.colorScheme.error,
+                                    modifier = Modifier
+                                        .clickable { vm.deleteWater(r) }
+                                        .padding(horizontal = 8.dp, vertical = 4.dp),
+                                )
+                            }
                         }
                     }
                 }
@@ -159,20 +184,13 @@ fun WaterDialog(vm: AppViewModel, date: LocalDate, targetMl: Double, onDismiss: 
             TextButton(onClick = {
                 text.toDoubleOrNull()?.let { v ->
                     if (v > 0) {
-                        if (editMode) vm.setWaterTotal(v, date) else vm.addWater(v, date)
-                        onDismiss()
+                        vm.addWater(v, date)
+                        text = ""
                     }
                 }
-            }) { Text(if (editMode) "设定" else "记录", color = Accent) }
+            }) { Text("记录", color = Accent) }
         },
-        dismissButton = {
-            Row {
-                TextButton(onClick = {
-                    if (editMode) { editMode = false; text = "" } else { editMode = true; text = "" }
-                }) { Text(if (editMode) "返回追加" else "修改总量", color = TextLo, fontSize = 13.sp) }
-                TextButton(onClick = onDismiss) { Text("关闭", color = TextLo, fontSize = 13.sp) }
-            }
-        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("关闭", color = TextLo, fontSize = 13.sp) } },
     )
 }
 

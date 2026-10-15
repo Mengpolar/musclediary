@@ -96,11 +96,12 @@ fun ManageTemplatesScreen(vm: AppViewModel, kind: Int, onClose: () -> Unit) {
         CustomFoodDialog(
             initial = editFood,
             onDismiss = { editFood = null; addFood = false },
-            onConfirm = { name, p, c, f, tag ->
+            onConfirm = { name, p, c, f, tag, unitName, unitGrams ->
                 if (editFood != null) {
-                    vm.saveFoodTemplate(editFood!!.copy(name = name, protein = p, carb = c, fat = f, tag = tag))
+                    vm.saveFoodTemplate(editFood!!.copy(name = name, protein = p, carb = c, fat = f, tag = tag,
+                        unitName = unitName, unitGrams = unitGrams))
                 } else {
-                    vm.addCustomFood(name, p, c, f, tag) { }
+                    vm.addCustomFood(name, p, c, f, tag, unitName, unitGrams) { }
                 }
                 editFood = null; addFood = false
             },
@@ -163,9 +164,10 @@ private fun ActionChip(label: String, color: Color, onClick: () -> Unit) {
 
 @Composable
 private fun FoodManageRow(t: FoodTemplate, onEdit: () -> Unit, onDelete: () -> Unit) {
+    val unitInfo = if (t.unitName.isNotBlank() && t.unitGrams > 0) " · 1${t.unitName}=${fmt0(t.unitGrams)}g" else ""
     SwipeEntryRow(
         title = t.name + if (t.isCustom) " · 自定义" else "",
-        detail = "蛋白${fmt1(t.protein)} 碳水${fmt1(t.carb)} 脂肪${fmt1(t.fat)} · 左滑可修改/删除",
+        detail = "蛋白${fmt1(t.protein)} 碳水${fmt1(t.carb)} 脂肪${fmt1(t.fat)}$unitInfo · 左滑可修改/删除",
         trailing = "${fmt0(t.kcal)} kcal",
         onEdit = onEdit,
         onDelete = onDelete,

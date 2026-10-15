@@ -30,6 +30,10 @@ class MainActivity : ComponentActivity() {
         registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
             if (granted) {
                 com.eelan.musclediary.reminder.WaterReminder.scheduleNext(applicationContext)
+                // 授权后立刻补一次当前时段检查，避免错过本轮
+                lifecycleScope.launch {
+                    runCatching { com.eelan.musclediary.reminder.WaterReminder.checkNow(applicationContext) }
+                }
             }
             // 未授权：提醒功能保持关闭（设置页可重新开启）
         }
@@ -44,6 +48,8 @@ class MainActivity : ComponentActivity() {
             if (p?.waterReminder == 1) {
                 if (com.eelan.musclediary.reminder.WaterReminder.hasPermission(applicationContext)) {
                     com.eelan.musclediary.reminder.WaterReminder.scheduleNext(applicationContext)
+                    // 已过时段若落后，打开 App 时补提醒
+                    runCatching { reminder.checkNow(applicationContext) }
                 } else if (android.os.Build.VERSION.SDK_INT >= 33) {
                     requestPermissionLauncher.launch(android.Manifest.permission.POST_NOTIFICATIONS)
                 }
@@ -52,8 +58,6 @@ class MainActivity : ComponentActivity() {
         setContent {
             MuscleDiaryTheme {
                 val vm: AppViewModel = viewModel()
-                // 启动即预热训练语音（后台加载 105 个音效，进入训练时已就绪）
-                com.eelan.musclediary.reminder.VoicePlayer.get(applicationContext)
                 if (!vm.loaded) {
                     Box(
                         Modifier.fillMaxSize().background(Ink0),
@@ -75,10 +79,6 @@ private data class Tab(val label: String, val icon: ImageVector)
 fun AppRoot(vm: AppViewModel) {
     var tab by remember { mutableIntStateOf(0) }
     var manage by remember { mutableIntStateOf(-1) } // -1 无；0 食物模板管理；1 锻炼模板管理
-    var builderOrSession by remember { mutableIntStateOf(0) } // 0 无；1 编排页；2 训练进行中
-    var sessionItems by remember {
-        mutableStateOf<List<com.eelan.musclediary.data.PlanItem>>(emptyList())
-    }
     val tabs = listOf(
         Tab("今日", Icons.Default.Home),
         Tab("饮食", Icons.Default.Restaurant),
@@ -110,43 +110,21 @@ fun AppRoot(vm: AppViewModel) {
                 .fillMaxSize()
                 .background(Ink0)
         ) {
-            // 训练模式为全屏覆盖层：编排/进行中时盖住底部导航和页面内容
-            if (builderOrSession == 0) {
-                Column(Modifier.fillMaxSize().padding(top = 12.dp)) {
-                    when (tab) {
-                        0 -> TodayScreen(vm, onGoWorkout = { tab = 2 })
-                        1 -> DietScreen(vm)
-                        2 -> WorkoutScreen(
+            Column(Modifier.fillMaxSize().padding(top = 12.dp)) {
+                when (tab) {
+                    0 -> TodayScreen(vm, onGoWorkout = { tab = 2 })
+                    1 -> DietScreen(vm)
+                    2 -> WorkoutScreen(vm)
+                    3 -> when (manage) {
+                        0 -> ManageTemplatesScreen(vm, 0, onClose = { manage = -1 })
+                        1 -> ManageTemplatesScreen(vm, 1, onClose = { manage = -1 })
+                        else -> SettingsScreen(
                             vm,
-                            onStartTraining = { builderOrSession = 1 },
+                            onManageFood = { manage = 0 },
+                            onManageExercise = { manage = 1 },
                         )
-                        3 -> when (manage) {
-                            0 -> ManageTemplatesScreen(vm, 0, onClose = { manage = -1 })
-                            1 -> ManageTemplatesScreen(vm, 1, onClose = { manage = -1 })
-                            else -> SettingsScreen(
-                                vm,
-                                onManageFood = { manage = 0 },
-                                onManageExercise = { manage = 1 },
-                            )
-                        }
                     }
                 }
-            } else if (builderOrSession == 1) {
-                WorkoutBuilderOverlay(
-                    vm = vm,
-                    onDismiss = { builderOrSession = 0 },
-                    onStart = { planItems ->
-                        sessionItems = planItems
-                        builderOrSession = 2
-                    },
-                )
-            } else {
-                WorkoutSessionOverlay(
-                    vm = vm,
-                    items = sessionItems,
-                    onFinished = { builderOrSession = 0 },
-                    onQuit = { builderOrSession = 0 },
-                )
             }
         }
     }
