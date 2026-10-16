@@ -126,7 +126,7 @@ fun TodayScreen(vm: AppViewModel, onGoWorkout: () -> Unit = {}, onOpenWaterRecor
 }
 
 /**
- * 饮水记录对话框：快速记录本次饮水（快捷标签 + 快捷按钮 + 输入）。
+ * 饮水记录对话框：快捷按钮点击直接记录并关窗；也可手输 ml 后点「记录」。
  * 当日/历史明细在「全部记录」全屏页查看。
  */
 @Composable
@@ -147,26 +147,24 @@ fun WaterDialog(vm: AppViewModel, date: LocalDate, targetMl: Double, onDismiss: 
                     else "当前 ${fmt0(current)} / ${fmt0(targetMl)} ml · 已达标",
                     fontSize = 13.sp, color = if (remain > 0) Protein else Good,
                 )
+                // 快捷按钮：合并最近值与常用值（去重，最多 4 个），点击直接记录并关窗
+                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    val chips = (recent.map { fmt0(it) } + listOf("100", "250", "500")).distinct().take(4)
+                    chips.forEach { q ->
+                        OutlinedButton(onClick = {
+                            q.toDoubleOrNull()?.let { vm.addWater(it, date) }
+                            onDismiss()
+                        }) { Text("${q}ml", fontSize = 12.sp, color = TextHi) }
+                    }
+                }
                 OutlinedTextField(
                     value = text, onValueChange = { text = it },
-                    label = { Text("本次喝了多少 ml", color = TextLo) },
+                    label = { Text("其他毫升数（输入后点「记录」）", color = TextLo) },
                     singleLine = true,
                     keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
                         keyboardType = androidx.compose.ui.text.input.KeyboardType.Number),
                     colors = fieldColors(),
                 )
-                QuickChips(
-                    chips = recent.map { "${fmt0(it)}ml" },
-                    onPick = { text = it.removeSuffix("ml") },
-                )
-                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    listOf("100", "250", "500").forEach { q ->
-                        OutlinedButton(onClick = {
-                            vm.addWater(q.toDouble(), date)
-                            text = ""
-                        }) { Text("${q}ml", fontSize = 12.sp, color = TextHi) }
-                    }
-                }
             }
         },
         confirmButton = {
@@ -174,7 +172,7 @@ fun WaterDialog(vm: AppViewModel, date: LocalDate, targetMl: Double, onDismiss: 
                 text.toDoubleOrNull()?.let { v ->
                     if (v > 0) {
                         vm.addWater(v, date)
-                        text = ""
+                        onDismiss()
                     }
                 }
             }) { Text("记录", color = Accent) }
