@@ -34,7 +34,7 @@ fun WeightCard(vm: AppViewModel, onOpenRecords: () -> Unit = {}) {
         Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
                 Text(
-                    latest?.let { "最近 ${it.date.substring(5)} · ${fmt1(it.weightKg)} kg（共 ${entries.size} 条记录）" }
+                    latest?.let { "最近 ${it.date.substring(5)} · ${fmt1(it.weightKg)} kg" }
                         ?: "还没有记录",
                     fontSize = 12.sp, color = TextLo,
                 )
@@ -51,7 +51,7 @@ fun WeightCard(vm: AppViewModel, onOpenRecords: () -> Unit = {}) {
         if (entries.isNotEmpty()) {
             Spacer(Modifier.height(8.dp))
             Text(
-                "全部记录 >",
+                "全部记录（${entries.size} 条）>",
                 fontSize = 12.sp, color = Accent,
                 modifier = Modifier
                     .clickable(onClick = onOpenRecords)
@@ -173,15 +173,23 @@ fun WeightChart(entries: List<WeightEntry>) {
         }
     }
     Spacer(Modifier.height(2.dp))
-    Row(Modifier.fillMaxWidth()) {
+    // 单点时首尾相同只标一次
+    if (sorted.size == 1) {
         Text(
             "${sorted.first().date.substring(5)} ${fmt1(sorted.first().weightKg)}kg",
             fontSize = 11.sp, color = TextLo,
         )
-        Spacer(Modifier.weight(1f))
-        Text(
-            "${sorted.last().date.substring(5)} ${fmt1(sorted.last().weightKg)}kg",
-            fontSize = 11.sp, color = TextLo,
-        )
+    } else {
+        Row(Modifier.fillMaxWidth()) {
+            Text(
+                "${sorted.first().date.substring(5)} ${fmt1(sorted.first().weightKg)}kg",
+                fontSize = 11.sp, color = TextLo,
+            )
+            Spacer(Modifier.weight(1f))
+            Text(
+                "${sorted.last().date.substring(5)} ${fmt1(sorted.last().weightKg)}kg",
+                fontSize = 11.sp, color = TextLo,
+            )
+        }
     }
 }

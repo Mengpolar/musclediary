@@ -215,6 +215,9 @@ interface AppDao {
 
     @Update
     suspend fun updateExerciseEntry(e: ExerciseEntry)
+
+    @Update
+    suspend fun updateWaterEntry(e: WaterEntry)
 }
 
 @Database(

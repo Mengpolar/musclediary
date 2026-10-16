@@ -32,3 +32,6 @@ app/src/main/assets/
 # UI 调试转储（模拟器测试临时文件）
 ui_*.xml
 tap.txt
+
+# 本地 UI 自动化测试脚本（不入库）
+.uitest/

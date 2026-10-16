@@ -557,12 +557,12 @@ fun MealQuickDialog(
 /** 饮食记录行 detail：按克录入显示克数，快速记录的餐食（grams=0）只显示营养 */
 internal fun foodDetail(f: com.eelan.musclediary.data.FoodEntry): String {
     val head = if (f.grams > 0) "${fmt0(f.grams)}g · " else ""
-    return "$head 蛋白${fmt1(f.protein)} 碳水${fmt1(f.carb)} 脂肪${fmt1(f.fat)}".replace("  ", " ")
+    return "${head}蛋白${fmt1(f.protein)} 碳水${fmt1(f.carb)} 脂肪${fmt1(f.fat)}"
 }
 
 /** 修改快速记录的餐食热量 */
 @Composable
-private fun MealEditDialog(
+internal fun MealEditDialog(
     entry: com.eelan.musclediary.data.FoodEntry,
     onDismiss: () -> Unit,
     onConfirm: (Double) -> Unit,

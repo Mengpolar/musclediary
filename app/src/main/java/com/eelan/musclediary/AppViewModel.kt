@@ -134,6 +134,13 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         waterEntries = waterEntries.filterNot { it.id == e.id }
     }
 
+    /** 修改单条饮水记录的毫升数 */
+    fun updateWater(e: WaterEntry, newMl: Double) {
+        val upd = e.copy(ml = newMl)
+        viewModelScope.launch(Dispatchers.IO) { dao.updateWaterEntry(upd) }
+        waterEntries = waterEntries.map { if (it.id == e.id) upd else it }
+    }
+
     /** 修改饮食记录克数：营养按克数比例重算 */
     fun updateFoodEntry(e: FoodEntry, newGrams: Double) {
         if (e.grams <= 0) return

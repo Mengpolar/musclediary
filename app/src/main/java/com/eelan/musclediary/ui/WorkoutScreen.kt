@@ -138,7 +138,7 @@ fun WorkoutScreen(vm: AppViewModel, onOpenWeightRecords: () -> Unit = {}, onOpen
                     entries.forEach { e ->
                         SwipeEntryRow(
                             e.name,
-                            workoutDetail(e),
+                            workoutDetail(e, vm.exerciseTemplates),
                             "${fmt0(e.calories)} kcal",
                             onEdit = { editingEntry = e },
                             onDelete = { vm.deleteExercise(e) },
@@ -196,10 +196,15 @@ fun WorkoutScreen(vm: AppViewModel, onOpenWeightRecords: () -> Unit = {}, onOpen
     }
 }
 
-private fun workoutDetail(e: com.eelan.musclediary.data.ExerciseEntry): String {
+/** 锻炼行 detail：单位按模板类型区分（个/公里/秒） */
+private fun workoutDetail(e: com.eelan.musclediary.data.ExerciseEntry, templates: List<ExerciseTemplate>): String {
+    // 模板可能已被删，找不到时按名称兜底
+    val unit = templates.firstOrNull { it.id == e.templateId }
+        ?.let { Calc.unitLabel(it) }
+        ?: if (e.name.contains("跑") || e.name.contains("步") || e.name.contains("骑")) "公里" else "个"
     val qty = when {
         e.weightKg > 0 -> "${fmt1(e.qty)}个×${fmt1(e.weightKg)}kg"
-        else -> "${fmt1(e.qty)}${if (e.name.contains("跑") || e.name.contains("步") || e.name.contains("骑")) "公里" else "个/秒"}"
+        else -> "${fmt1(e.qty)}$unit"
     }
     val muscles = runCatching {
         JSONObject(e.musclesJson).keys().asSequence().toList()

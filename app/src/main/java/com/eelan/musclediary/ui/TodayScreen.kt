@@ -3,7 +3,9 @@ package com.eelan.musclediary.ui
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ChevronLeft
 import androidx.compose.material.icons.filled.ChevronRight
@@ -38,7 +40,10 @@ fun TodayScreen(vm: AppViewModel, onGoWorkout: () -> Unit = {}, onOpenWaterRecor
     var showCalendar by remember { mutableStateOf(false) }
     var showWater by remember { mutableStateOf(false) }
 
-    Column(Modifier.padding(horizontal = 16.dp)) {
+    Column(
+        Modifier.padding(horizontal = 16.dp)
+            .verticalScroll(rememberScrollState())
+    ) {
         DateHeader(vm, onOpenCalendar = { showCalendar = true })
         Spacer(Modifier.height(8.dp))
         CardBox(title = "今日目标（${if (targets.isCut) "减脂期" else "增肌期"}）") {
@@ -83,11 +88,17 @@ fun TodayScreen(vm: AppViewModel, onGoWorkout: () -> Unit = {}, onOpenWaterRecor
                         valueColor = if (water >= waterTarget) Good else TextHi,
                     )
                     Spacer(Modifier.height(6.dp))
-                    Text(
-                        "点环记录 · 全部记录 >",
-                        fontSize = 11.sp, color = TextLo,
-                        modifier = Modifier.clickable(onClick = onOpenWaterRecords),
-                    )
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text("点环记录", fontSize = 11.sp, color = TextLo)
+                        Spacer(Modifier.width(4.dp))
+                        Text(
+                            "全部记录 >",
+                            fontSize = 11.sp, color = Accent,
+                            modifier = Modifier
+                                .clickable(onClick = onOpenWaterRecords)
+                                .padding(horizontal = 4.dp, vertical = 2.dp),
+                        )
+                    }
                 }
                 // 锻炼消耗环
                 Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.weight(1f)) {

@@ -1,7 +1,6 @@
 package com.eelan.musclediary.ui
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -17,17 +16,30 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.eelan.musclediary.AppViewModel
+import com.eelan.musclediary.data.ExerciseEntry
+import com.eelan.musclediary.data.ExerciseTemplate
+import com.eelan.musclediary.data.FoodEntry
+import com.eelan.musclediary.data.WaterEntry
+import com.eelan.musclediary.data.WeightEntry
 import com.eelan.musclediary.ui.theme.*
+import androidx.compose.ui.graphics.Color
 import java.time.LocalDate
 import java.time.YearMonth
 
 /**
- * 全屏记录历史页（仿模板管理）：搜索 + 按月分组（分组头带统计）+ 左滑修改/删除。
+ * 全屏记录历史页（仿模板管理）：搜索 + 按月分组（分组头带统计）+ 左滑修改/删除（删除带确认）。
  * kind 决定展示的数据与行内容：0 体重 / 1 饮水 / 2 饮食 / 3 锻炼。
  */
 @Composable
 fun RecordsScreen(vm: AppViewModel, kind: Int, onClose: () -> Unit) {
     var search by remember { mutableStateOf("") }
+    // 待确认删除的记录（弹确认框），确认后执行
+    var pendingDelete by remember { mutableStateOf<Any?>(null) }
+    // 待修改的记录
+    var editingWeight by remember { mutableStateOf<WeightEntry?>(null) }
+    var editingWater by remember { mutableStateOf<WaterEntry?>(null) }
+    var editingFood by remember { mutableStateOf<FoodEntry?>(null) }
+    var editingExercise by remember { mutableStateOf<ExerciseEntry?>(null) }
 
     val title = when (kind) {
         0 -> "体重记录"; 1 -> "饮水记录"; 2 -> "饮食记录"; else -> "锻炼记录"
@@ -44,13 +56,95 @@ fun RecordsScreen(vm: AppViewModel, kind: Int, onClose: () -> Unit) {
             singleLine = true, colors = fieldColors(), modifier = Modifier.fillMaxWidth(),
         )
         Spacer(Modifier.height(8.dp))
-        RecordsBody(vm, kind, search, onClose)
+        RecordsBody(
+            vm, kind, search,
+            onEdit = { entry ->
+                when (entry) {
+                    is WeightEntry -> editingWeight = entry
+                    is WaterEntry -> editingWater = entry
+                    is FoodEntry -> editingFood = entry
+                    is ExerciseEntry -> editingExercise = entry
+                }
+            },
+            onDelete = { pendingDelete = it },
+        )
+    }
+
+    pendingDelete?.let { entry ->
+        val name = when (entry) {
+            is WeightEntry -> "${entry.date} 体重 ${fmt1(entry.weightKg)}kg"
+            is WaterEntry -> "${entry.date} 饮水 ${fmt0(entry.ml)}ml"
+            is FoodEntry -> "${entry.date} ${entry.name}"
+            else -> (entry as ExerciseEntry).let { "${entry.date} ${it.name}" }
+        }
+        AlertDialog(
+            onDismissRequest = { pendingDelete = null },
+            containerColor = Ink2,
+            title = { Text("删除这条记录？", color = TextHi, fontSize = 16.sp) },
+            text = { Text(name, color = TextLo, fontSize = 13.sp) },
+            confirmButton = {
+                TextButton(onClick = {
+                    when (entry) {
+                        is WeightEntry -> vm.deleteWeight(entry)
+                        is WaterEntry -> vm.deleteWater(entry)
+                        is FoodEntry -> vm.deleteFood(entry)
+                        is ExerciseEntry -> vm.deleteExercise(entry)
+                    }
+                    pendingDelete = null
+                }) { Text("删除", color = Color(0xFFEF5350)) }
+            },
+            dismissButton = {
+                TextButton(onClick = { pendingDelete = null }) { Text("取消", color = TextLo) }
+            },
+        )
+    }
+
+    editingWeight?.let { e ->
+        NumberDialog(
+            title = "修改体重（${e.date}）", label = "公斤", initial = fmt1(e.weightKg),
+            onDismiss = { editingWeight = null },
+            onConfirm = { v -> vm.updateWeight(e, v); editingWeight = null },
+        )
+    }
+    editingWater?.let { e ->
+        NumberDialog(
+            title = "修改饮水量（${e.date}）", label = "毫升", initial = fmt0(e.ml),
+            onDismiss = { editingWater = null },
+            onConfirm = { v -> vm.updateWater(e, v); editingWater = null },
+        )
+    }
+    editingFood?.let { e ->
+        if (e.grams > 0) {
+            NumberDialog(
+                title = "修改「${e.name}」", label = "克数", initial = fmt0(e.grams),
+                onDismiss = { editingFood = null },
+                onConfirm = { v -> vm.updateFoodEntry(e, v); editingFood = null },
+            )
+        } else {
+            MealEditDialog(
+                entry = e, onDismiss = { editingFood = null },
+                onConfirm = { v -> vm.updateMealEntry(e, v); editingFood = null },
+            )
+        }
+    }
+    editingExercise?.let { e ->
+        NumberDialog(
+            title = "修改「${e.name}」", label = "数量", initial = fmt1(e.qty),
+            onDismiss = { editingExercise = null },
+            onConfirm = { v -> vm.updateExerciseEntry(e, v); editingExercise = null },
+        )
     }
 }
 
 /** 分类型渲染正文（体重/饮水/饮食/锻炼各自实现分组与统计） */
 @Composable
-private fun RecordsBody(vm: AppViewModel, kind: Int, search: String, onClose: () -> Unit) {
+private fun RecordsBody(
+    vm: AppViewModel,
+    kind: Int,
+    search: String,
+    onEdit: (Any) -> Unit,
+    onDelete: (Any) -> Unit,
+) {
     fun hit(vararg fields: String) = fields.any { it.contains(search.trim(), ignoreCase = true) }
 
     when (kind) {
@@ -81,8 +175,8 @@ private fun RecordsBody(vm: AppViewModel, kind: Int, search: String, onClose: ()
                             "${e.date.substring(5)} · ${fmt1(e.weightKg)} kg",
                             d?.let { x -> "较上次 ${if (x >= 0) "+" else "−"}${fmt1(kotlin.math.abs(x))} kg" } ?: "首次记录",
                             "${fmt1(e.weightKg)} kg",
-                            onEdit = { /* 弹框修改由父级处理 */ },
-                            onDelete = { vm.deleteWeight(e) },
+                            onEdit = { onEdit(e) },
+                            onDelete = { onDelete(e) },
                         )
                     }
                 }
@@ -90,7 +184,7 @@ private fun RecordsBody(vm: AppViewModel, kind: Int, search: String, onClose: ()
             }
         }
         1 -> {
-            // 饮水：按天分组（当日多笔），月汇总头 = 日均 · 达标天数
+            // 饮水：按天分组（当日多笔），月汇总头 = 日均 · 达标天数（不含未来日期）
             val target = com.eelan.musclediary.domain.Calc.waterTargetMl(vm.profile.weightKg)
             val filtered = vm.waterEntries.sortedByDescending { it.createdAt }
                 .filter { hit(it.date, "${fmt0(it.ml)}") }
@@ -102,7 +196,14 @@ private fun RecordsBody(vm: AppViewModel, kind: Int, search: String, onClose: ()
                     val monthDays = monthEs.groupBy { it.date }
                     val avg = monthDays.values.map { g -> g.sumOf { it.ml } }.average()
                     val okDays = monthDays.values.count { g -> g.sumOf { it.ml } >= target }
-                    val days = month.lengthOfMonth()
+                    // 分母 = 当月已过的天数（当月按今天算，历史月按月末），未来天数不参与达标率
+                    val today = LocalDate.now()
+                    val lastCounted = when {
+                        month < YearMonth.from(today) -> month.atEndOfMonth()
+                        month == YearMonth.from(today) -> today
+                        else -> month.atDay(1).minusDays(1) // 未来月（理论上不会出现）
+                    }
+                    val days = lastCounted.dayOfMonth.coerceAtLeast(1)
                     item(key = "h$month") {
                         GroupHeader(
                             "${month.year}年${month.monthValue}月",
@@ -131,8 +232,8 @@ private fun RecordsBody(vm: AppViewModel, kind: Int, search: String, onClose: ()
                                 String.format("%02d:%02d", t.hour, t.minute),
                                 "饮水",
                                 "+${fmt0(e.ml)} ml",
-                                onEdit = {},
-                                onDelete = { vm.deleteWater(e) },
+                                onEdit = { onEdit(e) },
+                                onDelete = { onDelete(e) },
                             )
                         }
                     }
@@ -159,8 +260,8 @@ private fun RecordsBody(vm: AppViewModel, kind: Int, search: String, onClose: ()
                             e.name,
                             "${e.date.substring(5)} · " + foodDetail(e).trimStart(),
                             "${fmt0(e.kcal)} kcal",
-                            onEdit = {},
-                            onDelete = { vm.deleteFood(e) },
+                            onEdit = { onEdit(e) },
+                            onDelete = { onDelete(e) },
                         )
                     }
                 }
@@ -184,8 +285,8 @@ private fun RecordsBody(vm: AppViewModel, kind: Int, search: String, onClose: ()
                             e.name,
                             "${e.date.substring(5)} · ${fmt0(e.calories)} kcal · ${fmt1(e.minutes)} 分钟",
                             "${fmt0(e.calories)} kcal",
-                            onEdit = {},
-                            onDelete = { vm.deleteExercise(e) },
+                            onEdit = { onEdit(e) },
+                            onDelete = { onDelete(e) },
                         )
                     }
                 }
