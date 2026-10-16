@@ -79,6 +79,7 @@ private data class Tab(val label: String, val icon: ImageVector)
 fun AppRoot(vm: AppViewModel) {
     var tab by remember { mutableIntStateOf(0) }
     var manage by remember { mutableIntStateOf(-1) } // -1 无；0 食物模板管理；1 锻炼模板管理
+    var records by remember { mutableIntStateOf(-1) } // -1 无；0 体重；1 饮水；2 饮食；3 锻炼 记录历史页
     val tabs = listOf(
         Tab("今日", Icons.Default.Home),
         Tab("饮食", Icons.Default.Restaurant),
@@ -93,7 +94,7 @@ fun AppRoot(vm: AppViewModel) {
                 tabs.forEachIndexed { i, t ->
                     NavigationBarItem(
                         selected = tab == i,
-                        onClick = { tab = i; manage = -1 },
+                        onClick = { tab = i; manage = -1; records = -1 },
                         icon = { Icon(t.icon, t.label, tint = if (tab == i) Accent else TextLo) },
                         label = { Text(t.label, color = if (tab == i) Accent else TextLo, fontSize = 11.sp) },
                         colors = NavigationBarItemDefaults.colors(
@@ -111,18 +112,21 @@ fun AppRoot(vm: AppViewModel) {
                 .background(Ink0)
         ) {
             Column(Modifier.fillMaxSize().padding(top = 12.dp)) {
-                when (tab) {
-                    0 -> TodayScreen(vm, onGoWorkout = { tab = 2 })
-                    1 -> DietScreen(vm)
-                    2 -> WorkoutScreen(vm)
-                    3 -> when (manage) {
-                        0 -> ManageTemplatesScreen(vm, 0, onClose = { manage = -1 })
-                        1 -> ManageTemplatesScreen(vm, 1, onClose = { manage = -1 })
-                        else -> SettingsScreen(
-                            vm,
-                            onManageFood = { manage = 0 },
-                            onManageExercise = { manage = 1 },
-                        )
+                when {
+                    records >= 0 -> RecordsScreen(vm, records) { records = -1 }
+                    else -> when (tab) {
+                        0 -> TodayScreen(vm, onGoWorkout = { tab = 2 }, onOpenWaterRecords = { records = 1 })
+                        1 -> DietScreen(vm, onOpenRecords = { records = 2 })
+                        2 -> WorkoutScreen(vm, onOpenWeightRecords = { records = 0 }, onOpenRecords = { records = 3 })
+                        3 -> when (manage) {
+                            0 -> ManageTemplatesScreen(vm, 0, onClose = { manage = -1 })
+                            1 -> ManageTemplatesScreen(vm, 1, onClose = { manage = -1 })
+                            else -> SettingsScreen(
+                                vm,
+                                onManageFood = { manage = 0 },
+                                onManageExercise = { manage = 1 },
+                            )
+                        }
                     }
                 }
             }

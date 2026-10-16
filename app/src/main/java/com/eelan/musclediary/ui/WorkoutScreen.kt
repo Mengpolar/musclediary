@@ -31,7 +31,7 @@ import org.json.JSONObject
 
 /** 锻炼页：肌肉概览图 + 当日记录 + 模板快速添加 */
 @Composable
-fun WorkoutScreen(vm: AppViewModel) {
+fun WorkoutScreen(vm: AppViewModel, onOpenWeightRecords: () -> Unit = {}, onOpenRecords: () -> Unit = {}) {
     var pickOpen by remember { mutableStateOf(false) }
     var pendingTemplate by remember { mutableStateOf<ExerciseTemplate?>(null) }
     var customOpen by remember { mutableStateOf(false) }
@@ -80,8 +80,8 @@ fun WorkoutScreen(vm: AppViewModel) {
                     vm.profile.weightKg, vm.profile.heightCm)
             }
             Spacer(Modifier.height(12.dp))
-            WeightCard(vm)
-            SectionTitle("消耗统计（按动作合并 · 降序）")
+            WeightCard(vm, onOpenRecords = onOpenWeightRecords)
+            SectionTitle("消耗统计")
             if (entries.isEmpty()) {
                 Text("当天还没有锻炼记录", fontSize = 12.sp, color = TextLo)
             } else {
@@ -125,7 +125,7 @@ fun WorkoutScreen(vm: AppViewModel) {
                 }
             }
 
-            SectionTitle("锻炼记录（${entries.size}） · 共消耗 ${fmt0(entries.sumOf { it.calories })} kcal · 左滑可修改/删除")
+            SectionTitleRow("锻炼记录（${entries.size}）", "全部 >", onMore = onOpenRecords)
             if (entries.isEmpty()) {
                 EmptyState(
                     icon = Icons.Default.FitnessCenter,

@@ -21,7 +21,7 @@ import java.time.LocalDate
 
 /** 今日总览：目标环（可点击看推导）+ 饮水环 + 锻炼消耗环；点日期弹日历选择 */
 @Composable
-fun TodayScreen(vm: AppViewModel, onGoWorkout: () -> Unit = {}) {
+fun TodayScreen(vm: AppViewModel, onGoWorkout: () -> Unit = {}, onOpenWaterRecords: () -> Unit = {}) {
     val date = vm.selectedDate
     val food = vm.foodOn(date)
     val exKcal = vm.exerciseKcalOn(date)
@@ -59,7 +59,12 @@ fun TodayScreen(vm: AppViewModel, onGoWorkout: () -> Unit = {}) {
             }
             Spacer(Modifier.height(6.dp))
             Text(
-                "运动消耗 ${fmt0(exKcal)} kcal 已计入今日活动系数，点击任意数值查看计算过程",
+                "刻度：白=目标所需 · 橙=热量所需（按热量等比分摊）",
+                fontSize = 10.sp, color = TextLo,
+            )
+            Spacer(Modifier.height(2.dp))
+            Text(
+                "运动消耗 ${fmt0(exKcal)} kcal 已计入目标 · 点数值看推导",
                 fontSize = 11.sp, color = TextLo,
             )
         }
@@ -67,7 +72,7 @@ fun TodayScreen(vm: AppViewModel, onGoWorkout: () -> Unit = {}) {
         Spacer(Modifier.height(12.dp))
         CardBox(title = "今日状态") {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                // 饮水环
+                // 饮水环（点击记录，下方入口看全部记录）
                 Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.weight(1f)) {
                     ProgressRing(
                         progress = if (waterTarget > 0) (water / waterTarget).toFloat() else 0f,
@@ -78,7 +83,11 @@ fun TodayScreen(vm: AppViewModel, onGoWorkout: () -> Unit = {}) {
                         valueColor = if (water >= waterTarget) Good else TextHi,
                     )
                     Spacer(Modifier.height(6.dp))
-                    Text("饮水 · 体重×35ml", fontSize = 11.sp, color = TextLo)
+                    Text(
+                        "点环记录 · 全部记录 >",
+                        fontSize = 11.sp, color = TextLo,
+                        modifier = Modifier.clickable(onClick = onOpenWaterRecords),
+                    )
                 }
                 // 锻炼消耗环
                 Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.weight(1f)) {
@@ -91,7 +100,7 @@ fun TodayScreen(vm: AppViewModel, onGoWorkout: () -> Unit = {}) {
                         valueColor = if (p.exerciseGoalKcal > 0 && exKcal >= p.exerciseGoalKcal) Good else TextHi,
                     )
                     Spacer(Modifier.height(6.dp))
-                    Text("锻炼消耗 · 点环去记录", fontSize = 11.sp, color = TextLo)
+                    Text("点环去记录", fontSize = 11.sp, color = TextLo)
                 }
             }
             if (date != LocalDate.now()) {
@@ -116,14 +125,17 @@ fun TodayScreen(vm: AppViewModel, onGoWorkout: () -> Unit = {}) {
     }
 }
 
-/** 饮水记录对话框：按条记录本次饮水（可逐条删除），输入框下方展示最近 3 次记录值快捷标签 */
+/**
+ * 饮水记录对话框：快速记录本次饮水（快捷标签 + 快捷按钮 + 输入）。
+ * 当日/历史明细在「全部记录」全屏页查看。
+ */
 @Composable
 fun WaterDialog(vm: AppViewModel, date: LocalDate, targetMl: Double, onDismiss: () -> Unit) {
     var text by remember { mutableStateOf("") }
     val current = vm.waterOn(date)
-    val records = vm.waterListOn(date)
     val recent = vm.recentWaterMl()
     val dateLabel = if (date == LocalDate.now()) "今日" else "${date.monthValue}月${date.dayOfMonth}日"
+    val remain = (targetMl - current).coerceAtLeast(0.0)
     AlertDialog(
         onDismissRequest = onDismiss,
         containerColor = Ink2,
@@ -131,8 +143,9 @@ fun WaterDialog(vm: AppViewModel, date: LocalDate, targetMl: Double, onDismiss: 
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text(
-                    "当前 ${fmt0(current)} / 目标 ${fmt0(targetMl)} ml",
-                    fontSize = 13.sp, color = Protein,
+                    if (remain > 0) "当前 ${fmt0(current)} / ${fmt0(targetMl)} ml · 还差 ${fmt0(remain)} ml"
+                    else "当前 ${fmt0(current)} / ${fmt0(targetMl)} ml · 已达标",
+                    fontSize = 13.sp, color = if (remain > 0) Protein else Good,
                 )
                 OutlinedTextField(
                     value = text, onValueChange = { text = it },
@@ -148,34 +161,10 @@ fun WaterDialog(vm: AppViewModel, date: LocalDate, targetMl: Double, onDismiss: 
                 )
                 Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     listOf("100", "250", "500").forEach { q ->
-                        OutlinedButton(onClick = { text = q }) {
-                            Text("${q}ml", fontSize = 12.sp, color = TextHi)
-                        }
-                    }
-                }
-                // 当日明细（按条，可删除）
-                if (records.isNotEmpty()) {
-                    Text("当日记录（${records.size} 条）", fontSize = 12.sp, color = TextLo)
-                    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                        records.reversed().take(8).forEach { r ->
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                val t = java.time.Instant.ofEpochMilli(r.createdAt)
-                                    .atZone(java.time.ZoneId.systemDefault())
-                                Text(
-                                    String.format("%02d:%02d", t.hour, t.minute),
-                                    fontSize = 11.sp, color = TextLo,
-                                    modifier = Modifier.width(40.dp),
-                                )
-                                Text("+${fmt0(r.ml)} ml", fontSize = 12.sp, color = TextHi,
-                                    modifier = Modifier.weight(1f))
-                                Text(
-                                    "删", fontSize = 11.sp, color = MaterialTheme.colorScheme.error,
-                                    modifier = Modifier
-                                        .clickable { vm.deleteWater(r) }
-                                        .padding(horizontal = 8.dp, vertical = 4.dp),
-                                )
-                            }
-                        }
+                        OutlinedButton(onClick = {
+                            vm.addWater(q.toDouble(), date)
+                            text = ""
+                        }) { Text("${q}ml", fontSize = 12.sp, color = TextHi) }
                     }
                 }
             }

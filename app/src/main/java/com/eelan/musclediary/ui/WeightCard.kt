@@ -22,9 +22,9 @@ import com.eelan.musclediary.domain.Calc
 import com.eelan.musclediary.ui.theme.*
 import java.time.LocalDate
 
-/** 「我的」页体重卡片：曲线 + 记录今日体重 + 历史记录（不必每天记，一天最多一条） */
+/** 「我的」页体重卡片：曲线 + 记录今日体重 + 全部记录入口（完整历史在全屏记录页查看） */
 @Composable
-fun WeightCard(vm: AppViewModel) {
+fun WeightCard(vm: AppViewModel, onOpenRecords: () -> Unit = {}) {
     var recordOpen by remember { mutableStateOf(false) }
     var editingEntry by remember { mutableStateOf<WeightEntry?>(null) }
     val entries = vm.weightEntries.sortedBy { it.date }
@@ -50,23 +50,14 @@ fun WeightCard(vm: AppViewModel) {
         WeightChart(entries)
         if (entries.isNotEmpty()) {
             Spacer(Modifier.height(8.dp))
-            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                entries.takeLast(4).reversed().forEach { e ->
-                    SwipeEntryRow(
-                        title = e.date,
-                        detail = "体重记录 · 左滑可修改/删除",
-                        trailing = "${fmt1(e.weightKg)} kg",
-                        onEdit = { editingEntry = e },
-                        onDelete = { vm.deleteWeight(e) },
-                    )
-                }
-            }
-            if (entries.size > 4) {
-                Text("更早的记录可在曲线上查看", fontSize = 11.sp, color = TextLo)
-            }
+            Text(
+                "全部记录 >",
+                fontSize = 12.sp, color = Accent,
+                modifier = Modifier
+                    .clickable(onClick = onOpenRecords)
+                    .padding(vertical = 4.dp),
+            )
         }
-        Spacer(Modifier.height(4.dp))
-        Text("记录后自动更新身体档案，目标计算随之调整；不必每天记录", fontSize = 11.sp, color = TextLo)
     }
 
     if (recordOpen) {
@@ -148,7 +139,7 @@ fun BmiBar(bmi: Double, weightKg: Double, heightCm: Double) {
 @Composable
 fun WeightChart(entries: List<WeightEntry>) {
     if (entries.isEmpty()) {
-        Text("记满 2 条后显示曲线", fontSize = 12.sp, color = TextLo)
+        Text("记录 2 次后生成曲线", fontSize = 12.sp, color = TextLo)
         return
     }
     val sorted = entries.sortedBy { it.date }

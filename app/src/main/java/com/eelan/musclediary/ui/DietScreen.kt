@@ -26,7 +26,7 @@ import com.eelan.musclediary.ui.theme.*
 
 /** 饮食页：当日记录列表 + 模板快速添加 + 自定义食物 */
 @Composable
-fun DietScreen(vm: AppViewModel) {
+fun DietScreen(vm: AppViewModel, onOpenRecords: () -> Unit = {}) {
     var pickOpen by remember { mutableStateOf(false) }
     var pendingTemplate by remember { mutableStateOf<FoodTemplate?>(null) }
     var customOpen by remember { mutableStateOf(false) }
@@ -63,7 +63,7 @@ fun DietScreen(vm: AppViewModel) {
                     }
                 }
             }
-            SectionTitle("饮食记录（${entries.size}） · 左滑可修改/删除")
+            SectionTitleRow("饮食记录（${entries.size}）", "全部 >", onMore = onOpenRecords)
             if (entries.isEmpty()) {
                 EmptyState(
                     icon = Icons.Default.Restaurant,

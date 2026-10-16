@@ -56,7 +56,7 @@ fun ManageTemplatesScreen(vm: AppViewModel, kind: Int, onClose: () -> Unit) {
         }
         Spacer(Modifier.height(4.dp))
         Text(
-            "共 ${filtered.size} 个 · 「编辑」「删」作用于模板本身，历史记录不受影响",
+            "共 ${filtered.size} 个 · 左滑可编辑或删除模板，历史记录不受影响",
             fontSize = 11.sp, color = TextLo,
         )
         Spacer(Modifier.height(8.dp))
@@ -167,7 +167,7 @@ private fun FoodManageRow(t: FoodTemplate, onEdit: () -> Unit, onDelete: () -> U
     val unitInfo = if (t.unitName.isNotBlank() && t.unitGrams > 0) " · 1${t.unitName}=${fmt0(t.unitGrams)}g" else ""
     SwipeEntryRow(
         title = t.name + if (t.isCustom) " · 自定义" else "",
-        detail = "蛋白${fmt1(t.protein)} 碳水${fmt1(t.carb)} 脂肪${fmt1(t.fat)}$unitInfo · 左滑可修改/删除",
+        detail = "蛋白${fmt1(t.protein)} 碳水${fmt1(t.carb)} 脂肪${fmt1(t.fat)}$unitInfo",
         trailing = "${fmt0(t.kcal)} kcal",
         onEdit = onEdit,
         onDelete = onDelete,
@@ -178,7 +178,7 @@ private fun FoodManageRow(t: FoodTemplate, onEdit: () -> Unit, onDelete: () -> U
 private fun ExerciseManageRow(t: ExerciseTemplate, onEdit: () -> Unit, onDelete: () -> Unit) {
     SwipeEntryRow(
         title = t.name + if (t.isCustom) " · 自定义" else "",
-        detail = "${Calc.unitLabel(t)} · MET ${fmt1(t.met)} · 主练${Muscle.labelOf(t.primaryMuscle)} · 左滑可修改/删除",
+        detail = "${Calc.unitLabel(t)} · MET ${fmt1(t.met)} · 主练${Muscle.labelOf(t.primaryMuscle)}",
         trailing = "MET ${fmt1(t.met)}",
         onEdit = onEdit,
         onDelete = onDelete,

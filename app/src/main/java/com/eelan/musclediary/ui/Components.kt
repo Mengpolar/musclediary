@@ -152,10 +152,6 @@ fun MacroBar(
             if (kotlin.math.abs(scaledTarget - baseTarget) > 0.5) tick(scaledTarget, Accent)
         }
         Spacer(Modifier.height(2.dp))
-        Text(
-            "刻度：白=目标所需 ${fmt1(baseTarget)}g · 橙=热量所需 ${fmt1(scaledTarget)}g",
-            fontSize = 9.sp, color = TextLo,
-        )
     }
 }
 
@@ -330,6 +326,22 @@ fun SectionTitle(text: String, modifier: Modifier = Modifier) {
         text, modifier = modifier.padding(vertical = 8.dp),
         fontSize = 15.sp, fontWeight = FontWeight.Bold, color = TextHi,
     )
+}
+
+/** 标题行 + 右侧「全部 >」入口（进全屏记录历史页） */
+@Composable
+fun SectionTitleRow(text: String, moreText: String = "全部 >", onMore: () -> Unit) {
+    Row(
+        Modifier.fillMaxWidth().padding(vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(text, fontSize = 15.sp, fontWeight = FontWeight.Bold, color = TextHi)
+        Spacer(Modifier.weight(1f))
+        Text(
+            moreText, fontSize = 12.sp, color = Accent,
+            modifier = Modifier.clickable(onClick = onMore).padding(4.dp),
+        )
+    }
 }
 
 /** 快捷输入标签行：最近几次记录（已去重），点击直接填入 */

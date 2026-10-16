@@ -115,7 +115,7 @@ fun SettingsScreen(
                 Text("减脂期：蛋白质 1.5g/kg · 碳水 2.0g/kg · 脂肪 0.8g/kg，热量赤字 300~500 大卡",
                     fontSize = 11.sp, color = TextLo)
             }
-            Text("三维基础目标之外多出/不足的热量，按三者的热量比例等比分摊（即进度条上的「热量所需」刻度）",
+            Text("多余/不足热量按蛋白、碳水、脂肪的比例等比分摊",
                 fontSize = 11.sp, color = TextLo)
             Spacer(Modifier.height(4.dp))
             Row(verticalAlignment = Alignment.CenterVertically) {
