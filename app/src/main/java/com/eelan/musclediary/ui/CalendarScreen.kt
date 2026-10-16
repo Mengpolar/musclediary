@@ -45,7 +45,7 @@ fun CalendarSheet(vm: AppViewModel, onDismiss: () -> Unit) {
                 }
                 Text(
                     "${month.year}年${month.monthValue}月",
-                    fontSize = 17.sp, fontWeight = FontWeight.Bold, color = TextHi,
+                    fontSize = 16.sp, fontWeight = FontWeight.Bold, color = TextHi,
                     modifier = Modifier.weight(1f), textAlign = TextAlign.Center,
                 )
                 IconButton(onClick = { month = month.plusMonths(1) }) {
@@ -132,7 +132,7 @@ private fun LegendDot(color: Color?, label: String) {
                       else Modifier.border(1.dp, Ink3, CircleShape))
         )
         Spacer(Modifier.width(4.dp))
-        Text(label, fontSize = 10.sp, color = TextLo)
+        Text(label, fontSize = 12.sp, color = TextLo)
     }
 }
 

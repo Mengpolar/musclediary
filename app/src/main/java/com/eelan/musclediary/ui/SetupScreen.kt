@@ -43,7 +43,7 @@ fun SetupScreen(vm: AppViewModel) {
         Spacer(Modifier.height(32.dp))
 
         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
-            Text("性别", fontSize = 15.sp, color = TextHi, modifier = Modifier.weight(1f))
+            Text("性别", fontSize = 14.sp, color = TextHi, modifier = Modifier.weight(1f))
             FilterChip(
                 selected = male, onClick = { male = true }, label = { Text("男") },
                 colors = FilterChipDefaults.filterChipColors(selectedContainerColor = Accent.copy(alpha = 0.35f)),
@@ -74,7 +74,7 @@ fun SetupScreen(vm: AppViewModel) {
             modifier = Modifier.fillMaxWidth().height(48.dp),
         ) { Text("开始使用", fontSize = 16.sp, fontWeight = FontWeight.Bold) }
         Spacer(Modifier.height(24.dp))
-        Text("这些数据之后可以在「我的」页随时修改", fontSize = 11.sp, color = TextLo)
+        Text("这些数据之后可以在「我的」页随时修改", fontSize = 12.sp, color = TextLo)
     }
 }
 

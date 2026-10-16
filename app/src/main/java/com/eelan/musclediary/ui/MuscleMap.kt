@@ -178,7 +178,7 @@ private fun MuscleView(
 ) {
     val shapes = if (side == Side.FRONT) frontShapes else backShapes
     Column(modifier, horizontalAlignment = Alignment.CenterHorizontally) {
-        Text(if (side == Side.FRONT) "正面" else "背面", fontSize = 11.sp, color = TextLo)
+        Text(if (side == Side.FRONT) "正面" else "背面", fontSize = 12.sp, color = TextLo)
         Canvas(
             Modifier
                 .fillMaxSize()

@@ -48,7 +48,7 @@ fun RecordsScreen(vm: AppViewModel, kind: Int, onClose: () -> Unit) {
     Column(Modifier.fillMaxSize().padding(horizontal = 16.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
             IconButton(onClick = onClose) { Icon(Icons.Default.ArrowBack, "返回", tint = TextLo) }
-            Text(title, fontSize = 17.sp, fontWeight = FontWeight.Bold, color = TextHi, modifier = Modifier.weight(1f))
+            Text(title, fontSize = 16.sp, fontWeight = FontWeight.Bold, color = TextHi, modifier = Modifier.weight(1f))
         }
         OutlinedTextField(
             value = search, onValueChange = { search = it },
@@ -305,7 +305,7 @@ private fun GroupHeader(title: String, stat: String) {
             .padding(horizontal = 12.dp, vertical = 8.dp)
     ) {
         Text(title, fontSize = 13.sp, fontWeight = FontWeight.Bold, color = Accent)
-        if (stat.isNotBlank()) Text(stat, fontSize = 11.sp, color = TextLo)
+        if (stat.isNotBlank()) Text(stat, fontSize = 12.sp, color = TextLo)
     }
 }
 

@@ -73,9 +73,9 @@ fun ProgressRing(
             )
         }
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Text(centerLabel, fontSize = 11.sp, color = TextLo)
+            Text(centerLabel, fontSize = 12.sp, color = TextLo)
             Text(centerValue, fontSize = 16.sp, fontWeight = FontWeight.Bold, color = valueColor)
-            Text(subValue, fontSize = 10.sp, color = TextLo)
+            Text(subValue, fontSize = 12.sp, color = TextLo)
         }
     }
 }
@@ -166,7 +166,7 @@ fun CardBox(modifier: Modifier = Modifier, title: String? = null, content: @Comp
             .padding(16.dp),
     ) {
         if (title != null) {
-            Text(title, fontSize = 15.sp, fontWeight = FontWeight.Bold, color = TextHi)
+            Text(title, fontSize = 14.sp, fontWeight = FontWeight.Bold, color = TextHi)
             Spacer(Modifier.height(8.dp))
         }
         content()
@@ -324,7 +324,7 @@ fun SwipeEntryRow(
 fun SectionTitle(text: String, modifier: Modifier = Modifier) {
     Text(
         text, modifier = modifier.padding(vertical = 8.dp),
-        fontSize = 15.sp, fontWeight = FontWeight.Bold, color = TextHi,
+        fontSize = 14.sp, fontWeight = FontWeight.Bold, color = TextHi,
     )
 }
 
@@ -332,14 +332,16 @@ fun SectionTitle(text: String, modifier: Modifier = Modifier) {
 @Composable
 fun SectionTitleRow(text: String, moreText: String = "全部 >", onMore: () -> Unit) {
     Row(
-        Modifier.fillMaxWidth().padding(vertical = 8.dp),
+        Modifier.fillMaxWidth().heightIn(min = 40.dp).padding(vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Text(text, fontSize = 15.sp, fontWeight = FontWeight.Bold, color = TextHi)
-        Spacer(Modifier.weight(1f))
+        Text(text, fontSize = 14.sp, fontWeight = FontWeight.Bold, color = TextHi,
+            modifier = Modifier.weight(1f))
         Text(
             moreText, fontSize = 12.sp, color = Accent,
-            modifier = Modifier.clickable(onClick = onMore).padding(4.dp),
+            modifier = Modifier
+                .clickable(onClick = onMore)
+                .padding(start = 16.dp, top = 8.dp, bottom = 8.dp, end = 4.dp),
         )
     }
 }
@@ -357,17 +359,19 @@ fun QuickChips(
         modifier = modifier,
         horizontalArrangement = Arrangement.spacedBy(6.dp),
     ) {
-        Text("最近：", fontSize = 11.sp, color = TextLo,
+        Text("最近：", fontSize = 12.sp, color = TextLo,
             modifier = Modifier.align(Alignment.CenterVertically))
         chips.forEach { c ->
-            Text(
-                c, fontSize = 11.sp, color = Accent,
+            Box(
                 modifier = Modifier
                     .clip(RoundedCornerShape(14.dp))
                     .background(Accent.copy(alpha = 0.15f))
                     .clickable { onPick(c) }
-                    .padding(horizontal = 10.dp, vertical = 4.dp),
-            )
+                    .padding(horizontal = 12.dp, vertical = 8.dp),
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(c, fontSize = 12.sp, color = Accent)
+            }
         }
     }
 }

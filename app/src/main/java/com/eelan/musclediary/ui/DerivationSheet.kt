@@ -84,7 +84,7 @@ fun DerivationSheet(
                         "$fPer × ${w} × ${fmt2(t.scale)} = ${fmt0(t.fat)} g")
 
                     Spacer(Modifier.height(16.dp))
-                    Text("今日完成情况", fontSize = 15.sp, fontWeight = FontWeight.Bold, color = TextHi)
+                    Text("今日完成情况", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = TextHi)
                     Spacer(Modifier.height(8.dp))
                     FormulaRow("摄入热量", "", "${fmt0(intakeKcal)} / ${fmt0(t.tdee)} kcal（${pct(intakeKcal, t.tdee)}）")
                     FormulaRow("摄入蛋白质", "", "${fmt1(intakeProtein)} / ${fmt0(t.protein)} g（${pct(intakeProtein, t.protein)}）")

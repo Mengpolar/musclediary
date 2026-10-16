@@ -203,7 +203,7 @@ private fun FoodQtyDialog(
                             modifier = Modifier.weight(1f), colors = fieldColors(),
                         )
                         Text("$unitName = ${fmt0(template.unitGrams)}g",
-                            fontSize = 11.sp, color = TextLo)
+                            fontSize = 12.sp, color = TextLo)
                     }
                 }
                 OutlinedTextField(
@@ -288,7 +288,7 @@ fun TemplatePickerDialog(
                         FilterChip(
                             selected = tagFilter == tag,
                             onClick = { tagFilter = if (tagFilter == tag) null else tag },
-                            label = { Text(tag, fontSize = 10.sp) },
+                            label = { Text(tag, fontSize = 12.sp) },
                             colors = FilterChipDefaults.filterChipColors(
                                 selectedContainerColor = Accent.copy(alpha = 0.35f),
                                 selectedLabelColor = Accent,
@@ -317,7 +317,7 @@ fun TemplatePickerDialog(
                                         Spacer(Modifier.width(6.dp))
                                         t.tag.split(',').filter { it.isNotBlank() }.forEach { tg ->
                                             Text(
-                                                tg, fontSize = 9.sp, color = Accent,
+                                                tg, fontSize = 12.sp, color = Accent,
                                                 modifier = Modifier
                                                     .padding(end = 4.dp)
                                                     .background(Accent.copy(alpha = 0.15f),
@@ -327,7 +327,7 @@ fun TemplatePickerDialog(
                                         }
                                     }
                                 }
-                                Text(detail(t), color = TextLo, fontSize = 11.sp)
+                                Text(detail(t), color = TextLo, fontSize = 12.sp)
                             }
                             Text(trailing(t), color = Accent, fontSize = 13.sp, fontWeight = FontWeight.Bold)
                         }
@@ -387,15 +387,15 @@ fun CustomFoodDialog(
                     label = { Text("名称", color = TextLo) }, singleLine = true, colors = fieldColors())
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     OutlinedTextField(value = p, onValueChange = { p = it },
-                        label = { Text("蛋白g", color = TextLo, fontSize = 11.sp) }, singleLine = true,
+                        label = { Text("蛋白g", color = TextLo, fontSize = 12.sp) }, singleLine = true,
                         keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
                             keyboardType = KeyboardType.Decimal), modifier = Modifier.weight(1f), colors = fieldColors())
                     OutlinedTextField(value = c, onValueChange = { c = it },
-                        label = { Text("碳水g", color = TextLo, fontSize = 11.sp) }, singleLine = true,
+                        label = { Text("碳水g", color = TextLo, fontSize = 12.sp) }, singleLine = true,
                         keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
                             keyboardType = KeyboardType.Decimal), modifier = Modifier.weight(1f), colors = fieldColors())
                     OutlinedTextField(value = f, onValueChange = { f = it },
-                        label = { Text("脂肪g", color = TextLo, fontSize = 11.sp) }, singleLine = true,
+                        label = { Text("脂肪g", color = TextLo, fontSize = 12.sp) }, singleLine = true,
                         keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
                             keyboardType = KeyboardType.Decimal), modifier = Modifier.weight(1f), colors = fieldColors())
                 }
@@ -410,7 +410,7 @@ fun CustomFoodDialog(
                                 if (tg in cur) cur.remove(tg) else cur.add(tg)
                                 tag = cur.joinToString(",")
                             },
-                            label = { Text(tg, fontSize = 10.sp) },
+                            label = { Text(tg, fontSize = 12.sp) },
                             colors = FilterChipDefaults.filterChipColors(
                                 selectedContainerColor = Accent.copy(alpha = 0.35f),
                                 selectedLabelColor = Accent,
@@ -427,7 +427,7 @@ fun CustomFoodDialog(
                                 if (tg in cur) cur.remove(tg) else cur.add(tg)
                                 tag = cur.joinToString(",")
                             },
-                            label = { Text(tg, fontSize = 10.sp) },
+                            label = { Text(tg, fontSize = 12.sp) },
                             colors = FilterChipDefaults.filterChipColors(
                                 selectedContainerColor = Accent.copy(alpha = 0.35f),
                                 selectedLabelColor = Accent,
@@ -438,10 +438,10 @@ fun CustomFoodDialog(
                 // 量词单位（可选）：如名称填「个」、等于填 50，表示 1个=50g
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
                     OutlinedTextField(value = unitName, onValueChange = { unitName = it },
-                        label = { Text("量词单位（可选，如：个/盒/碗）", color = TextLo, fontSize = 11.sp) },
+                        label = { Text("量词单位（可选，如：个/盒/碗）", color = TextLo, fontSize = 12.sp) },
                         singleLine = true, modifier = Modifier.weight(1.4f), colors = fieldColors())
                     OutlinedTextField(value = unitGrams, onValueChange = { unitGrams = it },
-                        label = { Text("1单位=?g", color = TextLo, fontSize = 11.sp) },
+                        label = { Text("1单位=?g", color = TextLo, fontSize = 12.sp) },
                         singleLine = true,
                         enabled = unitName.isNotBlank(),
                         keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
@@ -522,26 +522,26 @@ fun MealQuickDialog(
                 )
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     OutlinedTextField(value = p, onValueChange = { p = it },
-                        label = { Text("蛋白g", color = TextLo, fontSize = 11.sp) }, singleLine = true,
+                        label = { Text("蛋白g", color = TextLo, fontSize = 12.sp) }, singleLine = true,
                         keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
                             keyboardType = KeyboardType.Decimal),
                         modifier = Modifier.weight(1f), colors = fieldColors())
                     OutlinedTextField(value = c, onValueChange = { c = it },
-                        label = { Text("碳水g", color = TextLo, fontSize = 11.sp) }, singleLine = true,
+                        label = { Text("碳水g", color = TextLo, fontSize = 12.sp) }, singleLine = true,
                         keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
                             keyboardType = KeyboardType.Decimal),
                         modifier = Modifier.weight(1f), colors = fieldColors())
                     OutlinedTextField(value = f, onValueChange = { f = it },
-                        label = { Text("脂肪g", color = TextLo, fontSize = 11.sp) }, singleLine = true,
+                        label = { Text("脂肪g", color = TextLo, fontSize = 12.sp) }, singleLine = true,
                         keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
                             keyboardType = KeyboardType.Decimal),
                         modifier = Modifier.weight(1f), colors = fieldColors())
                 }
                 if (calcKcal != null) {
                     Text("按三维推算 ≈ ${fmt0(calcKcal)} kcal（热量没填时会用它）",
-                        fontSize = 11.sp, color = TextLo)
+                        fontSize = 12.sp, color = TextLo)
                 }
-                if (!valid) Text("至少填写热量或任一营养素", fontSize = 11.sp, color = Warn)
+                if (!valid) Text("至少填写热量或任一营养素", fontSize = 12.sp, color = Warn)
             }
         },
         confirmButton = {

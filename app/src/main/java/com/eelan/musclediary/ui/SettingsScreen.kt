@@ -110,20 +110,20 @@ fun SettingsScreen(
             Spacer(Modifier.height(4.dp))
             if (p.mode == 0) {
                 Text("增肌期：蛋白质 2.0g/kg · 碳水 5.0g/kg · 脂肪 1.0g/kg，热量盈余 200~300 大卡",
-                    fontSize = 11.sp, color = TextLo)
+                    fontSize = 12.sp, color = TextLo)
             } else {
                 Text("减脂期：蛋白质 1.5g/kg · 碳水 2.0g/kg · 脂肪 0.8g/kg，热量赤字 300~500 大卡",
-                    fontSize = 11.sp, color = TextLo)
+                    fontSize = 12.sp, color = TextLo)
             }
             Text("多余/不足热量按蛋白、碳水、脂肪的比例等比分摊",
-                fontSize = 11.sp, color = TextLo)
+                fontSize = 12.sp, color = TextLo)
             Spacer(Modifier.height(4.dp))
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
                     Text(if (p.mode == 0) "增肌盈余" else "减脂赤字", fontSize = 14.sp, color = TextHi)
                     Text(
                         if (p.mode == 0) "每天多吃多少热量" else "每天少吃多少热量（赤字为负数）",
-                        fontSize = 11.sp, color = TextLo,
+                        fontSize = 12.sp, color = TextLo,
                     )
                 }
                 SmallButton("−") {
@@ -133,7 +133,7 @@ fun SettingsScreen(
                 }
                 Text(
                     if (p.surplusKcal < 0) "−${fmt0(-p.surplusKcal)}" else "+${fmt0(p.surplusKcal)}",
-                    fontSize = 15.sp, color = Accent,
+                    fontSize = 14.sp, color = Accent,
                     fontWeight = FontWeight.Bold, modifier = Modifier.padding(horizontal = 12.dp),
                 )
                 SmallButton("+") {
@@ -167,12 +167,12 @@ fun SettingsScreen(
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
                     Text("每日锻炼目标", fontSize = 14.sp, color = TextHi)
-                    Text("今日页锻炼消耗环的目标值", fontSize = 11.sp, color = TextLo)
+                    Text("今日页锻炼消耗环的目标值", fontSize = 12.sp, color = TextLo)
                 }
                 SmallButton("−") {
                     if (p.exerciseGoalKcal > 100) vm.updateProfile(p.copy(exerciseGoalKcal = p.exerciseGoalKcal - 50))
                 }
-                Text("${fmt0(p.exerciseGoalKcal)}", fontSize = 15.sp, color = Accent,
+                Text("${fmt0(p.exerciseGoalKcal)}", fontSize = 14.sp, color = Accent,
                     fontWeight = FontWeight.Bold, modifier = Modifier.padding(horizontal = 12.dp))
                 SmallButton("+") {
                     if (p.exerciseGoalKcal < 1000) vm.updateProfile(p.copy(exerciseGoalKcal = p.exerciseGoalKcal + 50))
@@ -182,10 +182,10 @@ fun SettingsScreen(
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
                     Text("饮水目标", fontSize = 14.sp, color = TextHi)
-                    Text("每日饮水目标 = 体重 × 35ml（固定系数）", fontSize = 11.sp, color = TextLo)
+                    Text("每日饮水目标 = 体重 × 35ml（固定系数）", fontSize = 12.sp, color = TextLo)
                 }
                 Text("${fmt0(com.eelan.musclediary.domain.Calc.waterTargetMl(p.weightKg))} ml",
-                    fontSize = 15.sp, color = Accent, fontWeight = FontWeight.Bold)
+                    fontSize = 14.sp, color = Accent, fontWeight = FontWeight.Bold)
             }
             Spacer(Modifier.height(4.dp))
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -194,7 +194,7 @@ fun SettingsScreen(
                     Text(
                         if (p.waterReminder == 1) "分时段检查饮水量，落后时通知（11/15/19/22点）"
                         else "已关闭",
-                        fontSize = 11.sp, color = TextLo,
+                        fontSize = 12.sp, color = TextLo,
                     )
                 }
                 Switch(
@@ -227,7 +227,7 @@ fun SettingsScreen(
             SettingRow("锻炼动作模板", "${vm.exerciseTemplates.size} 个") { onManageExercise() }
             Spacer(Modifier.height(4.dp))
             Text("可修改、删除内置与自定义模板，也可补回被删的内置模板",
-                fontSize = 11.sp, color = TextLo)
+                fontSize = 12.sp, color = TextLo)
         }
 
         SectionTitle("数据备份（本地 CSV）")
@@ -243,7 +243,7 @@ fun SettingsScreen(
             }
             Spacer(Modifier.height(6.dp))
             Text("包含：档案、自定义模板、全部饮食与锻炼记录。内置模板不在备份内。",
-                fontSize = 11.sp, color = TextLo)
+                fontSize = 12.sp, color = TextLo)
         }
 
         SectionTitle("关于与更新")
@@ -252,7 +252,7 @@ fun SettingsScreen(
                 Column(Modifier.weight(1f)) {
                     Text("当前版本", fontSize = 14.sp, color = TextHi)
                     Text("v${BuildConfig.VERSION_NAME} · GitHub: ${Updater.REPO}",
-                        fontSize = 11.sp, color = TextLo)
+                        fontSize = 12.sp, color = TextLo)
                 }
                 Button(
                     onClick = {
@@ -359,7 +359,7 @@ private fun SettingRow(label: String, value: String, onClick: () -> Unit) {
         Text(value, fontSize = 14.sp, color = Accent)
         Spacer(Modifier.width(10.dp))
         Text(
-            "修改", fontSize = 11.sp, color = TextLo,
+            "修改", fontSize = 12.sp, color = TextLo,
             modifier = Modifier
                 .border(1.dp, Ink3, androidx.compose.foundation.shape.RoundedCornerShape(6.dp))
                 .padding(horizontal = 8.dp, vertical = 4.dp),
@@ -369,11 +369,13 @@ private fun SettingRow(label: String, value: String, onClick: () -> Unit) {
 
 @Composable
 private fun SmallButton(text: String, onClick: () -> Unit) {
-    Text(
-        text, fontSize = 16.sp, color = TextHi,
+    Box(
         modifier = Modifier
+            .size(44.dp)
             .clickable(onClick = onClick)
-            .background(Ink3, androidx.compose.foundation.shape.RoundedCornerShape(8.dp))
-            .padding(horizontal = 12.dp, vertical = 2.dp),
-    )
+            .background(Ink3, androidx.compose.foundation.shape.RoundedCornerShape(10.dp)),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(text, fontSize = 18.sp, color = TextHi, fontWeight = FontWeight.Bold)
+    }
 }

@@ -65,12 +65,12 @@ fun TodayScreen(vm: AppViewModel, onGoWorkout: () -> Unit = {}, onOpenWaterRecor
             Spacer(Modifier.height(6.dp))
             Text(
                 "刻度：白=目标所需 · 橙=热量所需（按热量等比分摊）",
-                fontSize = 10.sp, color = TextLo,
+                fontSize = 12.sp, color = TextLo,
             )
             Spacer(Modifier.height(2.dp))
             Text(
                 "运动消耗 ${fmt0(exKcal)} kcal 已计入目标 · 点数值看推导",
-                fontSize = 11.sp, color = TextLo,
+                fontSize = 12.sp, color = TextLo,
             )
         }
 
@@ -89,14 +89,13 @@ fun TodayScreen(vm: AppViewModel, onGoWorkout: () -> Unit = {}, onOpenWaterRecor
                     )
                     Spacer(Modifier.height(6.dp))
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text("点环记录", fontSize = 11.sp, color = TextLo)
-                        Spacer(Modifier.width(4.dp))
+                        Text("点环记录", fontSize = 12.sp, color = TextLo)
                         Text(
                             "全部记录 >",
-                            fontSize = 11.sp, color = Accent,
+                            fontSize = 12.sp, color = Accent,
                             modifier = Modifier
                                 .clickable(onClick = onOpenWaterRecords)
-                                .padding(horizontal = 4.dp, vertical = 2.dp),
+                                .padding(horizontal = 6.dp, vertical = 6.dp),
                         )
                     }
                 }
@@ -111,12 +110,12 @@ fun TodayScreen(vm: AppViewModel, onGoWorkout: () -> Unit = {}, onOpenWaterRecor
                         valueColor = if (p.exerciseGoalKcal > 0 && exKcal >= p.exerciseGoalKcal) Good else TextHi,
                     )
                     Spacer(Modifier.height(6.dp))
-                    Text("点环去记录", fontSize = 11.sp, color = TextLo)
+                    Text("点环去记录", fontSize = 12.sp, color = TextLo)
                 }
             }
             if (date != LocalDate.now()) {
                 Spacer(Modifier.height(6.dp))
-                Text("当前查看 ${date.monthValue}月${date.dayOfMonth}日 的数据", fontSize = 11.sp, color = Warn)
+                Text("当前查看 ${date.monthValue}月${date.dayOfMonth}日 的数据", fontSize = 12.sp, color = Warn)
             }
         }
     }
@@ -159,13 +158,17 @@ fun WaterDialog(vm: AppViewModel, date: LocalDate, targetMl: Double, onDismiss: 
                     fontSize = 13.sp, color = if (remain > 0) Protein else Good,
                 )
                 // 快捷按钮：合并最近值与常用值（去重，最多 4 个），点击直接记录并关窗
-                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                     val chips = (recent.map { fmt0(it) } + listOf("100", "250", "500")).distinct().take(4)
                     chips.forEach { q ->
-                        OutlinedButton(onClick = {
-                            q.toDoubleOrNull()?.let { vm.addWater(it, date) }
-                            onDismiss()
-                        }) { Text("${q}ml", fontSize = 12.sp, color = TextHi) }
+                        OutlinedButton(
+                            onClick = {
+                                q.toDoubleOrNull()?.let { vm.addWater(it, date) }
+                                onDismiss()
+                            },
+                            modifier = Modifier.height(44.dp),
+                            contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 16.dp),
+                        ) { Text("${q}ml", fontSize = 13.sp, color = TextHi) }
                     }
                 }
                 OutlinedTextField(
@@ -201,7 +204,7 @@ fun DateHeader(vm: AppViewModel, onOpenCalendar: () -> Unit = {}) {
             "${d.year}年${d.monthValue}月${d.dayOfMonth}日 · ${
                 listOf("周一", "周二", "周三", "周四", "周五", "周六", "周日")[d.dayOfWeek.value - 1]
             }",
-            fontSize = 17.sp, fontWeight = androidx.compose.ui.text.font.FontWeight.Bold, color = TextHi,
+            fontSize = 16.sp, fontWeight = androidx.compose.ui.text.font.FontWeight.Bold, color = TextHi,
             modifier = Modifier
                 .weight(1f)
                 .clickable(enabled = onOpenCalendar != {}) { onOpenCalendar() },

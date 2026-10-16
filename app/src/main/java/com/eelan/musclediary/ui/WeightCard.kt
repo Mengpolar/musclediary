@@ -43,7 +43,7 @@ fun WeightCard(vm: AppViewModel, onOpenRecords: () -> Unit = {}) {
                 "＋ 记录今日体重", fontSize = 13.sp, color = Accent, fontWeight = FontWeight.Medium,
                 modifier = Modifier
                     .clickable { recordOpen = true }
-                    .padding(6.dp),
+                    .padding(start = 8.dp, top = 10.dp, bottom = 10.dp, end = 2.dp),
             )
         }
         Spacer(Modifier.height(8.dp))
@@ -55,7 +55,7 @@ fun WeightCard(vm: AppViewModel, onOpenRecords: () -> Unit = {}) {
                 fontSize = 12.sp, color = Accent,
                 modifier = Modifier
                     .clickable(onClick = onOpenRecords)
-                    .padding(vertical = 4.dp),
+                    .padding(top = 8.dp, bottom = 8.dp, end = 8.dp),
             )
         }
     }
@@ -100,7 +100,7 @@ fun BmiBar(bmi: Double, weightKg: Double, heightCm: Double) {
             )
             Spacer(Modifier.weight(1f))
             Text("体重 ${fmt1(weightKg)}kg · 身高 ${fmt1(heightCm)}cm",
-                fontSize = 11.sp, color = TextLo)
+                fontSize = 12.sp, color = TextLo)
         }
         Spacer(Modifier.height(6.dp))
         Canvas(Modifier.fillMaxWidth().height(14.dp)) {
@@ -126,11 +126,11 @@ fun BmiBar(bmi: Double, weightKg: Double, heightCm: Double) {
         }
         Spacer(Modifier.height(2.dp))
         Row(Modifier.fillMaxWidth()) {
-            Text("18.5", fontSize = 10.sp, color = TextLo)
+            Text("18.5", fontSize = 12.sp, color = TextLo)
             Spacer(Modifier.weight(1f))
-            Text("24", fontSize = 10.sp, color = TextLo)
+            Text("24", fontSize = 12.sp, color = TextLo)
             Spacer(Modifier.weight(0.76f))
-            Text("28", fontSize = 10.sp, color = TextLo)
+            Text("28", fontSize = 12.sp, color = TextLo)
             Spacer(Modifier.weight(1.14f))
         }
     }
@@ -177,18 +177,18 @@ fun WeightChart(entries: List<WeightEntry>) {
     if (sorted.size == 1) {
         Text(
             "${sorted.first().date.substring(5)} ${fmt1(sorted.first().weightKg)}kg",
-            fontSize = 11.sp, color = TextLo,
+            fontSize = 12.sp, color = TextLo,
         )
     } else {
         Row(Modifier.fillMaxWidth()) {
             Text(
                 "${sorted.first().date.substring(5)} ${fmt1(sorted.first().weightKg)}kg",
-                fontSize = 11.sp, color = TextLo,
+                fontSize = 12.sp, color = TextLo,
             )
             Spacer(Modifier.weight(1f))
             Text(
                 "${sorted.last().date.substring(5)} ${fmt1(sorted.last().weightKg)}kg",
-                fontSize = 11.sp, color = TextLo,
+                fontSize = 12.sp, color = TextLo,
             )
         }
     }

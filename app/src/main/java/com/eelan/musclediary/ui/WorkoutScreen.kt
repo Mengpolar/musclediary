@@ -68,13 +68,13 @@ fun WorkoutScreen(vm: AppViewModel, onOpenWeightRecords: () -> Unit = {}, onOpen
             DateHeader(vm, onOpenCalendar = { showCalendar = true })
             Spacer(Modifier.height(8.dp))
             CardBox {
-                Text("肌肉概览", fontSize = 15.sp, fontWeight = FontWeight.Bold, color = TextHi)
+                Text("肌肉概览", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = TextHi)
                 Spacer(Modifier.height(4.dp))
                 MuscleMap(scores, { Calc.intensity(it) }, onPick = { })
             }
             Spacer(Modifier.height(12.dp))
             CardBox {
-                Text("BMI", fontSize = 15.sp, fontWeight = FontWeight.Bold, color = TextHi)
+                Text("BMI", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = TextHi)
                 Spacer(Modifier.height(4.dp))
                 BmiBar(Calc.bmi(vm.profile.weightKg, vm.profile.heightCm),
                     vm.profile.weightKg, vm.profile.heightCm)
@@ -252,7 +252,7 @@ private fun ExercisePickerDialog(
                                             QtyType.SECONDS -> "按秒"
                                         }
                                     }",
-                                    color = TextLo, fontSize = 11.sp,
+                                    color = TextLo, fontSize = 12.sp,
                                 )
                             }
                             Text("MET ${fmt1(t.met)}", color = Accent, fontSize = 13.sp, fontWeight = FontWeight.Bold)
@@ -403,7 +403,7 @@ fun CustomExerciseDialog(
                     Muscle.entries.forEach { m ->
                         FilterChip(
                             selected = primary == m.id, onClick = { primary = m.id },
-                            label = { Text(m.label, fontSize = 11.sp) },
+                            label = { Text(m.label, fontSize = 12.sp) },
                             colors = FilterChipDefaults.filterChipColors(
                                 selectedContainerColor = Accent.copy(alpha = 0.35f),
                             ),
@@ -418,7 +418,7 @@ fun CustomExerciseDialog(
                             selected = on, onClick = {
                                 secondary = if (on) secondary - m.id else secondary + m.id
                             },
-                            label = { Text(m.label, fontSize = 11.sp) },
+                            label = { Text(m.label, fontSize = 12.sp) },
                             colors = FilterChipDefaults.filterChipColors(
                                 selectedContainerColor = Accent.copy(alpha = 0.35f),
                             ),

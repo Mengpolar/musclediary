@@ -47,7 +47,7 @@ fun ManageTemplatesScreen(vm: AppViewModel, kind: Int, onClose: () -> Unit) {
             IconButton(onClick = onClose) { Icon(Icons.Default.ArrowBack, "返回", tint = TextLo) }
             Text(
                 if (kind == 0) "食物模板管理" else "锻炼模板管理",
-                fontSize = 17.sp, fontWeight = FontWeight.Bold, color = TextHi,
+                fontSize = 16.sp, fontWeight = FontWeight.Bold, color = TextHi,
                 modifier = Modifier.weight(1f),
             )
             TextButton(onClick = {
@@ -57,7 +57,7 @@ fun ManageTemplatesScreen(vm: AppViewModel, kind: Int, onClose: () -> Unit) {
         Spacer(Modifier.height(4.dp))
         Text(
             "共 ${filtered.size} 个 · 左滑可编辑或删除模板，历史记录不受影响",
-            fontSize = 11.sp, color = TextLo,
+            fontSize = 12.sp, color = TextLo,
         )
         Spacer(Modifier.height(8.dp))
 
