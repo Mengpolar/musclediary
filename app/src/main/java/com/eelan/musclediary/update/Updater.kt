@@ -16,7 +16,7 @@ object Updater {
     const val REPO = "Mengpolar/musclediary"
     const val RELEASES_URL = "https://github.com/$REPO/releases"
 
-    data class UpdateInfo(val version: String, val notes: String, val apkUrl: String, val sizeBytes: Long)
+    data class UpdateInfo(val version: String, val notes: String, val apkUrl: String, val sizeBytes: Long, val sha256: String)
 
     /** 查询最新版本；无更新返回 null；网络失败抛异常由调用方提示 */
     suspend fun check(currentVersion: String): UpdateInfo? = withContext(Dispatchers.IO) {
@@ -29,7 +29,10 @@ object Updater {
             ?.let { arr -> (0 until arr.length()).map { arr.getJSONObject(it) } }
             ?.firstOrNull { it.optString("name").endsWith(".apk") }
             ?: throw IllegalStateException("Release 中没有 APK 附件")
-        UpdateInfo(tag, obj.optString("body"), asset.optString("browser_download_url"), asset.optLong("size"))
+        // GitHub 返回的资产摘要形如 sha256:xxxx；下载完成后用于完整性校验
+        val sha256 = asset.optString("digest").removePrefix("sha256:")
+        UpdateInfo(tag, obj.optString("body"), asset.optString("browser_download_url"),
+            asset.optLong("size"), sha256)
     }
 
     fun formatSize(bytes: Long): String = when {
@@ -71,6 +74,22 @@ object Updater {
             addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK)
         }
         ctx.startActivity(intent)
+    }
+
+    /** 校验下载的 APK 是否与 Release 资产摘要一致；expectedSha256 为空时跳过（兼容旧 Release） */
+    fun verifySha256(apk: File, expectedSha256: String): Boolean {
+        if (expectedSha256.isBlank()) return true
+        val md = java.security.MessageDigest.getInstance("SHA-256")
+        apk.inputStream().use { input ->
+            val buf = ByteArray(64 * 1024)
+            while (true) {
+                val n = input.read(buf)
+                if (n < 0) break
+                md.update(buf, 0, n)
+            }
+        }
+        val actual = md.digest().joinToString("") { "%02x".format(it) }
+        return actual.equals(expectedSha256, ignoreCase = true)
     }
 
     /** 语义化版本比较：0.1.10 > 0.1.9 */

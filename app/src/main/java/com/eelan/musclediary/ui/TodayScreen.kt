@@ -194,9 +194,6 @@ fun WaterDialog(vm: AppViewModel, date: LocalDate, targetMl: Double, onDismiss: 
     )
 }
 
-fun fmtQty(e: com.eelan.musclediary.data.ExerciseEntry): String =
-    if (e.weightKg > 0) "${fmt1(e.qty)} 个×${fmt1(e.weightKg)}kg" else "${fmt1(e.qty)} 个"
-
 @Composable
 fun DateHeader(vm: AppViewModel, onOpenCalendar: () -> Unit = {}) {
     val d = vm.selectedDate

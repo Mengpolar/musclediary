@@ -16,7 +16,7 @@ data class Profile(
     val exerciseGoalKcal: Double = 300.0,
     val setupDone: Int = 0, // 0 未完成首次引导
     val waterReminder: Int = 1, // 0 关 / 1 开（需系统通知权限）
-    val voiceId: String = "default", // 训练语音音色
+    val voiceId: String = "default", // 旧训练模式遗留字段，已废弃
 )
 
 /** 每日体重记录（每天最多一条，不必天天记） */
@@ -83,7 +83,7 @@ data class ExerciseTemplate(
     val secondaryMuscles: String = "",// 逗号分隔的 Muscle.id
     val isCustom: Boolean = false,
     val lastUsedAt: Long = 0,
-    val voiceKey: String = "",        // 训练模式动作名语音 key（如 ex_pushup），空则用提示音
+    val voiceKey: String = "",        // 旧训练模式遗留字段，已废弃
 )
 
 @Entity(tableName = "exercise_entries")

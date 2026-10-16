@@ -54,7 +54,6 @@ fun DietScreen(vm: AppViewModel) {
             CardBox(title = "当日摄入") {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Column(Modifier.weight(1f)) {
-                        Text("当日摄入", fontSize = 12.sp, color = TextLo)
                         Text("${fmt0(kcal)} kcal", fontSize = 22.sp, fontWeight = FontWeight.Bold, color = Accent)
                     }
                     Column(horizontalAlignment = Alignment.End) {
@@ -163,7 +162,6 @@ private fun FoodQtyDialog(
     }
 
     val grams = gramsText.toDoubleOrNull()
-    val units = unitText.toDoubleOrNull()
     val valid = grams != null && grams > 0
 
     AlertDialog(
@@ -234,19 +232,6 @@ private fun FoodQtyDialog(
         dismissButton = { TextButton(onClick = onDismiss) { Text("取消", color = TextLo) } },
     )
 }
-
-@Composable
-private fun EmptyCard(text: String) {
-    Text(
-        text, fontSize = 13.sp, color = TextLo,
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(12.dp))
-            .background(Ink1, RoundedCornerShape(12.dp))
-            .padding(14.dp),
-    )
-}
-
 
 /** 食物/动作模板选择器 */
 @Composable

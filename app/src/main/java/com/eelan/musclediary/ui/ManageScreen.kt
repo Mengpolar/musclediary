@@ -185,13 +185,3 @@ private fun ExerciseManageRow(t: ExerciseTemplate, onEdit: () -> Unit, onDelete:
     )
 }
 
-@Composable
-private fun Tag(text: String) {
-    Text(
-        text, fontSize = 9.sp, color = Accent,
-        modifier = Modifier
-            .padding(start = 6.dp)
-            .background(Accent.copy(alpha = 0.15f), RoundedCornerShape(4.dp))
-            .padding(horizontal = 4.dp, vertical = 1.dp),
-    )
-}

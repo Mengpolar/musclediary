@@ -69,14 +69,6 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             exerciseEntries = dao.allExerciseEntries()
             weightEntries = dao.allWeightEntries()
             waterEntries = dao.allWaterEntries()
-            // 补齐旧内置动作的语音 key
-            val vkByName = ExerciseSeed.items.associate { it.name to it.voiceKey }
-            dao.exerciseTemplates().filter { !it.isCustom && it.voiceKey.isEmpty() }
-                .forEach { old ->
-                    vkByName[old.name]?.takeIf { it.isNotEmpty() }?.let { vk ->
-                        dao.upsertExerciseTemplate(old.copy(voiceKey = vk))
-                    }
-                }
             withContext(Dispatchers.Main) { loaded = true }
         }
     }

@@ -322,6 +322,13 @@ fun SettingsScreen(
                         runCatching {
                             Updater.downloadApk(ctx, info.apkUrl) { progress = it }
                         }.onSuccess { apk ->
+                            // 校验下载包与 Release 资产摘要一致，防止下载损坏或被篡改
+                            if (!Updater.verifySha256(apk, info.sha256)) {
+                                apk.delete()
+                                downloading = false
+                                updateState = "安装包校验失败，已取消。请稍后重试"
+                                return@launch
+                            }
                             downloading = false
                             updateInfo = null
                             Updater.install(ctx, apk)
