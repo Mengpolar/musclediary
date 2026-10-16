@@ -157,7 +157,7 @@ private fun RecordsBody(vm: AppViewModel, kind: Int, search: String, onClose: ()
                     items(es, key = { "f${it.id}" }) { e ->
                         SwipeEntryRow(
                             e.name,
-                            "${e.date.substring(5)} · ${fmt0(e.grams)}g · 蛋白${fmt1(e.protein)} 碳水${fmt1(e.carb)} 脂肪${fmt1(e.fat)}",
+                            "${e.date.substring(5)} · " + foodDetail(e).trimStart(),
                             "${fmt0(e.kcal)} kcal",
                             onEdit = {},
                             onDelete = { vm.deleteFood(e) },

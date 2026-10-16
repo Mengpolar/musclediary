@@ -175,6 +175,32 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    /** 快速记录一餐：直接录入整餐热量与营养（不经过食物模板），克数记 0 表示按餐录入 */
+    fun addMealEntry(mealName: String, kcal: Double, protein: Double, carb: Double, fat: Double, date: LocalDate) {
+        val e = FoodEntry(
+            date = date.toString(), name = mealName, grams = 0.0,
+            protein = protein, carb = carb, fat = fat,
+        )
+        viewModelScope.launch(Dispatchers.IO) {
+            val id = dao.insertFoodEntry(e)
+            withContext(Dispatchers.Main) { foodEntries = foodEntries + e.copy(id = id) }
+        }
+    }
+
+    /** 修改快速记录的餐食热量：把目标热量与现有营养热量的差额按三维热量占比分摊；
+     *  三维全 0（只有热量没存得进营养）时按 4/4/9 标准比例反推 */
+    fun updateMealEntry(e: FoodEntry, newKcal: Double) {
+        val curKcal = e.kcal
+        val upd = if (curKcal > 0) {
+            val k = newKcal / curKcal
+            e.copy(protein = e.protein * k, carb = e.carb * k, fat = e.fat * k)
+        } else {
+            e.copy(protein = newKcal * 0.25 / 4, carb = newKcal * 0.5 / 4, fat = newKcal * 0.25 / 9)
+        }
+        viewModelScope.launch(Dispatchers.IO) { dao.updateFoodEntry(upd) }
+        foodEntries = foodEntries.map { if (it.id == e.id) upd else it }
+    }
+
     /** 使用模板后记录时间并置顶排序 */
     private fun bumpFoodUsage(t: FoodTemplate) {
         val bumped = t.copy(lastUsedAt = System.currentTimeMillis())

@@ -30,6 +30,7 @@ fun DietScreen(vm: AppViewModel, onOpenRecords: () -> Unit = {}) {
     var pickOpen by remember { mutableStateOf(false) }
     var pendingTemplate by remember { mutableStateOf<FoodTemplate?>(null) }
     var customOpen by remember { mutableStateOf(false) }
+    var mealOpen by remember { mutableStateOf(false) }
     var editingEntry by remember { mutableStateOf<FoodEntry?>(null) }
     var showCalendar by remember { mutableStateOf(false) }
 
@@ -79,7 +80,7 @@ fun DietScreen(vm: AppViewModel, onOpenRecords: () -> Unit = {}) {
                     items(entries, key = { it.id }) { f ->
                         SwipeEntryRow(
                             f.name,
-                            "${fmt0(f.grams)}g · 蛋白${fmt1(f.protein)} 碳水${fmt1(f.carb)} 脂肪${fmt1(f.fat)}",
+                            foodDetail(f),
                             "${fmt0(f.kcal)} kcal",
                             onEdit = { editingEntry = f },
                             onDelete = { vm.deleteFood(f) },
@@ -98,6 +99,7 @@ fun DietScreen(vm: AppViewModel, onOpenRecords: () -> Unit = {}) {
             trailing = { t -> "${fmt0(t.kcal)} kcal" },
             onPick = { pickOpen = false; pendingTemplate = it },
             onCustom = { pickOpen = false; customOpen = true },
+            onMeal = { pickOpen = false; mealOpen = true },
             onDismiss = { pickOpen = false },
         )
     }
@@ -112,11 +114,18 @@ fun DietScreen(vm: AppViewModel, onOpenRecords: () -> Unit = {}) {
     }
 
     editingEntry?.let { e ->
-        NumberDialog(
-            title = "修改「${e.name}」", label = "克数", initial = fmt1(e.grams),
-            onDismiss = { editingEntry = null },
-            onConfirm = { grams -> vm.updateFoodEntry(e, grams); editingEntry = null },
-        )
+        if (e.grams <= 0.0) {
+            // 快速记录的餐食：直接改热量（营养不按比例缩放，保持手输值）
+            MealEditDialog(e,
+                onDismiss = { editingEntry = null },
+                onConfirm = { kcal -> vm.updateMealEntry(e, kcal); editingEntry = null })
+        } else {
+            NumberDialog(
+                title = "修改「${e.name}」", label = "克数", initial = fmt1(e.grams),
+                onDismiss = { editingEntry = null },
+                onConfirm = { grams -> vm.updateFoodEntry(e, grams); editingEntry = null },
+            )
+        }
     }
 
     if (customOpen) {
@@ -127,6 +136,16 @@ fun DietScreen(vm: AppViewModel, onOpenRecords: () -> Unit = {}) {
                     pendingTemplate = saved
                 }
                 customOpen = false
+            },
+        )
+    }
+
+    if (mealOpen) {
+        MealQuickDialog(
+            onDismiss = { mealOpen = false },
+            onConfirm = { mealName, kcalV, pV, cV, fV ->
+                vm.addMealEntry(mealName, kcalV, pV, cV, fV, vm.selectedDate)
+                mealOpen = false
             },
         )
     }
@@ -242,6 +261,7 @@ fun TemplatePickerDialog(
     trailing: (FoodTemplate) -> String,
     onPick: (FoodTemplate) -> Unit,
     onCustom: () -> Unit,
+    onMeal: () -> Unit = {},
     onDismiss: () -> Unit,
 ) {
     var search by remember { mutableStateOf("") }
@@ -259,8 +279,11 @@ fun TemplatePickerDialog(
                     colors = fieldColors(),
                 )
                 Spacer(Modifier.height(6.dp))
-                // 标签筛选行
-                Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                // 标签筛选（两行流式布局，保证 5 个标签都可见可点）
+                @OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
+                androidx.compose.foundation.layout.FlowRow(
+                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                ) {
                     com.eelan.musclediary.data.ALL_TAGS.forEach { tag ->
                         FilterChip(
                             selected = tagFilter == tag,
@@ -310,8 +333,16 @@ fun TemplatePickerDialog(
                         }
                     }
                 }
-                TextButton(onClick = onCustom) {
-                    Text("＋ 新建自定义", color = Accent, fontSize = 13.sp)
+                Row(
+                    Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                ) {
+                    TextButton(onClick = onCustom, modifier = Modifier.weight(1f)) {
+                        Text("＋ 新建自定义", color = Accent, fontSize = 13.sp)
+                    }
+                    TextButton(onClick = onMeal, modifier = Modifier.weight(1f)) {
+                        Text("🍽 快速记录一餐", color = Accent, fontSize = 13.sp)
+                    }
                 }
             }
         },
@@ -428,6 +459,134 @@ fun CustomFoodDialog(
                 onConfirm(name.trim(), pd!!, cd!!, fd!!, tag,
                     unitName.trim(), if (unitName.isNotBlank()) (ug ?: 0.0) else 0.0)
             }) { Text("保存", color = if (valid) Accent else TextLo) }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("取消", color = TextLo) } },
+    )
+}
+
+/**
+ * 快速记录一餐：选餐次（早餐/午餐/晚餐/加餐），直接输入这一餐的热量与三大营养素。
+ * 适合外食、食堂等不方便按食材拆分的场景；记录名如「午餐」，与普通食物一样参与当日统计。
+ */
+@Composable
+fun MealQuickDialog(
+    onDismiss: () -> Unit,
+    onConfirm: (String, Double, Double, Double, Double) -> Unit,
+) {
+    val meals = listOf("早餐", "午餐", "晚餐", "加餐")
+    // 按当前时间默认选中餐次
+    val hour = remember { java.util.Calendar.getInstance().get(java.util.Calendar.HOUR_OF_DAY) }
+    var meal by remember {
+        mutableStateOf(when {
+            hour < 10 -> "早餐"; hour < 15 -> "午餐"; hour < 21 -> "晚餐"; else -> "加餐"
+        })
+    }
+    var kcal by remember { mutableStateOf("") }
+    var p by remember { mutableStateOf("") }
+    var c by remember { mutableStateOf("") }
+    var f by remember { mutableStateOf("") }
+    val kd = kcal.toDoubleOrNull(); val pd = p.toDoubleOrNull()
+    val cd = c.toDoubleOrNull(); val fd = f.toDoubleOrNull()
+    // 热量必填；三维至少填一项（未填的按 0 处理）
+    val valid = (kd != null && kd > 0) || (pd != null || cd != null || fd != null)
+    // 从三维反推热量参考
+    val calcKcal = listOfNotNull(pd, cd, fd).let { if (it.size == 3) pd!! * 4 + cd!! * 4 + fd!! * 9 else null }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = Ink2,
+        title = { Text("快速记录一餐", color = TextHi, fontSize = 16.sp) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                // 餐次选择
+                Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                    meals.forEach { m ->
+                        FilterChip(
+                            selected = meal == m,
+                            onClick = { meal = m },
+                            label = { Text(m, fontSize = 12.sp) },
+                            colors = FilterChipDefaults.filterChipColors(
+                                selectedContainerColor = Accent.copy(alpha = 0.35f),
+                                selectedLabelColor = Accent,
+                            ),
+                        )
+                    }
+                }
+                OutlinedTextField(
+                    value = kcal, onValueChange = { kcal = it },
+                    label = { Text("这一餐多少热量 kcal（推荐填）", color = TextLo) },
+                    singleLine = true,
+                    keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
+                        keyboardType = KeyboardType.Decimal),
+                    colors = fieldColors(),
+                )
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedTextField(value = p, onValueChange = { p = it },
+                        label = { Text("蛋白g", color = TextLo, fontSize = 11.sp) }, singleLine = true,
+                        keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
+                            keyboardType = KeyboardType.Decimal),
+                        modifier = Modifier.weight(1f), colors = fieldColors())
+                    OutlinedTextField(value = c, onValueChange = { c = it },
+                        label = { Text("碳水g", color = TextLo, fontSize = 11.sp) }, singleLine = true,
+                        keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
+                            keyboardType = KeyboardType.Decimal),
+                        modifier = Modifier.weight(1f), colors = fieldColors())
+                    OutlinedTextField(value = f, onValueChange = { f = it },
+                        label = { Text("脂肪g", color = TextLo, fontSize = 11.sp) }, singleLine = true,
+                        keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
+                            keyboardType = KeyboardType.Decimal),
+                        modifier = Modifier.weight(1f), colors = fieldColors())
+                }
+                if (calcKcal != null) {
+                    Text("按三维推算 ≈ ${fmt0(calcKcal)} kcal（热量没填时会用它）",
+                        fontSize = 11.sp, color = TextLo)
+                }
+                if (!valid) Text("至少填写热量或任一营养素", fontSize = 11.sp, color = Warn)
+            }
+        },
+        confirmButton = {
+            TextButton(enabled = valid, onClick = {
+                val k = kd ?: calcKcal ?: 0.0
+                onConfirm(meal, k, pd ?: 0.0, cd ?: 0.0, fd ?: 0.0)
+            }) { Text("记录", color = if (valid) Accent else TextLo) }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("取消", color = TextLo) } },
+    )
+}
+
+/** 饮食记录行 detail：按克录入显示克数，快速记录的餐食（grams=0）只显示营养 */
+internal fun foodDetail(f: com.eelan.musclediary.data.FoodEntry): String {
+    val head = if (f.grams > 0) "${fmt0(f.grams)}g · " else ""
+    return "$head 蛋白${fmt1(f.protein)} 碳水${fmt1(f.carb)} 脂肪${fmt1(f.fat)}".replace("  ", " ")
+}
+
+/** 修改快速记录的餐食热量 */
+@Composable
+private fun MealEditDialog(
+    entry: com.eelan.musclediary.data.FoodEntry,
+    onDismiss: () -> Unit,
+    onConfirm: (Double) -> Unit,
+) {
+    var kcal by remember { mutableStateOf(fmt0(entry.kcal)) }
+    val kd = kcal.toDoubleOrNull()
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = Ink2,
+        title = { Text("修改「${entry.name}」热量", color = TextHi, fontSize = 16.sp) },
+        text = {
+            OutlinedTextField(
+                value = kcal, onValueChange = { kcal = it },
+                label = { Text("热量 kcal", color = TextLo) },
+                singleLine = true,
+                keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
+                    keyboardType = KeyboardType.Decimal),
+                colors = fieldColors(),
+            )
+        },
+        confirmButton = {
+            TextButton(enabled = kd != null && kd > 0, onClick = {
+                onConfirm(kd!!); onDismiss()
+            }) { Text("确定", color = if (kd != null && kd > 0) Accent else TextLo) }
         },
         dismissButton = { TextButton(onClick = onDismiss) { Text("取消", color = TextLo) } },
     )
