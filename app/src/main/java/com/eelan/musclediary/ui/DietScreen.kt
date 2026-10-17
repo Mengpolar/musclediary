@@ -373,6 +373,7 @@ fun CustomFoodDialog(
     var tag by remember { mutableStateOf(initial?.tag ?: "") }
     var unitName by remember { mutableStateOf(initial?.unitName ?: "") }
     var unitGrams by remember { mutableStateOf(initial?.takeIf { it.unitGrams > 0 }?.let { fmt0(it.unitGrams) } ?: "") }
+    var kJ by remember { mutableStateOf("") } // 包装能量（千焦），填后自动反推三维
     val pd = p.toDoubleOrNull(); val cd = c.toDoubleOrNull(); val fd = f.toDoubleOrNull()
     val ug = unitGrams.toDoubleOrNull()
     val unitInvalid = unitName.isNotBlank() && (ug == null || ug <= 0)
@@ -385,6 +386,24 @@ fun CustomFoodDialog(
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 OutlinedTextField(value = name, onValueChange = { name = it },
                     label = { Text("名称", color = TextLo) }, singleLine = true, colors = fieldColors())
+                // 能量直填：包装标签单位是千焦（kJ），填后按 15/50/35 能量占比反推三维营养
+                OutlinedTextField(
+                    value = kJ, onValueChange = { v ->
+                        kJ = v
+                        v.toDoubleOrNull()?.let { kj ->
+                            if (kj > 0) {
+                                val kcal = kj / 4.184
+                                p = fmt1(kcal * 0.15 / 4)
+                                c = fmt1(kcal * 0.50 / 4)
+                                f = fmt1(kcal * 0.35 / 9)
+                            }
+                        }
+                    },
+                    label = { Text("能量 kJ（可选，填包装上的千焦值自动算营养）", color = TextLo, fontSize = 12.sp) },
+                    singleLine = true,
+                    keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
+                        keyboardType = KeyboardType.Decimal), colors = fieldColors(),
+                )
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     OutlinedTextField(value = p, onValueChange = { p = it },
                         label = { Text("蛋白g", color = TextLo, fontSize = 12.sp) }, singleLine = true,
@@ -449,7 +468,11 @@ fun CustomFoodDialog(
                         modifier = Modifier.weight(1f), colors = fieldColors())
                 }
                 if (pd != null && cd != null && fd != null) {
-                    Text("热量 ≈ ${fmt0(pd * 4 + cd * 4 + fd * 9)} kcal/100g",
+                    val formula = pd * 4 + cd * 4 + fd * 9
+                    val hint = if (kJ.toDoubleOrNull()?.let { it > 0 } == true)
+                        "（包装 ${fmt0(kJ.toDoubleOrNull()!!)} kJ ≈ ${fmt0(kJ.toDoubleOrNull()!! / 4.184)} kcal）"
+                    else ""
+                    Text("热量 ≈ ${fmt0(formula)} kcal/100g $hint",
                         color = Accent, fontSize = 13.sp)
                 }
             }
