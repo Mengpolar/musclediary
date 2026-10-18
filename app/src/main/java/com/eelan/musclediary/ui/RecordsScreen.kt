@@ -115,8 +115,10 @@ fun RecordsScreen(vm: AppViewModel, kind: Int, onClose: () -> Unit) {
     }
     editingFood?.let { e ->
         if (e.grams > 0) {
-            NumberDialog(
-                title = "修改「${e.name}」", label = "克数", initial = fmt0(e.grams),
+            FoodEditDialog(
+                entryName = e.name,
+                currentGrams = e.grams,
+                template = vm.foodTemplates.firstOrNull { it.name == e.name },
                 onDismiss = { editingFood = null },
                 onConfirm = { v -> vm.updateFoodEntry(e, v); editingFood = null },
             )

@@ -120,8 +120,10 @@ fun DietScreen(vm: AppViewModel, onOpenRecords: () -> Unit = {}) {
                 onDismiss = { editingEntry = null },
                 onConfirm = { kcal -> vm.updateMealEntry(e, kcal); editingEntry = null })
         } else {
-            NumberDialog(
-                title = "修改「${e.name}」", label = "克数", initial = fmt1(e.grams),
+            FoodEditDialog(
+                entryName = e.name,
+                currentGrams = e.grams,
+                template = vm.foodTemplates.firstOrNull { it.name == e.name },
                 onDismiss = { editingEntry = null },
                 onConfirm = { grams -> vm.updateFoodEntry(e, grams); editingEntry = null },
             )
