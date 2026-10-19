@@ -168,6 +168,9 @@ interface AppDao {
     @Query("DELETE FROM exercise_entries")
     suspend fun clearExerciseEntries()
 
+    @Query("DELETE FROM water_entries")
+    suspend fun clearWaterEntries()
+
     @Insert
     suspend fun insertFoodEntries(list: List<FoodEntry>)
 
@@ -180,11 +183,11 @@ interface AppDao {
     @Query("DELETE FROM exercise_templates WHERE isCustom = 1")
     suspend fun clearCustomExerciseTemplates()
 
-    @Insert
-    suspend fun insertFoodTemplatesGetIds(list: List<FoodTemplate>): List<Long>
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertWeightEntries(list: List<WeightEntry>)
 
     @Insert
-    suspend fun insertExerciseTemplatesGetIds(list: List<ExerciseTemplate>): List<Long>
+    suspend fun insertWaterEntries(list: List<WaterEntry>)
 
     @Query("SELECT * FROM weight_entries ORDER BY date")
     suspend fun allWeightEntries(): List<WeightEntry>

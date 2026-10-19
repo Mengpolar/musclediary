@@ -281,7 +281,7 @@ object ExerciseSeed {
         ExerciseTemplate(name = "西西里卷腹", qtyType = QtyType.REPS, met = 5.5, perRepSeconds = 3.0,
             primaryMuscle = Muscle.ABS.id, secondaryMuscles = "", voiceKey = "ex_sicilian_crunch"),
         ExerciseTemplate(name = "俄罗斯转体", qtyType = QtyType.REPS, met = 5.0, perRepSeconds = 2.0,
-            primaryMuscle = Muscle.ABS.id, secondaryMuscles = "obliques", voiceKey = "ex_russian_twist"),
+            primaryMuscle = Muscle.ABS.id, secondaryMuscles = "lower_back", voiceKey = "ex_russian_twist"),
         ExerciseTemplate(name = "仰卧抬腿", qtyType = QtyType.REPS, met = 4.5, perRepSeconds = 3.0,
             primaryMuscle = Muscle.ABS.id, secondaryMuscles = "quads", voiceKey = "ex_leg_raise"),
         ExerciseTemplate(name = "侧平板支撑", qtyType = QtyType.SECONDS, met = 4.0,

@@ -318,7 +318,8 @@ fun SettingsScreen(
             confirmButton = {
                 TextButton(onClick = {
                     downloading = true; progress = 0
-                    scope.launch {
+                    // 下载是长任务：用 ViewModel 作用域，切页不中断
+                    vm.appScope.launch {
                         runCatching {
                             Updater.downloadApk(ctx, info.apkUrl) { progress = it }
                         }.onSuccess { apk ->

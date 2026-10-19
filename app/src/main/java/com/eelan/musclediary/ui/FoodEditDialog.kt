@@ -22,23 +22,26 @@ import com.eelan.musclediary.data.FoodTemplate
 import com.eelan.musclediary.ui.theme.*
 
 /**
- * 修改饮食记录克数：模板带量词单位时显示「个数 ↔ 克数」双向联动（如 2个=60g），
- * 无单位模板退化为纯克数输入。确定返回新克数。
+ * 食物克数输入对话框（录入与修改共用的核心组件）：
+ * - 模板带量词单位时显示「个数 ↔ 克数」双向联动（如 2个=60g），无单位退化为纯克数输入
+ * - recent 非空时展示最近记录快捷标签（录入场景），确定返回克数
  */
 @Composable
-fun FoodEditDialog(
-    entryName: String,
-    currentGrams: Double,
+fun FoodGramsDialog(
+    title: String,
     template: FoodTemplate?,
+    initialGrams: Double,
+    recent: List<Double> = emptyList(),
+    confirmText: String = "确定",
     onDismiss: () -> Unit,
     onConfirm: (Double) -> Unit,
 ) {
     val hasUnit = template != null && template.unitName.isNotBlank() && template.unitGrams > 0
     val unitName = template?.unitName?.ifBlank { "份" } ?: "份"
 
-    var gramsText by remember { mutableStateOf(fmt1(currentGrams)) }
+    var gramsText by remember { mutableStateOf(fmt1(initialGrams)) }
     var unitText by remember {
-        mutableStateOf(if (hasUnit) fmt1(currentGrams / template!!.unitGrams) else "")
+        mutableStateOf(if (hasUnit) fmt1(initialGrams / template!!.unitGrams) else "")
     }
     val grams = gramsText.toDoubleOrNull()
     val valid = grams != null && grams > 0
@@ -46,7 +49,7 @@ fun FoodEditDialog(
     AlertDialog(
         onDismissRequest = onDismiss,
         containerColor = Ink2,
-        title = { Text("修改「$entryName」", color = TextHi, fontSize = 16.sp) },
+        title = { Text(title, color = TextHi, fontSize = 16.sp) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 if (hasUnit) {
@@ -79,6 +82,22 @@ fun FoodEditDialog(
                         keyboardType = KeyboardType.Decimal),
                     colors = fieldColors(),
                 )
+                if (recent.isNotEmpty()) {
+                    QuickChips(
+                        chips = recent.map { g ->
+                            if (hasUnit) "${fmt1(g / template!!.unitGrams)}$unitName（${fmt0(g)}g）" else "${fmt0(g)}g"
+                        },
+                        onPick = { c ->
+                            // 从标签文本反解出克数：取括号里的数字，无括号取整体
+                            val g = Regex("（([0-9.]+)g）").find(c)?.groupValues?.get(1)?.toDoubleOrNull()
+                                ?: c.removeSuffix("g").toDoubleOrNull()
+                            g?.let {
+                                gramsText = fmt1(it)
+                                if (hasUnit) unitText = fmt1(it / template!!.unitGrams)
+                            }
+                        },
+                    )
+                }
                 if (valid && template != null) {
                     val k = grams!! / 100.0
                     Text(
@@ -92,8 +111,26 @@ fun FoodEditDialog(
         confirmButton = {
             TextButton(enabled = valid, onClick = {
                 onConfirm(grams!!); onDismiss()
-            }) { Text("确定", color = if (valid) Accent else TextLo) }
+            }) { Text(confirmText, color = if (valid) Accent else TextLo) }
         },
         dismissButton = { TextButton(onClick = onDismiss) { Text("取消", color = TextLo) } },
+    )
+}
+
+/** 修改饮食记录：模板带量词单位时支持按个数联动克数（无单位退化为纯克数） */
+@Composable
+fun FoodEditDialog(
+    entryName: String,
+    currentGrams: Double,
+    template: FoodTemplate?,
+    onDismiss: () -> Unit,
+    onConfirm: (Double) -> Unit,
+) {
+    FoodGramsDialog(
+        title = "修改「$entryName」",
+        template = template,
+        initialGrams = currentGrams,
+        onDismiss = onDismiss,
+        onConfirm = onConfirm,
     )
 }

@@ -26,7 +26,6 @@ import java.time.LocalDate
 @Composable
 fun WeightCard(vm: AppViewModel, onOpenRecords: () -> Unit = {}) {
     var recordOpen by remember { mutableStateOf(false) }
-    var editingEntry by remember { mutableStateOf<WeightEntry?>(null) }
     val entries = vm.weightEntries.sortedBy { it.date }
     val latest = entries.lastOrNull()
 
@@ -66,13 +65,6 @@ fun WeightCard(vm: AppViewModel, onOpenRecords: () -> Unit = {}) {
             initial = vm.profile.let { fmt1(it.weightKg) },
             onDismiss = { recordOpen = false },
             onConfirm = { vm.addWeight(it); recordOpen = false },
-        )
-    }
-    editingEntry?.let { e ->
-        NumberDialog(
-            title = "修改 ${e.date} 体重", label = "公斤", initial = fmt1(e.weightKg),
-            onDismiss = { editingEntry = null },
-            onConfirm = { vm.updateWeight(e, it); editingEntry = null },
         )
     }
 }

@@ -21,6 +21,7 @@ import com.eelan.musclediary.data.ExerciseTemplate
 import com.eelan.musclediary.data.FoodEntry
 import com.eelan.musclediary.data.WaterEntry
 import com.eelan.musclediary.data.WeightEntry
+import com.eelan.musclediary.domain.Calc
 import com.eelan.musclediary.ui.theme.*
 import androidx.compose.ui.graphics.Color
 import java.time.LocalDate
@@ -131,11 +132,21 @@ fun RecordsScreen(vm: AppViewModel, kind: Int, onClose: () -> Unit) {
     }
     editingExercise?.let { e ->
         NumberDialog(
-            title = "修改「${e.name}」", label = "数量", initial = fmt1(e.qty),
+            title = "修改「${e.name}」",
+            label = qtyLabel(e, vm.exerciseTemplates),
+            initial = fmt1(e.qty),
             onDismiss = { editingExercise = null },
             onConfirm = { v -> vm.updateExerciseEntry(e, v); editingExercise = null },
         )
     }
+}
+
+/** 锻炼修改弹框的数量单位标签：按模板类型显示 个/公里/秒，模板已删按名称兜底 */
+private fun qtyLabel(e: ExerciseEntry, templates: List<ExerciseTemplate>): String {
+    val unit = templates.firstOrNull { it.id == e.templateId }
+        ?.let { Calc.unitLabel(it) }
+        ?: if (e.name.contains("跑") || e.name.contains("步") || e.name.contains("骑")) "公里" else "数量"
+    return if (unit == "数量") "数量" else "数量（$unit）"
 }
 
 /** 分类型渲染正文（体重/饮水/饮食/锻炼各自实现分组与统计） */

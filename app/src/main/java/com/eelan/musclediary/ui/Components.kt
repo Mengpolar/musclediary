@@ -199,8 +199,8 @@ fun EmptyState(
     }
 }
 
-fun fmt1(v: Double): String = if (v >= 100) v.toInt().toString() else String.format("%.1f", v)
-fun fmt0(v: Double): String = v.toInt().toString()
+fun fmt1(v: Double): String = if (v >= 100) Math.round(v).toInt().toString() else String.format("%.1f", v)
+fun fmt0(v: Double): String = Math.round(v).toInt().toString()
 
 /** 数字输入对话框 */
 @Composable
@@ -212,27 +212,32 @@ fun NumberDialog(
     onConfirm: (Double) -> Unit,
 ) {
     var text by remember { mutableStateOf(initial) }
+    val v = text.toDoubleOrNull()
+    val valid = v != null && v > 0
     AlertDialog(
         onDismissRequest = onDismiss,
         containerColor = Ink2,
         title = { Text(title, color = TextHi) },
         text = {
-            OutlinedTextField(
-                value = text, onValueChange = { text = it },
-                label = { Text(label, color = TextLo) },
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                singleLine = true,
-                colors = TextFieldDefaults.colors(
-                    focusedTextColor = TextHi, unfocusedTextColor = TextHi,
-                    focusedContainerColor = Ink1, unfocusedContainerColor = Ink1,
-                    focusedIndicatorColor = Accent, unfocusedIndicatorColor = Ink3,
-                ),
-            )
+            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                OutlinedTextField(
+                    value = text, onValueChange = { text = it },
+                    label = { Text(label, color = TextLo) },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                    singleLine = true,
+                    colors = TextFieldDefaults.colors(
+                        focusedTextColor = TextHi, unfocusedTextColor = TextHi,
+                        focusedContainerColor = Ink1, unfocusedContainerColor = Ink1,
+                        focusedIndicatorColor = Accent, unfocusedIndicatorColor = Ink3,
+                    ),
+                )
+                if (!valid) Text("请输入大于 0 的数字", fontSize = 12.sp, color = Warn)
+            }
         },
         confirmButton = {
-            TextButton(onClick = {
-                text.toDoubleOrNull()?.let { if (it > 0) onConfirm(it) }
-            }) { Text("确定", color = Accent) }
+            TextButton(enabled = valid, onClick = {
+                onConfirm(v!!)
+            }) { Text("确定", color = if (valid) Accent else TextLo) }
         },
         dismissButton = { TextButton(onClick = onDismiss) { Text("取消", color = TextLo) } },
     )

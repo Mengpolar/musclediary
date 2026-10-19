@@ -136,13 +136,15 @@ fun WorkoutScreen(vm: AppViewModel, onOpenWeightRecords: () -> Unit = {}, onOpen
             } else {
                 Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     entries.forEach { e ->
-                        SwipeEntryRow(
-                            e.name,
-                            workoutDetail(e, vm.exerciseTemplates),
-                            "${fmt0(e.calories)} kcal",
-                            onEdit = { editingEntry = e },
-                            onDelete = { vm.deleteExercise(e) },
-                        )
+                        key(e.id) {
+                            SwipeEntryRow(
+                                e.name,
+                                workoutDetail(e, vm.exerciseTemplates),
+                                "${fmt0(e.calories)} kcal",
+                                onEdit = { editingEntry = e },
+                                onDelete = { vm.deleteExercise(e) },
+                            )
+                        }
                     }
                 }
             }
@@ -178,8 +180,13 @@ fun WorkoutScreen(vm: AppViewModel, onOpenWeightRecords: () -> Unit = {}, onOpen
     }
 
     editingEntry?.let { e ->
+        val unit = vm.exerciseTemplates.firstOrNull { it.id == e.templateId }
+            ?.let { Calc.unitLabel(it) }
+            ?: if (e.name.contains("跑") || e.name.contains("步") || e.name.contains("骑")) "公里" else "数量"
         NumberDialog(
-            title = "修改「${e.name}」", label = "数量", initial = fmt1(e.qty),
+            title = "修改「${e.name}」",
+            label = if (unit == "数量") "数量" else "数量（$unit）",
+            initial = fmt1(e.qty),
             onDismiss = { editingEntry = null },
             onConfirm = { qty -> vm.updateExerciseEntry(e, qty); editingEntry = null },
         )

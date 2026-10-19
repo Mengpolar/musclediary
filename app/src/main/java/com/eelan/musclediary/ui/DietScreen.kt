@@ -105,9 +105,12 @@ fun DietScreen(vm: AppViewModel, onOpenRecords: () -> Unit = {}) {
     }
 
     pendingTemplate?.let { t ->
-        FoodQtyDialog(
+        FoodGramsDialog(
+            title = t.name,
             template = t,
+            initialGrams = vm.recentFoodGrams(t).firstOrNull() ?: 100.0,
             recent = vm.recentFoodGrams(t),
+            confirmText = "记录",
             onDismiss = { pendingTemplate = null },
             onConfirm = { grams -> vm.addFood(t, grams, vm.selectedDate); pendingTemplate = null },
         )
@@ -155,103 +158,6 @@ fun DietScreen(vm: AppViewModel, onOpenRecords: () -> Unit = {}) {
     if (showCalendar) {
         CalendarSheet(vm, onDismiss = { showCalendar = false })
     }
-}
-
-/**
- * 食物记录对话框：
- * - 模板设了量词单位（如 1个=50g、1盒=250ml）时，可按「X 个/盒」或克数输入，二者联动
- * - 输入框下方展示最近 3 次记录（去重）快捷标签，点击直接填入
- */
-@Composable
-private fun FoodQtyDialog(
-    template: FoodTemplate,
-    recent: List<Double>,
-    onDismiss: () -> Unit,
-    onConfirm: (Double) -> Unit,
-) {
-    val hasUnit = template.unitName.isNotBlank() && template.unitGrams > 0
-    val unitName = template.unitName.ifBlank { "份" }
-
-    // grams 始终为真值来源；unitText 独立显示，仅在联动时更新
-    var gramsText by remember(template.id) {
-        mutableStateOf(fmt0(recent.firstOrNull() ?: 100.0))
-    }
-    var unitText by remember(template.id) {
-        mutableStateOf(
-            if (hasUnit) fmt1((recent.firstOrNull() ?: (template.unitGrams)) / template.unitGrams) else ""
-        )
-    }
-
-    val grams = gramsText.toDoubleOrNull()
-    val valid = grams != null && grams > 0
-
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        containerColor = Ink2,
-        title = { Text(template.name, color = TextHi, fontSize = 16.sp) },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                if (hasUnit) {
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-                        OutlinedTextField(
-                            value = unitText, onValueChange = { v ->
-                                unitText = v
-                                v.toDoubleOrNull()?.let { u -> gramsText = fmt1(u * template.unitGrams) }
-                            },
-                            label = { Text("吃了多少$unitName？", color = TextLo) },
-                            singleLine = true,
-                            keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
-                                keyboardType = KeyboardType.Decimal),
-                            modifier = Modifier.weight(1f), colors = fieldColors(),
-                        )
-                        Text("$unitName = ${fmt0(template.unitGrams)}g",
-                            fontSize = 12.sp, color = TextLo)
-                    }
-                }
-                OutlinedTextField(
-                    value = gramsText, onValueChange = { v ->
-                        gramsText = v
-                        if (hasUnit) {
-                            v.toDoubleOrNull()?.let { g -> unitText = fmt1(g / template.unitGrams) }
-                        }
-                    },
-                    label = { Text(if (hasUnit) "或输入克数 g" else "吃了多少克？", color = TextLo) },
-                    singleLine = true,
-                    keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
-                        keyboardType = KeyboardType.Decimal),
-                    colors = fieldColors(),
-                )
-                QuickChips(
-                    chips = recent.map { g ->
-                        if (hasUnit) "${fmt1(g / template.unitGrams)}$unitName（${fmt0(g)}g）" else "${fmt0(g)}g"
-                    },
-                    onPick = { c ->
-                        // 从标签文本反解出克数：取括号里的数字，无括号取整体
-                        val g = Regex("（([0-9.]+)g）").find(c)?.groupValues?.get(1)?.toDoubleOrNull()
-                            ?: c.removeSuffix("g").toDoubleOrNull()
-                        g?.let {
-                            gramsText = fmt1(it)
-                            if (hasUnit) unitText = fmt1(it / template.unitGrams)
-                        }
-                    },
-                )
-                if (valid && grams != null) {
-                    val k = grams / 100.0
-                    Text(
-                        "蛋白${fmt1(template.protein * k)}g · 碳水${fmt1(template.carb * k)}g · " +
-                                "脂肪${fmt1(template.fat * k)}g · ${fmt0(template.kcal * k)} kcal",
-                        color = Accent, fontSize = 13.sp,
-                    )
-                }
-            }
-        },
-        confirmButton = {
-            TextButton(enabled = valid, onClick = {
-                onConfirm(grams!!); onDismiss()
-            }) { Text("记录", color = if (valid) Accent else TextLo) }
-        },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("取消", color = TextLo) } },
-    )
 }
 
 /** 食物/动作模板选择器 */

@@ -8,6 +8,7 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.eelan.musclediary.data.*
 import com.eelan.musclediary.domain.Calc
+import com.eelan.musclediary.domain.Muscle
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -16,6 +17,9 @@ import java.time.LocalDate
 class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     private val dao = AppDatabase.get(app).dao()
+
+    /** 应用更新下载等长任务：不随页面销毁中断，ViewModel 存活期内有效 */
+    val appScope = kotlinx.coroutines.CoroutineScope(viewModelScope.coroutineContext + Dispatchers.Main.immediate)
 
     var selectedDate by mutableStateOf(LocalDate.now())
         private set
@@ -61,15 +65,30 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                         dao.upsertFoodTemplate(old.copy(tag = tag))
                     }
                 }
-            foodTemplates = dao.foodTemplates().sortedWith(
+            // 修复历史数据里的无效肌群 id（如 obliques），避免详情显示英文与刺激分丢失
+            dao.exerciseTemplates().forEach { t ->
+                val fixed = t.secondaryMuscles.split(',').map { it.trim() }
+                    .filter { it.isEmpty() || Muscle.byId.containsKey(it) }
+                    .joinToString(",")
+                if (fixed != t.secondaryMuscles) dao.upsertExerciseTemplate(t.copy(secondaryMuscles = fixed))
+            }
+            val fList = dao.foodTemplates().sortedWith(
                 compareByDescending<FoodTemplate> { it.lastUsedAt }.thenBy { it.name })
-            exerciseTemplates = dao.exerciseTemplates().sortedWith(
+            val xList = dao.exerciseTemplates().sortedWith(
                 compareByDescending<ExerciseTemplate> { it.lastUsedAt }.thenBy { it.name })
-            foodEntries = dao.allFoodEntries()
-            exerciseEntries = dao.allExerciseEntries()
-            weightEntries = dao.allWeightEntries()
-            waterEntries = dao.allWaterEntries()
-            withContext(Dispatchers.Main) { loaded = true }
+            val fEntries = dao.allFoodEntries()
+            val xEntries = dao.allExerciseEntries()
+            val wEntries = dao.allWeightEntries()
+            val waEntries = dao.allWaterEntries()
+            withContext(Dispatchers.Main) {
+                foodTemplates = fList
+                exerciseTemplates = xList
+                foodEntries = fEntries
+                exerciseEntries = xEntries
+                weightEntries = wEntries
+                waterEntries = waEntries
+                loaded = true
+            }
         }
     }
 
@@ -124,7 +143,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         val e = WaterEntry(date = date.toString(), ml = ml)
         viewModelScope.launch(Dispatchers.IO) {
             dao.insertWaterEntry(e)
-            waterEntries = dao.allWaterEntries()
+            val list = dao.allWaterEntries()
+            withContext(Dispatchers.Main) { waterEntries = list }
         }
     }
 
@@ -195,14 +215,14 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     /** 修改快速记录的餐食热量：把目标热量与现有营养热量的差额按三维热量占比分摊；
-     *  三维全 0（只有热量没存得进营养）时按 4/4/9 标准比例反推 */
+     *  三维全 0（只有热量没存进营养）时按 15/50/35 能量占比反推（与自定义食物填 kJ 的口径一致） */
     fun updateMealEntry(e: FoodEntry, newKcal: Double) {
         val curKcal = e.kcal
         val upd = if (curKcal > 0) {
             val k = newKcal / curKcal
             e.copy(protein = e.protein * k, carb = e.carb * k, fat = e.fat * k)
         } else {
-            e.copy(protein = newKcal * 0.25 / 4, carb = newKcal * 0.5 / 4, fat = newKcal * 0.25 / 9)
+            e.copy(protein = newKcal * 0.15 / 4, carb = newKcal * 0.50 / 4, fat = newKcal * 0.35 / 9)
         }
         viewModelScope.launch(Dispatchers.IO) { dao.updateFoodEntry(upd) }
         foodEntries = foodEntries.map { if (it.id == e.id) upd else it }
@@ -346,27 +366,37 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         exerciseEntries = exerciseEntries.filterNot { it.id == e.id }
     }
 
-    /** 备份：导出后回调文件路径 */
+    /** 备份：导出后回调文件路径（v2 格式：含体重/饮水记录与自定义模板的标签/量词单位，旧版可读的部分向后兼容） */
     fun exportCsv(onDone: (java.io.File) -> Unit) = viewModelScope.launch(Dispatchers.IO) {
         val sb = StringBuilder()
         sb.appendLine("# profile")
-        sb.appendLine("male,age,heightCm,weightKg,surplus")
-        with(profile) { sb.appendLine("$male,$age,$heightCm,$weightKg,$surplusKcal") }
+        sb.appendLine("male,age,heightCm,weightKg,surplus,mode,setupDone,waterReminder,exerciseGoalKcal")
+        with(profile) {
+            sb.appendLine("$male,$age,$heightCm,$weightKg,$surplusKcal,$mode,$setupDone,$waterReminder,$exerciseGoalKcal")
+        }
         sb.appendLine("# food_templates(custom)")
         foodTemplates.filter { it.isCustom }.forEach {
-            sb.appendLine("food,${it.name},${it.protein},${it.carb},${it.fat}")
+            sb.appendLine("food,${csv(it.name)},${it.protein},${it.carb},${it.fat},${csv(it.tag)},${csv(it.unitName)},${it.unitGrams}")
         }
         sb.appendLine("# exercise_templates(custom)")
         exerciseTemplates.filter { it.isCustom }.forEach {
-            sb.appendLine("exercise,${it.name},${it.qtyType},${it.met},${it.perRepSeconds},${it.paceMinPerKm},${it.primaryMuscle},${it.secondaryMuscles}")
+            sb.appendLine("exercise,${csv(it.name)},${it.qtyType},${it.met},${it.perRepSeconds},${it.paceMinPerKm},${it.primaryMuscle},${csv(it.secondaryMuscles)}")
         }
         sb.appendLine("# food_entries")
         foodEntries.forEach {
-            sb.appendLine("fentry,${it.date},${it.name},${it.grams},${it.protein},${it.carb},${it.fat}")
+            sb.appendLine("fentry,${it.date},${csv(it.name)},${it.grams},${it.protein},${it.carb},${it.fat}")
         }
         sb.appendLine("# exercise_entries")
         exerciseEntries.forEach {
-            sb.appendLine("xentry,${it.date},${it.name},${it.qty},${it.weightKg},${it.qtyTypeOf(exerciseTemplates)},${it.calories}")
+            sb.appendLine("xentry,${it.date},${csv(it.name)},${it.qty},${it.weightKg},${it.qtyTypeOf(exerciseTemplates)},${it.calories}")
+        }
+        sb.appendLine("# weight_entries")
+        weightEntries.forEach {
+            sb.appendLine("wentry,${it.date},${it.weightKg}")
+        }
+        sb.appendLine("# water_entries")
+        waterEntries.forEach {
+            sb.appendLine("waentry,${it.date},${it.ml}")
         }
         val dir = java.io.File(getApplication<Application>().filesDir, "backup").apply { mkdirs() }
         val f = java.io.File(dir, "musclediary_backup_${LocalDate.now()}.csv")
@@ -374,66 +404,140 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         withContext(Dispatchers.Main) { onDone(f) }
     }
 
+    /** CSV 字段转义：含逗号/引号/换行时加引号 */
+    private fun csv(s: String): String =
+        if (s.contains(',') || s.contains('"') || s.contains('\n'))
+            "\"" + s.replace("\"", "\"\"") + "\""
+        else s
+
+    /** 拆分一行 CSV（支持带引号字段） */
+    private fun parseCsvLine(line: String): List<String> {
+        if (!line.contains('"')) return line.split(',')
+        val out = mutableListOf<String>()
+        val cur = StringBuilder()
+        var inQuote = false
+        var i = 0
+        while (i < line.length) {
+            val c = line[i]
+            when {
+                inQuote && c == '"' && i + 1 < line.length && line[i + 1] == '"' -> { cur.append('"'); i++ }
+                c == '"' -> inQuote = !inQuote
+                c == ',' && !inQuote -> { out.add(cur.toString()); cur.clear() }
+                else -> cur.append(c)
+            }
+            i++
+        }
+        out.add(cur.toString())
+        return out
+    }
+
     private fun ExerciseEntry.qtyTypeOf(templates: List<ExerciseTemplate>): String =
         templates.firstOrNull { it.id == templateId }?.qtyType?.name
             ?: (if (name.contains("跑") || name.contains("步")) "DISTANCE" else "REPS")
 
+    /** 导入备份：解析失败的字段/行跳过，不中断；全程 try/catch，坏文件返回错误提示而非崩溃 */
     fun importCsv(text: String, onDone: (String) -> Unit) = viewModelScope.launch(Dispatchers.IO) {
-        var profileLine: List<String>? = null
-        val customsF = mutableListOf<FoodTemplate>()
-        val customsX = mutableListOf<ExerciseTemplate>()
-        val fEntries = mutableListOf<FoodEntry>()
-        val xEntries = mutableListOf<Triple<ExerciseEntry, String, String>>() // entry, qtyType, secondary
-        var section = ""
-        text.lineSequence().forEach { raw ->
-            val line = raw.trim()
-            when {
-                line.startsWith("#") -> section = line.removePrefix("#").trim()
-                line.isBlank() -> {}
-                section == "profile" -> profileLine = line.split(',')
-                section == "food_templates(custom)" && line.startsWith("food,") -> {
-                    val p = line.split(',')
-                    customsF += FoodTemplate(name = p[1], protein = p[2].toDouble(),
-                        carb = p[3].toDouble(), fat = p[4].toDouble(), isCustom = true)
-                }
-                section == "exercise_templates(custom)" && line.startsWith("exercise,") -> {
-                    val p = line.split(',')
-                    customsX += ExerciseTemplate(name = p[1], qtyType = QtyType.valueOf(p[2]),
-                        met = p[3].toDouble(), perRepSeconds = p[4].toDouble(),
-                        paceMinPerKm = p[5].toDouble(), primaryMuscle = p[6],
-                        secondaryMuscles = p.getOrElse(7) { "" }, isCustom = true)
-                }
-                section == "food_entries" && line.startsWith("fentry,") -> {
-                    val p = line.split(',')
-                    fEntries += FoodEntry(date = p[1], name = p[2], grams = p[3].toDouble(),
-                        protein = p[4].toDouble(), carb = p[5].toDouble(), fat = p[6].toDouble())
-                }
-                section == "exercise_entries" && line.startsWith("xentry,") -> {
-                    val p = line.split(',')
-                    xEntries += Triple(ExerciseEntry(date = p[1], templateId = 0, name = p[2],
-                        qty = p[3].toDouble(), weightKg = p[4].toDouble(), calories = p[6].toDouble(),
-                        minutes = 0.0, musclesJson = "{}"), p[5], "")
+        try {
+            var profileLine: List<String>? = null
+            val customsF = mutableListOf<FoodTemplate>()
+            val customsX = mutableListOf<ExerciseTemplate>()
+            val fEntries = mutableListOf<FoodEntry>()
+            val xEntries = mutableListOf<Triple<ExerciseEntry, String, String>>() // entry, qtyType, secondary
+            val wEntries = mutableListOf<WeightEntry>()
+            val waEntries = mutableListOf<WaterEntry>()
+            var section = ""
+            var skipped = 0
+            fun num(s: String?, def: Double = 0.0) = s?.trim()?.toDoubleOrNull() ?: def
+            text.lineSequence().forEach { raw ->
+                val line = raw.trim()
+                when {
+                    line.startsWith("#") -> section = line.removePrefix("#").trim()
+                    line.isBlank() -> {}
+                    section == "profile" -> profileLine = line.split(',')
+                    section == "food_templates(custom)" && line.startsWith("food,") -> runCatching {
+                        val p = parseCsvLine(line)
+                        customsF += FoodTemplate(name = p[1].trim(), protein = num(p[2]),
+                            carb = num(p[3]), fat = num(p[4]), isCustom = true,
+                            tag = p.getOrElse(5) { "" }.trim(),
+                            unitName = p.getOrElse(6) { "" }.trim(),
+                            unitGrams = num(p.getOrElse(7) { "0" }))
+                    }.onFailure { skipped++ }
+                    section == "exercise_templates(custom)" && line.startsWith("exercise,") -> runCatching {
+                        val p = parseCsvLine(line)
+                        customsX += ExerciseTemplate(name = p[1].trim(), qtyType = QtyType.valueOf(p[2].trim()),
+                            met = num(p[3]), perRepSeconds = num(p[4]),
+                            paceMinPerKm = num(p[5]), primaryMuscle = p[6].trim(),
+                            secondaryMuscles = p.getOrElse(7) { "" }.trim(), isCustom = true)
+                    }.onFailure { skipped++ }
+                    section == "food_entries" && line.startsWith("fentry,") -> runCatching {
+                        val p = parseCsvLine(line)
+                        fEntries += FoodEntry(date = p[1].trim(), name = p[2].trim(), grams = num(p[3]),
+                            protein = num(p[4]), carb = num(p[5]), fat = num(p[6]))
+                    }.onFailure { skipped++ }
+                    section == "exercise_entries" && line.startsWith("xentry,") -> runCatching {
+                        val p = parseCsvLine(line)
+                        xEntries += Triple(ExerciseEntry(date = p[1].trim(), templateId = 0, name = p[2].trim(),
+                            qty = num(p[3]), weightKg = num(p[4]), calories = num(p[6]),
+                            minutes = 0.0, musclesJson = "{}"), p[5].trim(), "")
+                    }.onFailure { skipped++ }
+                    section == "weight_entries" && line.startsWith("wentry,") -> runCatching {
+                        val p = line.split(',')
+                        wEntries += WeightEntry(date = p[1].trim(), weightKg = num(p[2]))
+                    }.onFailure { skipped++ }
+                    section == "water_entries" && line.startsWith("waentry,") -> runCatching {
+                        val p = line.split(',')
+                        waEntries += WaterEntry(date = p[1].trim(), ml = num(p[2]))
+                    }.onFailure { skipped++ }
                 }
             }
+            var summary = "导入完成：饮食 ${fEntries.size} 条，锻炼 ${xEntries.size} 条" +
+                    (if (wEntries.isNotEmpty() || waEntries.isNotEmpty())
+                        "，体重 ${wEntries.size} 条，饮水 ${waEntries.size} 条" else "") +
+                    (if (skipped > 0) "（跳过 $skipped 行无法识别的数据）" else "")
+            if (fEntries.isNotEmpty() || xEntries.isNotEmpty() || wEntries.isNotEmpty() ||
+                waEntries.isNotEmpty() || profileLine != null) {
+                // 档案：只覆盖备份里的字段，其余设置（模式/引导/提醒/锻炼目标）保持现状
+                profileLine?.let {
+                    if (it.size >= 5) {
+                        val cur = dao.getProfile() ?: Profile()
+                        dao.upsertProfile(cur.copy(
+                            male = it[0].trim().toBoolean(),
+                            age = it[1].trim().toIntOrNull() ?: cur.age,
+                            heightCm = num(it[2], cur.heightCm),
+                            weightKg = num(it[3], cur.weightKg),
+                            surplusKcal = num(it[4], cur.surplusKcal),
+                            // v2 备份才有的列：旧 5 列 CSV 缺省时保持现状
+                            mode = it.getOrNull(5)?.trim()?.toIntOrNull()?.coerceIn(0, 1) ?: cur.mode,
+                            setupDone = it.getOrNull(6)?.trim()?.toIntOrNull() ?: cur.setupDone,
+                            waterReminder = it.getOrNull(7)?.trim()?.toIntOrNull()?.coerceIn(0, 1) ?: cur.waterReminder,
+                            exerciseGoalKcal = num(it.getOrNull(8), cur.exerciseGoalKcal),
+                        ))
+                    }
+                }
+                // 体重按日期唯一（REPLACE 同日取后值）；饮水/饮食/锻炼按「覆盖」语义清空重灌
+                if (wEntries.isNotEmpty()) dao.insertWeightEntries(wEntries)
+                if (waEntries.isNotEmpty()) {
+                    dao.clearWaterEntries()
+                    dao.insertWaterEntries(waEntries)
+                }
+                dao.clearFoodEntries(); dao.clearExerciseEntries()
+                dao.insertFoodEntries(fEntries)
+                dao.insertExerciseEntries(xEntries.map { it.first })
+                dao.clearCustomFoodTemplates(); dao.insertFoodTemplates(customsF)
+                dao.clearCustomExerciseTemplates(); dao.insertExerciseTemplates(customsX)
+                foodEntries = dao.allFoodEntries()
+                exerciseEntries = dao.allExerciseEntries()
+                weightEntries = dao.allWeightEntries()
+                waterEntries = dao.allWaterEntries()
+                foodTemplates = dao.foodTemplates().sortedWith(
+                    compareByDescending<FoodTemplate> { it.lastUsedAt }.thenBy { it.name })
+                exerciseTemplates = dao.exerciseTemplates().sortedWith(
+                    compareByDescending<ExerciseTemplate> { it.lastUsedAt }.thenBy { it.name })
+                profile = dao.getProfile() ?: profile
+            } else summary = "文件中没有可导入的数据"
+            withContext(Dispatchers.Main) { onDone(summary) }
+        } catch (e: Exception) {
+            withContext(Dispatchers.Main) { onDone("导入失败：文件格式无法识别") }
         }
-        var summary = "导入完成：饮食 ${fEntries.size} 条，锻炼 ${xEntries.size} 条"
-        if (fEntries.isNotEmpty() || xEntries.isNotEmpty() || profileLine != null) {
-            dao.clearFoodEntries(); dao.clearExerciseEntries()
-            dao.insertFoodEntries(fEntries)
-            profileLine?.let {
-                if (it.size >= 5) dao.upsertProfile(Profile(male = it[0].toBoolean(), age = it[1].toInt(),
-                    heightCm = it[2].toDouble(), weightKg = it[3].toDouble(), surplusKcal = it[4].toDouble()))
-            }
-            dao.clearCustomFoodTemplates(); dao.insertFoodTemplates(customsF)
-            dao.clearCustomExerciseTemplates(); dao.insertExerciseTemplates(customsX)
-            foodEntries = dao.allFoodEntries()
-            exerciseEntries = dao.allExerciseEntries()
-            foodTemplates = dao.foodTemplates().sortedWith(
-                compareByDescending<FoodTemplate> { it.lastUsedAt }.thenBy { it.name })
-            exerciseTemplates = dao.exerciseTemplates().sortedWith(
-                compareByDescending<ExerciseTemplate> { it.lastUsedAt }.thenBy { it.name })
-            profile = dao.getProfile() ?: profile
-        } else summary = "文件中没有可导入的数据"
-        withContext(Dispatchers.Main) { onDone(summary) }
     }
 }
