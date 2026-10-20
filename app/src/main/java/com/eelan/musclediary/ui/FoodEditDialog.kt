@@ -85,7 +85,7 @@ fun FoodGramsDialog(
                 if (recent.isNotEmpty()) {
                     QuickChips(
                         chips = recent.map { g ->
-                            if (hasUnit) "${fmt1(g / template!!.unitGrams)}$unitName（${fmt0(g)}g）" else "${fmt0(g)}g"
+                            if (hasUnit) "${fmt1(g / template!!.unitGrams)}$unitName" else "${fmt0(g)}g"
                         },
                         onPick = { c ->
                             // 从标签文本反解出克数：取括号里的数字，无括号取整体

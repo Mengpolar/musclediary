@@ -106,15 +106,6 @@ fun TodayScreen(vm: AppViewModel, onGoWorkout: () -> Unit = {}, onOpenWaterRecor
             MacroBar("碳水", carb, targets.baseCarb, targets.carb, CarbC) { showSheet = true }
             MacroBar("脂肪", fat, targets.baseFat, targets.fat, FatC) { showSheet = true }
         }
-        Spacer(Modifier.height(6.dp))
-        Text(
-            "刻度：白齿 = 目标所需 · 橙齿 = 热量所需",
-            fontSize = 11.sp, color = TextLo,
-        )
-        Text(
-            "运动消耗 ${fmt0(exKcal)} kcal 已计入目标 · 点数值看推导",
-            fontSize = 12.sp, color = TextLo,
-        )
         Spacer(Modifier.height(18.dp))
 
         // 今日状态：双列大数字分栏
@@ -131,33 +122,37 @@ fun TodayScreen(vm: AppViewModel, onGoWorkout: () -> Unit = {}, onOpenWaterRecor
                     horizontalAlignment = Alignment.CenterHorizontally,
                 ) {
                     Text("饮水", fontSize = 11.sp, color = TextLo)
-                    Spacer(Modifier.height(2.dp))
+                    Spacer(Modifier.height(6.dp))
                     val waterProgress = if (waterTarget > 0) (water / waterTarget).toFloat().coerceIn(0f, 1f) else 0f
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        // 迷你进度环：进度一眼可见
-                        Box(Modifier.size(44.dp)) {
-                            Canvas(Modifier.fillMaxSize()) {
-                                val s = 5.dp.toPx()
-                                drawArc(Ink3, -90f, 360f, false, style = Stroke(s, cap = StrokeCap.Round))
-                                drawArc(
-                                    if (waterProgress >= 1f) Good else Protein, -90f, waterProgress * 360f,
-                                    false, style = Stroke(s, cap = StrokeCap.Round),
-                                )
-                            }
+                    // 迷你进度环：环内百分比一眼可见
+                    Box(
+                        Modifier.size(64.dp).clickable { showWater = true },
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Canvas(Modifier.fillMaxSize()) {
+                            val s = 5.dp.toPx()
+                            drawArc(Ink3, -90f, 360f, false, style = Stroke(s, cap = StrokeCap.Round))
+                            drawArc(
+                                if (waterProgress >= 1f) Good else Protein, -90f, waterProgress * 360f,
+                                false, style = Stroke(s, cap = StrokeCap.Round),
+                            )
                         }
-                        Spacer(Modifier.width(8.dp))
-                        // 数值滚动：200→750 时从 200 平滑滚到 750
-                        AnimatedCountText(
-                            fmt0(water),
-                            fontSize = 24.sp,
-                            color = if (water >= waterTarget) Good else Protein,
+                        Text(
+                            "${(waterProgress * 100).roundToInt()}%",
+                            fontSize = 13.sp, fontWeight = FontWeight.Bold,
+                            color = if (waterProgress >= 1f) Good else TextHi,
                         )
                     }
-                    Spacer(Modifier.height(4.dp))
-                    Text("目标 ${fmt0(waterTarget)} ml · 点+记录", fontSize = 11.sp, color = TextLo)
+                    Spacer(Modifier.height(6.dp))
+                    AnimatedCountText(
+                        fmt0(water),
+                        fontSize = 24.sp,
+                        color = if (water >= waterTarget) Good else Protein,
+                    )
+                    Text("目标 ${fmt0(waterTarget)} ml", fontSize = 11.sp, color = TextLo)
                 }
                 Box(
-                    Modifier.width(1.dp).height(52.dp)
+                    Modifier.width(1.dp).height(96.dp)
                         .background(Ink3).align(Alignment.CenterVertically),
                 )
                 Column(
@@ -166,28 +161,33 @@ fun TodayScreen(vm: AppViewModel, onGoWorkout: () -> Unit = {}, onOpenWaterRecor
                     horizontalAlignment = Alignment.CenterHorizontally,
                 ) {
                     Text("锻炼消耗", fontSize = 11.sp, color = TextLo)
-                    Spacer(Modifier.height(2.dp))
+                    Spacer(Modifier.height(6.dp))
                     val exProgress = if (p.exerciseGoalKcal > 0) (exKcal / p.exerciseGoalKcal).toFloat().coerceIn(0f, 1f) else 0f
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Box(Modifier.size(44.dp)) {
-                            Canvas(Modifier.fillMaxSize()) {
-                                val s = 5.dp.toPx()
-                                drawArc(Ink3, -90f, 360f, false, style = Stroke(s, cap = StrokeCap.Round))
-                                drawArc(
-                                    if (exProgress >= 1f) Good else Warn, -90f, exProgress * 360f,
-                                    false, style = Stroke(s, cap = StrokeCap.Round),
-                                )
-                            }
+                    Box(
+                        Modifier.size(64.dp).clickable(onClick = onGoWorkout),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Canvas(Modifier.fillMaxSize()) {
+                            val s = 5.dp.toPx()
+                            drawArc(Ink3, -90f, 360f, false, style = Stroke(s, cap = StrokeCap.Round))
+                            drawArc(
+                                if (exProgress >= 1f) Good else Warn, -90f, exProgress * 360f,
+                                false, style = Stroke(s, cap = StrokeCap.Round),
+                            )
                         }
-                        Spacer(Modifier.width(8.dp))
-                        AnimatedCountText(
-                            fmt0(exKcal),
-                            fontSize = 24.sp,
-                            color = if (p.exerciseGoalKcal > 0 && exKcal >= p.exerciseGoalKcal) Good else Warn,
+                        Text(
+                            "${(exProgress * 100).roundToInt()}%",
+                            fontSize = 13.sp, fontWeight = FontWeight.Bold,
+                            color = if (exProgress >= 1f) Good else TextHi,
                         )
                     }
-                    Spacer(Modifier.height(4.dp))
-                    Text("目标 ${fmt0(p.exerciseGoalKcal)} kcal · 去记录", fontSize = 11.sp, color = TextLo)
+                    Spacer(Modifier.height(6.dp))
+                    AnimatedCountText(
+                        fmt0(exKcal),
+                        fontSize = 24.sp,
+                        color = if (p.exerciseGoalKcal > 0 && exKcal >= p.exerciseGoalKcal) Good else Warn,
+                    )
+                    Text("目标 ${fmt0(p.exerciseGoalKcal)} kcal", fontSize = 11.sp, color = TextLo)
                 }
             }
         }
@@ -209,7 +209,7 @@ fun TodayScreen(vm: AppViewModel, onGoWorkout: () -> Unit = {}, onOpenWaterRecor
         CalendarSheet(vm, onDismiss = { showCalendar = false })
     }
     if (showWater) {
-        WaterDialog(vm, date, waterTarget, onDismiss = { showWater = false })
+        WaterDialog(vm, date, waterTarget, onDismiss = { showWater = false }, onOpenRecords = onOpenWaterRecords)
     }
 }
 
@@ -218,7 +218,7 @@ fun TodayScreen(vm: AppViewModel, onGoWorkout: () -> Unit = {}, onOpenWaterRecor
  * 当日/历史明细在「全部记录」全屏页查看。
  */
 @Composable
-fun WaterDialog(vm: AppViewModel, date: LocalDate, targetMl: Double, onDismiss: () -> Unit) {
+fun WaterDialog(vm: AppViewModel, date: LocalDate, targetMl: Double, onDismiss: () -> Unit, onOpenRecords: () -> Unit = {}) {
     var text by remember { mutableStateOf("") }
     val current = vm.waterOn(date)
     val recent = vm.recentWaterMl()
@@ -252,7 +252,7 @@ fun WaterDialog(vm: AppViewModel, date: LocalDate, targetMl: Double, onDismiss: 
                 }
                 OutlinedTextField(
                     value = text, onValueChange = { text = it },
-                    label = { Text("其他毫升数（输入后点「记录」）", color = TextLo) },
+                    label = { Text("自定义毫升数", color = TextLo) },
                     singleLine = true,
                     keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
                         keyboardType = androidx.compose.ui.text.input.KeyboardType.Number),
@@ -270,7 +270,13 @@ fun WaterDialog(vm: AppViewModel, date: LocalDate, targetMl: Double, onDismiss: 
                 }
             }) { Text("记录", color = Accent) }
         },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("关闭", color = TextLo, fontSize = 13.sp) } },
+        dismissButton = {
+            Row {
+                // 全部记录入口：查看当日/历史明细
+                TextButton(onClick = onOpenRecords) { Text("全部记录", color = Protein, fontSize = 13.sp) }
+                TextButton(onClick = onDismiss) { Text("关闭", color = TextLo, fontSize = 13.sp) }
+            }
+        },
     )
 }
 
@@ -285,21 +291,17 @@ fun DateHeader(vm: AppViewModel, onOpenCalendar: () -> Unit = {}) {
                 .clickable(enabled = onOpenCalendar != {}) { onOpenCalendar() }
         ) {
             Text(
-                listOf("MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN")[d.dayOfWeek.value - 1] +
+                (listOf("MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN")[d.dayOfWeek.value - 1]) +
                     if (d == today) " · 训练日" else "",
                 fontSize = 11.sp, color = TextLo, letterSpacing = 3.sp,
             )
             Spacer(Modifier.height(2.dp))
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(
-                    "${d.monthValue}月${d.dayOfMonth}日",
-                    fontSize = 20.sp, fontWeight = FontWeight.ExtraBold, color = TextHi,
-                )
-                if (d != today) {
-                    Spacer(Modifier.width(8.dp))
-                    Text("查看历史", fontSize = 12.sp, color = Warn)
-                }
-            }
+            Text(
+                "${d.monthValue}月${d.dayOfMonth}日",
+                fontSize = 20.sp, fontWeight = FontWeight.ExtraBold,
+                color = if (d == today) TextHi else Warn,
+                maxLines = 1,
+            )
         }
         IconButton(onClick = { vm.selectDate(d.minusDays(1)) }) {
             Icon(Icons.Default.ChevronLeft, "前一天", tint = TextLo)
@@ -307,11 +309,10 @@ fun DateHeader(vm: AppViewModel, onOpenCalendar: () -> Unit = {}) {
         IconButton(onClick = { vm.selectDate(d.plusDays(1)) }, enabled = d < today) {
             Icon(Icons.Default.ChevronRight, "后一天", tint = if (d < today) TextLo else Ink3)
         }
+        // 历史日期才出现的「今天」快捷钮：仅图标，不撑高日期行（布局与今日保持一致）
         if (d != today) {
-            TextButton(onClick = { vm.selectDate(today) }) {
-                Icon(Icons.Default.Today, null, tint = Accent, modifier = Modifier.size(16.dp))
-                Spacer(Modifier.width(4.dp))
-                Text("今天", color = Accent, fontSize = 13.sp)
+            IconButton(onClick = { vm.selectDate(today) }) {
+                Icon(Icons.Default.Today, "回到今天", tint = Accent, modifier = Modifier.size(20.dp))
             }
         }
     }

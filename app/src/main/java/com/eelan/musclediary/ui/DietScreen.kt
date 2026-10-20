@@ -45,8 +45,13 @@ fun DietScreen(vm: AppViewModel, onOpenRecords: () -> Unit = {}) {
 
     Scaffold(
         containerColor = Color.Transparent,
+        contentWindowInsets = WindowInsets(0, 0, 0, 0),
         floatingActionButton = {
-            FloatingActionButton(onClick = { pickOpen = true }, containerColor = Accent) {
+            FloatingActionButton(
+                onClick = { pickOpen = true },
+                containerColor = Accent,
+                modifier = Modifier.padding(bottom = 6.dp),
+            ) {
                 Icon(Icons.Default.Add, "添加饮食", tint = Ink0)
             }
         },
@@ -259,7 +264,7 @@ fun TemplatePickerDialog(
                         Text("＋ 新建自定义", color = Accent, fontSize = 13.sp)
                     }
                     TextButton(onClick = onMeal, modifier = Modifier.weight(1f)) {
-                        Text("🍽 快速记录一餐", color = Accent, fontSize = 13.sp)
+                        Text("＋ 快速记录一餐", color = Accent, fontSize = 13.sp)
                     }
                 }
             }
@@ -317,7 +322,7 @@ fun CustomFoodDialog(
                             }
                         }
                     },
-                    label = { Text("能量 kJ（可选，填包装上的千焦值自动算营养）", color = TextLo, fontSize = 12.sp) },
+                    label = { Text("能量 kJ", color = TextLo, fontSize = 12.sp) },
                     singleLine = true,
                     keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
                         keyboardType = KeyboardType.Decimal), colors = fieldColors(),

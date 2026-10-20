@@ -119,12 +119,15 @@ fun PillNavBar(
     ) {
         Row(Modifier.fillMaxWidth()) {
             tabs.forEachIndexed { i, label ->
+                // 选中橙 ↔ 未选中黑 双向渐变（330ms），避免直接跳变
                 val bg by animateColorAsState(
-                    if (i == selected) Accent else Color.Transparent,
+                    if (i == selected) Accent else Ink2,
+                    animationSpec = tween(330),
                     label = "navBg",
                 )
                 val fg by animateColorAsState(
                     if (i == selected) Color(0xFF1A1208) else TextLo,
+                    animationSpec = tween(330),
                     label = "navFg",
                 )
                 Box(
