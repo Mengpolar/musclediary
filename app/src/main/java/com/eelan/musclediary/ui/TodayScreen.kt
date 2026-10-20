@@ -90,11 +90,11 @@ fun TodayScreen(vm: AppViewModel, onGoWorkout: () -> Unit = {}, onOpenWaterRecor
                 )
             }
             Box(Modifier.clickable { showSheet = true }) {
-                ProgressRing(
+                LiquidGlobe(
                     progress = kcalProgress.toFloat(),
-                    color = Accent, size = 84.dp, stroke = 9.dp,
-                    centerLabel = "", centerValue = "${(kcalProgress * 100).roundToInt()}%", subValue = "",
-                    onClick = {},
+                    color = Accent, sizeDp = 84.dp,
+                    centerText = "${(kcalProgress * 100).roundToInt()}%",
+                    onClick = { showSheet = true },
                 )
             }
         }
@@ -124,25 +124,14 @@ fun TodayScreen(vm: AppViewModel, onGoWorkout: () -> Unit = {}, onOpenWaterRecor
                     Text("饮水", fontSize = 11.sp, color = TextLo)
                     Spacer(Modifier.height(6.dp))
                     val waterProgress = if (waterTarget > 0) (water / waterTarget).toFloat().coerceIn(0f, 1f) else 0f
-                    // 迷你进度环：环内百分比一眼可见
-                    Box(
-                        Modifier.size(64.dp).clickable { showWater = true },
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        Canvas(Modifier.fillMaxSize()) {
-                            val s = 5.dp.toPx()
-                            drawArc(Ink3, -90f, 360f, false, style = Stroke(s, cap = StrokeCap.Round))
-                            drawArc(
-                                if (waterProgress >= 1f) Good else Protein, -90f, waterProgress * 360f,
-                                false, style = Stroke(s, cap = StrokeCap.Round),
-                            )
-                        }
-                        Text(
-                            "${(waterProgress * 100).roundToInt()}%",
-                            fontSize = 13.sp, fontWeight = FontWeight.Bold,
-                            color = if (waterProgress >= 1f) Good else TextHi,
-                        )
-                    }
+                    // 玻璃液体球：液体高度=进度，液面流动，百分比保留在球心
+                    LiquidGlobe(
+                        progress = waterProgress,
+                        color = if (waterProgress >= 1f) Good else Protein,
+                        sizeDp = 64.dp,
+                        centerText = "${(waterProgress * 100).roundToInt()}%",
+                        onClick = { showWater = true },
+                    )
                     Spacer(Modifier.height(6.dp))
                     AnimatedCountText(
                         fmt0(water),
@@ -163,24 +152,13 @@ fun TodayScreen(vm: AppViewModel, onGoWorkout: () -> Unit = {}, onOpenWaterRecor
                     Text("锻炼消耗", fontSize = 11.sp, color = TextLo)
                     Spacer(Modifier.height(6.dp))
                     val exProgress = if (p.exerciseGoalKcal > 0) (exKcal / p.exerciseGoalKcal).toFloat().coerceIn(0f, 1f) else 0f
-                    Box(
-                        Modifier.size(64.dp).clickable(onClick = onGoWorkout),
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        Canvas(Modifier.fillMaxSize()) {
-                            val s = 5.dp.toPx()
-                            drawArc(Ink3, -90f, 360f, false, style = Stroke(s, cap = StrokeCap.Round))
-                            drawArc(
-                                if (exProgress >= 1f) Good else Warn, -90f, exProgress * 360f,
-                                false, style = Stroke(s, cap = StrokeCap.Round),
-                            )
-                        }
-                        Text(
-                            "${(exProgress * 100).roundToInt()}%",
-                            fontSize = 13.sp, fontWeight = FontWeight.Bold,
-                            color = if (exProgress >= 1f) Good else TextHi,
-                        )
-                    }
+                    LiquidGlobe(
+                        progress = exProgress,
+                        color = if (exProgress >= 1f) Good else Warn,
+                        sizeDp = 64.dp,
+                        centerText = "${(exProgress * 100).roundToInt()}%",
+                        onClick = onGoWorkout,
+                    )
                     Spacer(Modifier.height(6.dp))
                     AnimatedCountText(
                         fmt0(exKcal),

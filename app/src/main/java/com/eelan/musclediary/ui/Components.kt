@@ -2,8 +2,12 @@ package com.eelan.musclediary.ui
 
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.ui.composed
@@ -28,6 +32,10 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.graphics.drawscope.clipRect
+import androidx.compose.ui.graphics.drawscope.clipPath
+import androidx.compose.ui.graphics.drawscope.withTransform
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
@@ -137,25 +145,75 @@ fun MacroBar(
             )
         }
         Spacer(Modifier.height(4.dp))
-        // 图例：白=目标所需 · 橙=热量所需（只在本组条下方出现一次的语义说明由调用方补充，
-        // 这里把刻度线改为从顶部垂下的短齿，避免与填充混淆）
+        // 质感宏量条：加宽轨道 + 填充区从左往右流动的粒子 + 进度末尾滚动波浪
+        val infinite = rememberInfiniteTransition(label = "macroFx")
+        val wavePhase by infinite.animateFloat(
+            initialValue = 0f, targetValue = (2f * Math.PI).toFloat(),
+            animationSpec = infiniteRepeatable(tween(1600, easing = LinearEasing)),
+            label = "wavePhase",
+        )
+        val particlePhase by infinite.animateFloat(
+            initialValue = 0f, targetValue = 1f,
+            animationSpec = infiniteRepeatable(tween(2200, easing = LinearEasing)),
+            label = "particlePhase",
+        )
         Canvas(
             Modifier
                 .fillMaxWidth()
-                .height(10.dp)
+                .height(14.dp)
         ) {
             val w = size.width
             val h = size.height
             val r = androidx.compose.ui.geometry.CornerRadius(h / 2, h / 2)
-            // 底槽
+            val fillW = (animFill * w).toFloat().coerceAtLeast(h)
+            // 底槽（内描高光增加立体感）
             drawRoundRect(Ink2, topLeft = Offset(0f, 0f), size = Size(w, h), cornerRadius = r)
-            // 已摄入
             drawRoundRect(
-                color,
-                topLeft = Offset(0f, 0f),
-                size = Size((animFill * w).toFloat().coerceAtLeast(h), h),
+                Color.White.copy(alpha = 0.05f),
+                topLeft = Offset(h * 0.12f, h * 0.10f),
+                size = Size(w - h * 0.24f, h * 0.34f),
                 cornerRadius = r,
             )
+            // 已摄入填充（带纵向渐变：上亮下暗，液体感）
+            drawRoundRect(
+                androidx.compose.ui.graphics.Brush.verticalGradient(
+                    listOf(color.copy(alpha = 0.95f), color.copy(alpha = 0.65f)),
+                    startY = 0f, endY = h,
+                ),
+                topLeft = Offset(0f, 0f),
+                size = Size(fillW, h),
+                cornerRadius = r,
+            )
+            // 填充区粒子：从左往右流动的小亮点（裁剪在填充区内）
+            clipRect(left = 0f, top = 0f, right = fillW, bottom = h) {
+                repeat(6) { i ->
+                    val speed = 0.55f + i * 0.13f
+                    val px = ((particlePhase * speed + i * 0.17f) % 1f) * w
+                    val py = h * (0.28f + 0.44f * ((i * 0.37f) % 1f))
+                    val pr = h * (0.055f + 0.03f * ((i * 0.53f) % 1f))
+                    drawCircle(Color.White.copy(alpha = 0.30f), radius = pr, center = Offset(px, py))
+                }
+            }
+            // 进度末尾的滚动波浪：正弦波覆盖末尾一小段，随时间滚动
+            val waveW = h * 1.6f
+            if (fillW < w - 2f) {
+                val waveStart = (fillW - waveW * 0.4f).coerceAtLeast(0f)
+                val path = androidx.compose.ui.graphics.Path()
+                val amp = h * 0.16f
+                path.moveTo(waveStart, h / 2)
+                var x = waveStart
+                while (x <= fillW) {
+                    val phase = wavePhase + (x - waveStart) / waveW * (2f * Math.PI).toFloat() * 1.5f
+                    path.lineTo(x, h / 2 + amp * kotlin.math.sin(phase))
+                    x += 3f
+                }
+                path.lineTo(fillW, h)
+                path.lineTo(waveStart, h)
+                path.close()
+                clipRect(left = waveStart, top = 0f, right = fillW, bottom = h) {
+                    drawPath(path, color.copy(alpha = 0.85f))
+                }
+            }
             // 刻度：目标所需（白）/ 热量所需（主色）——短齿从轨道上缘垂下，只占一半高度
             fun tick(t: Double, c: Color) {
                 val x = (t / scaleMax * w).toFloat().coerceIn(0f, w)
@@ -269,31 +327,15 @@ fun SwipeEntryRow(
     val density = LocalDensity.current
     val maxSwipePx = with(density) { 132.dp.toPx() }
     val offset = remember { Animatable(0f) }
-    // 弧线删除动画状态：0=正常，1=飞出完成（围绕右端删除点旋转+缩小+淡出）
-    val flyOut = remember { Animatable(0f) }
+    // 粉碎删除：0=正常，1=粉碎完成。碎裂前沿从右往左推进，右侧先碎（下坠+缩小+淡出）
+    val crush = remember { Animatable(0f) }
     var flying by remember { mutableStateOf(false) }
-    val flyRotation by animateFloatAsState(
-        targetValue = -8f * flyOut.value,
-        animationSpec = tween(280, easing = FastOutSlowInEasing),
-        label = "flyRotation",
-    )
-    val flyScale by animateFloatAsState(
-        targetValue = 1f - 0.4f * flyOut.value,
-        animationSpec = tween(280, easing = FastOutSlowInEasing),
-        label = "flyScale",
-    )
-    val flyAlpha by animateFloatAsState(
-        targetValue = 1f - flyOut.value,
-        animationSpec = tween(280, easing = FastOutSlowInEasing),
-        label = "flyAlpha",
-    )
-    // 弧线：删除点在卡片右端外侧，卡片绕它做圆弧运动 → 表现为水平飞出 + 轻微下沉
-    val flyArc = with(density) { 24.dp.toPx() }
+    val cardW = with(density) { 300.dp.toPx() } // 估算宽度用于推进速度，实际以 draw 裁切为准
 
-    fun deleteWithArc() {
+    fun deleteWithCrush() {
         flying = true
         scope.launch {
-            flyOut.animateTo(1f, tween(280, easing = FastOutSlowInEasing))
+            crush.animateTo(1f, tween(420, easing = FastOutSlowInEasing))
             onDelete()
         }
     }
@@ -301,18 +343,36 @@ fun SwipeEntryRow(
     Box(
         Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(10.dp))
             .graphicsLayer {
                 if (flying) {
-                    // 弧线轨迹：水平位移加大同时绕弧下沉，配合旋转/缩放/淡出
-                    translationX = flyOut.value * flyArc * 2f
-                    translationY = flyOut.value * flyArc
-                    rotationZ = flyRotation
-                    scaleX = flyScale
-                    scaleY = flyScale
-                    alpha = flyAlpha
-                    // 旋转中心移到卡片右端（删除点一侧），产生绕点弧线感
-                    transformOrigin = TransformOrigin(1f, 0.5f)
+                    // 未碎区域整体：左移（被"吸"向碎裂口）+ 轻微下坠 + 缩小
+                    translationX = -size.width * 0.06f * crush.value
+                    translationY = size.height * 0.25f * crush.value
+                    val sc = 1f - 0.25f * crush.value
+                    scaleX = sc; scaleY = sc
+                    transformOrigin = TransformOrigin(0f, 0.5f)
+                }
+            }
+            .clip(RoundedCornerShape(10.dp))
+            .drawWithContent {
+                if (!flying) {
+                    drawContent()
+                } else {
+                    // 碎裂进度：前沿从右往左，已碎区域不再绘制（露出列表底色）
+                    val front = 1f - crush.value
+                    val remainingW = size.width * front
+                    clipRect(left = 0f, top = 0f, right = remainingW, bottom = size.height) {
+                        this@drawWithContent.drawContent()
+                    }
+                    // 碎裂口的闪白前沿，推进时可见
+                    if (crush.value < 1f && crush.value > 0.02f) {
+                        drawLine(
+                            color = Color.White.copy(alpha = 0.55f * (1f - crush.value)),
+                            start = Offset(remainingW, 0f),
+                            end = Offset(remainingW, size.height),
+                            strokeWidth = 2f,
+                        )
+                    }
                 }
             },
     ) {
@@ -337,7 +397,7 @@ fun SwipeEntryRow(
                     .width(66.dp)
                     .fillMaxHeight()
                     .background(Color(0xFFEF5350))
-                    .clickable { deleteWithArc() },
+                    .clickable { deleteWithCrush() },
                 contentAlignment = Alignment.Center,
             ) { Text("删除", color = Ink0, fontSize = 13.sp, fontWeight = FontWeight.Bold) }
         }
@@ -512,4 +572,121 @@ fun Modifier.stackApproach(peekDp: Float = 7f): Modifier {
                 transformOrigin = TransformOrigin(0.5f, 0f)
             }
         }
+}
+
+/**
+ * 玻璃液体球：进度为球内液体高度，液面带流动正弦波，球体有玻璃高光。
+ * progress 变化时液体高度平滑过渡（Animatable），不跳变。
+ * centerLabel 可为 null（不显示文字行）。
+ */
+@Composable
+fun LiquidGlobe(
+    progress: Float,
+    color: Color,
+    sizeDp: Dp,
+    modifier: Modifier = Modifier,
+    centerText: String? = null,
+    onClick: (() -> Unit)? = null,
+) {
+    // 液体高度平滑渐变（数值/日期改变时不突然变化）
+    val liquid by animateFloatAsState(
+        targetValue = progress.coerceIn(0f, 1f),
+        animationSpec = tween(900, easing = FastOutSlowInEasing),
+        label = "liquidLevel",
+    )
+    val infinite = rememberInfiniteTransition(label = "globeFx")
+    val wavePhase by infinite.animateFloat(
+        initialValue = 0f, targetValue = (2f * Math.PI).toFloat(),
+        animationSpec = infiniteRepeatable(tween(2400, easing = LinearEasing)),
+        label = "globeWave",
+    )
+    Box(
+        modifier
+            .size(sizeDp)
+            .let { if (onClick != null) it.clickable(onClick = onClick) else it },
+        contentAlignment = Alignment.Center,
+    ) {
+        Canvas(Modifier.fillMaxSize()) {
+            val r = this.size.minDimension / 2f
+            val cx = this.size.width / 2f
+            val cy = this.size.height / 2f
+            val c = Offset(cx, cy)
+            // 球体底色（深色玻璃）
+            drawCircle(Ink2, radius = r, center = c)
+            // 液体：以液面 y 裁剪画圆形液体，液面为两段叠加正弦波
+            val surfaceY = cy + r - (2f * r) * liquid
+            // 圆形裁剪：液体只画在球内
+            val circleClip = androidx.compose.ui.graphics.Path().apply { addOval(androidx.compose.ui.geometry.Rect(cx - r, cy - r, cx + r, cy + r)) }
+            clipPath(circleClip) {
+                drawCircle(color.copy(alpha = 0.38f), radius = r, center = c)
+                val wavePath = androidx.compose.ui.graphics.Path()
+                val amp = r * 0.06f
+                wavePath.moveTo(cx - r, surfaceY)
+                var x = cx - r
+                while (x <= cx + r) {
+                    val t = (x - (cx - r)) / (2f * r)
+                    val y = surfaceY + amp * kotlin.math.sin(t * (2f * Math.PI).toFloat() * 1.6f + wavePhase) +
+                        amp * 0.6f * kotlin.math.sin(t * (2f * Math.PI).toFloat() * 2.7f - wavePhase * 0.7f)
+                    wavePath.lineTo(x, y)
+                    x += 4f
+                }
+                wavePath.lineTo(cx + r, cy + r)
+                wavePath.lineTo(cx - r, cy + r)
+                wavePath.close()
+                drawPath(wavePath, color.copy(alpha = 0.85f))
+                // 液面下的次级波浪（错相位，浅色）增加流动层次
+                val wave2 = androidx.compose.ui.graphics.Path()
+                wave2.moveTo(cx - r, surfaceY + r * 0.05f)
+                x = cx - r
+                while (x <= cx + r) {
+                    val t = (x - (cx - r)) / (2f * r)
+                    val y = surfaceY + r * 0.05f + amp * kotlin.math.sin(t * (2f * Math.PI).toFloat() * 2.1f - wavePhase * 1.3f)
+                    wave2.lineTo(x, y)
+                    x += 4f
+                }
+                wave2.lineTo(cx + r, cy + r)
+                wave2.lineTo(cx - r, cy + r)
+                wave2.close()
+                drawPath(wave2, color.copy(alpha = 0.45f))
+                // 液面高光线
+                drawLine(
+                    Color.White.copy(alpha = 0.35f),
+                    Offset(cx - r * 0.7f, surfaceY + amp * 0.3f),
+                    Offset(cx + r * 0.7f, surfaceY + amp * 0.3f),
+                    strokeWidth = 1.5f,
+                )
+            }
+            // 玻璃质感：外环描边 + 左上高光弧 + 右下内阴影弧
+            drawCircle(
+                androidx.compose.ui.graphics.Brush.radialGradient(
+                    listOf(Color.White.copy(alpha = 0.14f), Color.Transparent),
+                    center = Offset(cx - r * 0.35f, cy - r * 0.4f),
+                    radius = r * 0.9f,
+                ),
+                radius = r, center = c,
+            )
+            drawCircle(Color(0xFF3A3F47), radius = r, center = c, style = Stroke(1.5f))
+            drawArc(
+                Color.White.copy(alpha = 0.30f),
+                startAngle = -140f, sweepAngle = 70f, useCenter = false,
+                topLeft = Offset(cx - r * 0.78f, cy - r * 0.78f),
+                size = Size(r * 1.56f, r * 1.56f),
+                style = Stroke(r * 0.09f, cap = StrokeCap.Round),
+            )
+            drawArc(
+                Color.Black.copy(alpha = 0.25f),
+                startAngle = 40f, sweepAngle = 60f, useCenter = false,
+                topLeft = Offset(cx - r * 0.78f, cy - r * 0.78f),
+                size = Size(r * 1.56f, r * 1.56f),
+                style = Stroke(r * 0.06f, cap = StrokeCap.Round),
+            )
+        }
+        if (centerText != null) {
+            Text(
+                centerText,
+                fontSize = 13.sp, fontWeight = FontWeight.Bold,
+                color = TextHi,
+            )
+        }
+    }
 }

@@ -78,6 +78,7 @@ fun ManageTemplatesScreen(vm: AppViewModel, kind: Int, onClose: () -> Unit) {
 
         StackedColumn {
             filtered.forEach { t ->
+                key(if (kind == 0) "f${(t as FoodTemplate).id}" else "x${(t as ExerciseTemplate).id}") {
                 Box(Modifier.stackApproach()) {
                     if (kind == 0) FoodManageRow(t as FoodTemplate,
                         onEdit = { editFood = t },
@@ -85,6 +86,7 @@ fun ManageTemplatesScreen(vm: AppViewModel, kind: Int, onClose: () -> Unit) {
                     else ExerciseManageRow(t as ExerciseTemplate,
                         onEdit = { editExercise = t },
                         onDelete = { confirmDelete = t })
+                }
                 }
             }
         }

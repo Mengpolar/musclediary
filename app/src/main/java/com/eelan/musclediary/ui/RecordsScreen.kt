@@ -188,6 +188,7 @@ private fun RecordsBody(
                     es.forEach { e ->
                         val prev = vm.weightEntries.filter { it.date < e.date }.maxByOrNull { it.date }
                         val d = prev?.let { e.weightKg - it.weightKg }
+                        key(e.id) {
                         Box(Modifier.stackApproach()) {
                             SwipeEntryRow(
                                 "${e.date.substring(5)} · ${fmt1(e.weightKg)} kg",
@@ -196,6 +197,7 @@ private fun RecordsBody(
                                 onEdit = { onEdit(e) },
                                 onDelete = { onDelete(e) },
                             )
+                        }
                         }
                     }
                 }
@@ -243,6 +245,7 @@ private fun RecordsBody(
                         es.forEach { e ->
                             val t = java.time.Instant.ofEpochMilli(e.createdAt)
                                 .atZone(java.time.ZoneId.systemDefault())
+                            key(e.id) {
                             Box(Modifier.stackApproach()) {
                                 SwipeEntryRow(
                                     String.format("%02d:%02d", t.hour, t.minute),
@@ -251,6 +254,7 @@ private fun RecordsBody(
                                     onEdit = { onEdit(e) },
                                     onDelete = { onDelete(e) },
                                 )
+                            }
                             }
                         }
                     }
@@ -271,6 +275,7 @@ private fun RecordsBody(
                     GroupHeader("${month.year}年${month.monthValue}月 · ${es.size} 条",
                         "日均 ${fmt0(avgKcal)} kcal")
                     es.forEach { e ->
+                        key(e.id) {
                         Box(Modifier.stackApproach()) {
                             SwipeEntryRow(
                                 e.name,
@@ -279,6 +284,7 @@ private fun RecordsBody(
                                 onEdit = { onEdit(e) },
                                 onDelete = { onDelete(e) },
                             )
+                        }
                         }
                     }
                 }
@@ -296,6 +302,7 @@ private fun RecordsBody(
                     GroupHeader("${month.year}年${month.monthValue}月 · ${es.size} 条",
                         "合计 ${fmt0(es.sumOf { it.calories })} kcal")
                     es.forEach { e ->
+                        key(e.id) {
                         Box(Modifier.stackApproach()) {
                             SwipeEntryRow(
                                 e.name,
@@ -304,6 +311,7 @@ private fun RecordsBody(
                                 onEdit = { onEdit(e) },
                                 onDelete = { onDelete(e) },
                             )
+                        }
                         }
                     }
                 }

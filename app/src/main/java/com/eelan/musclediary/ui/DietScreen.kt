@@ -83,7 +83,8 @@ fun DietScreen(vm: AppViewModel, onOpenRecords: () -> Unit = {}) {
             } else {
                 StackedColumn(contentPadding = PaddingValues(bottom = 80.dp)) {
                     entries.forEach { f ->
-                        // 滚到容器顶部钉住、被后面卡片叠盖（删除由 SwipeEntryRow 弧线飞出表现）
+                        // key 强制每个条目独立状态，防止删除/新增时复用残留的钉住偏移（空行 bug）
+                        key(f.id) {
                         Box(Modifier.stackApproach()) {
                             SwipeEntryRow(
                                 f.name,
@@ -92,6 +93,7 @@ fun DietScreen(vm: AppViewModel, onOpenRecords: () -> Unit = {}) {
                                 onEdit = { editingEntry = f },
                                 onDelete = { vm.deleteFood(f) },
                             )
+                        }
                         }
                     }
                 }

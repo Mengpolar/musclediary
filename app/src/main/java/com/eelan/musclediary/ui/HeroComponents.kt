@@ -109,6 +109,16 @@ fun PillNavBar(
     onSelect: (Int) -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    // 液态 Tab：文字不动，色块在标签间流动——按运动方向拉伸、接近目标回弹收缩
+    val animSelected by animateFloatAsState(
+        targetValue = selected.toFloat(),
+        animationSpec = spring(
+            dampingRatio = Spring.DampingRatioLowBouncy,
+            stiffness = Spring.StiffnessMediumLow,
+        ),
+        label = "liquidPos",
+    )
+
     Box(
         modifier
             .fillMaxWidth()
@@ -117,24 +127,31 @@ fun PillNavBar(
             .background(Ink1)
             .padding(5.dp),
     ) {
+        // 流动的液态色块：位于 selected 与上一位置之间，途经中间时横向拉伸
+        BoxWithConstraints(Modifier.matchParentSize()) {
+            val tabW = maxWidth / tabs.size
+            // 相对上一位置的偏移量（速度感）：拉伸量与移动距离成正比，两端小中间大
+            val stretch = (1f - kotlin.math.abs(animSelected - selected)).coerceIn(0f, 1f)
+            val stretchW = tabW * (1f + 0.45f * stretch)
+            Box(
+                Modifier
+                    .offset(x = tabW * animSelected + (tabW - stretchW) / 2)
+                    .width(stretchW)
+                    .fillMaxHeight()
+                    .clip(RoundedCornerShape(99.dp))
+                    .background(Accent),
+            )
+        }
         Row(Modifier.fillMaxWidth()) {
             tabs.forEachIndexed { i, label ->
-                // 选中橙 ↔ 未选中黑 双向渐变（330ms），避免直接跳变
-                val bg by animateColorAsState(
-                    if (i == selected) Accent else Ink2,
-                    animationSpec = tween(330),
-                    label = "navBg",
-                )
                 val fg by animateColorAsState(
                     if (i == selected) Color(0xFF1A1208) else TextLo,
-                    animationSpec = tween(330),
+                    animationSpec = tween(260),
                     label = "navFg",
                 )
                 Box(
                     Modifier
                         .weight(1f)
-                        .clip(RoundedCornerShape(99.dp))
-                        .background(bg)
                         .clickable(
                             interactionSource = remember { MutableInteractionSource() },
                             indication = null,
