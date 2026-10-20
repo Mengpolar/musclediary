@@ -1,5 +1,6 @@
 package com.eelan.musclediary.ui
 
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -15,6 +16,9 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
@@ -122,15 +126,34 @@ fun TodayScreen(vm: AppViewModel, onGoWorkout: () -> Unit = {}, onOpenWaterRecor
         ) {
             Row(Modifier.fillMaxWidth()) {
                 Column(
-                    Modifier.weight(1f).clickable { showWater = true },
+                    Modifier.weight(1f).clickable { showWater = true }
+                        .padding(horizontal = 14.dp),
                     horizontalAlignment = Alignment.CenterHorizontally,
                 ) {
                     Text("饮水", fontSize = 11.sp, color = TextLo)
-                    Text(
-                        fmt0(water),
-                        fontSize = 24.sp, fontWeight = FontWeight.ExtraBold,
-                        color = if (water >= waterTarget) Good else Protein,
-                    )
+                    Spacer(Modifier.height(2.dp))
+                    val waterProgress = if (waterTarget > 0) (water / waterTarget).toFloat().coerceIn(0f, 1f) else 0f
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        // 迷你进度环：进度一眼可见
+                        Box(Modifier.size(44.dp)) {
+                            Canvas(Modifier.fillMaxSize()) {
+                                val s = 5.dp.toPx()
+                                drawArc(Ink3, -90f, 360f, false, style = Stroke(s, cap = StrokeCap.Round))
+                                drawArc(
+                                    if (waterProgress >= 1f) Good else Protein, -90f, waterProgress * 360f,
+                                    false, style = Stroke(s, cap = StrokeCap.Round),
+                                )
+                            }
+                        }
+                        Spacer(Modifier.width(8.dp))
+                        // 数值滚动：200→750 时从 200 平滑滚到 750
+                        AnimatedCountText(
+                            fmt0(water),
+                            fontSize = 24.sp,
+                            color = if (water >= waterTarget) Good else Protein,
+                        )
+                    }
+                    Spacer(Modifier.height(4.dp))
                     Text("目标 ${fmt0(waterTarget)} ml · 点+记录", fontSize = 11.sp, color = TextLo)
                 }
                 Box(
@@ -138,15 +161,32 @@ fun TodayScreen(vm: AppViewModel, onGoWorkout: () -> Unit = {}, onOpenWaterRecor
                         .background(Ink3).align(Alignment.CenterVertically),
                 )
                 Column(
-                    Modifier.weight(1f).clickable(onClick = onGoWorkout),
+                    Modifier.weight(1f).clickable(onClick = onGoWorkout)
+                        .padding(horizontal = 14.dp),
                     horizontalAlignment = Alignment.CenterHorizontally,
                 ) {
                     Text("锻炼消耗", fontSize = 11.sp, color = TextLo)
-                    Text(
-                        fmt0(exKcal),
-                        fontSize = 24.sp, fontWeight = FontWeight.ExtraBold,
-                        color = if (p.exerciseGoalKcal > 0 && exKcal >= p.exerciseGoalKcal) Good else Warn,
-                    )
+                    Spacer(Modifier.height(2.dp))
+                    val exProgress = if (p.exerciseGoalKcal > 0) (exKcal / p.exerciseGoalKcal).toFloat().coerceIn(0f, 1f) else 0f
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Box(Modifier.size(44.dp)) {
+                            Canvas(Modifier.fillMaxSize()) {
+                                val s = 5.dp.toPx()
+                                drawArc(Ink3, -90f, 360f, false, style = Stroke(s, cap = StrokeCap.Round))
+                                drawArc(
+                                    if (exProgress >= 1f) Good else Warn, -90f, exProgress * 360f,
+                                    false, style = Stroke(s, cap = StrokeCap.Round),
+                                )
+                            }
+                        }
+                        Spacer(Modifier.width(8.dp))
+                        AnimatedCountText(
+                            fmt0(exKcal),
+                            fontSize = 24.sp,
+                            color = if (p.exerciseGoalKcal > 0 && exKcal >= p.exerciseGoalKcal) Good else Warn,
+                        )
+                    }
+                    Spacer(Modifier.height(4.dp))
                     Text("目标 ${fmt0(p.exerciseGoalKcal)} kcal · 去记录", fontSize = 11.sp, color = TextLo)
                 }
             }
@@ -196,7 +236,8 @@ fun WaterDialog(vm: AppViewModel, date: LocalDate, targetMl: Double, onDismiss: 
                     fontSize = 13.sp, color = if (remain > 0) Protein else Good,
                 )
                 // 快捷按钮：合并最近值与常用值（去重，最多 4 个），点击直接记录并关窗
-                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                // weight(1f) 均分宽度：窄屏下 4 个按钮不会互相挤压截断
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
                     val chips = (recent.map { fmt0(it) } + listOf("100", "250", "500")).distinct().take(4)
                     chips.forEach { q ->
                         OutlinedButton(
@@ -204,9 +245,9 @@ fun WaterDialog(vm: AppViewModel, date: LocalDate, targetMl: Double, onDismiss: 
                                 q.toDoubleOrNull()?.let { vm.addWater(it, date) }
                                 onDismiss()
                             },
-                            modifier = Modifier.height(44.dp),
-                            contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 16.dp),
-                        ) { Text("${q}ml", fontSize = 13.sp, color = TextHi) }
+                            modifier = Modifier.height(44.dp).weight(1f),
+                            contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 4.dp),
+                        ) { Text("${q}ml", fontSize = 13.sp, color = TextHi, maxLines = 1) }
                     }
                 }
                 OutlinedTextField(

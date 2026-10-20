@@ -33,6 +33,34 @@ import kotlin.math.roundToInt
  * - [PillNavBar] 底部悬浮胶囊导航（选中色块平滑移动）
  */
 
+/** 通用滚动计数文本：数值变化时从旧值平滑滚动到新值（450ms）；非数字内容静态展示 */
+@Composable
+fun AnimatedCountText(
+    value: String,
+    modifier: Modifier = Modifier,
+    fontSize: androidx.compose.ui.unit.TextUnit = 46.sp,
+    color: Color = TextHi,
+    letterSpacing: androidx.compose.ui.unit.TextUnit = 0.sp,
+) {
+    val target = value.toDoubleOrNull()
+    val shown = if (target != null) {
+        val anim by animateIntAsState(
+            targetValue = target.roundToInt(),
+            animationSpec = tween(450, easing = FastOutSlowInEasing),
+            label = "countAnim",
+        )
+        anim.toString()
+    } else value
+    Text(
+        shown,
+        fontSize = fontSize, color = color,
+        fontWeight = FontWeight.ExtraBold,
+        letterSpacing = letterSpacing,
+        style = androidx.compose.ui.text.TextStyle(fontFeatureSettings = "tnum"),
+        modifier = modifier,
+    )
+}
+
 /** 灯牌大数字：热量等核心指标的主展示；数值变化时从旧值滚动到新值（450ms） */
 @Composable
 fun HeroNumber(
@@ -42,22 +70,12 @@ fun HeroNumber(
     color: Color = TextHi,
     unitColor: Color = TextLo,
 ) {
-    val target = value.toDoubleOrNull()
-    // 非数字内容直接静态展示；数字则滚动计数
-    val shown = if (target != null) {
-        val anim by animateIntAsState(
-            targetValue = target.roundToInt(),
-            animationSpec = tween(450, easing = FastOutSlowInEasing),
-            label = "heroCount",
-        )
-        anim.toString()
-    } else value
     Row(modifier, verticalAlignment = Alignment.Bottom) {
-        Text(
-            shown,
-            fontSize = 46.sp, fontWeight = FontWeight.ExtraBold,
-            letterSpacing = (-1.5).sp, color = color,
-            lineHeight = 46.sp,
+        AnimatedCountText(
+            value,
+            fontSize = 46.sp,
+            color = color,
+            letterSpacing = (-1.5).sp,
         )
         if (unit.isNotEmpty()) {
             Text(
@@ -83,7 +101,7 @@ fun PhaseBadge(text: String, color: Color = Accent) {
     )
 }
 
-/** 底部悬浮胶囊导航 */
+/** 底部悬浮胶囊导航：均分占满可用宽度 */
 @Composable
 fun PillNavBar(
     tabs: List<String>,
@@ -93,12 +111,13 @@ fun PillNavBar(
 ) {
     Box(
         modifier
-            .padding(horizontal = 24.dp, vertical = 14.dp)
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 14.dp)
             .clip(RoundedCornerShape(99.dp))
             .background(Ink1)
             .padding(5.dp),
     ) {
-        Row {
+        Row(Modifier.fillMaxWidth()) {
             tabs.forEachIndexed { i, label ->
                 val bg by animateColorAsState(
                     if (i == selected) Accent else Color.Transparent,
@@ -108,28 +127,17 @@ fun PillNavBar(
                     if (i == selected) Color(0xFF1A1208) else TextLo,
                     label = "navFg",
                 )
-                // 标签舒展：选中胶囊弹性放大突出，其余让位
-                val itemScale by animateFloatAsState(
-                    targetValue = if (i == selected) 1.06f else 1f,
-                    animationSpec = spring(
-                        dampingRatio = Spring.DampingRatioMediumBouncy,
-                        stiffness = Spring.StiffnessMedium,
-                    ),
-                    label = "navScale",
-                )
                 Box(
                     Modifier
-                        .graphicsLayer {
-                            scaleX = itemScale
-                            scaleY = itemScale
-                        }
+                        .weight(1f)
                         .clip(RoundedCornerShape(99.dp))
                         .background(bg)
                         .clickable(
                             interactionSource = remember { MutableInteractionSource() },
                             indication = null,
                         ) { onSelect(i) }
-                        .padding(horizontal = 18.dp, vertical = 9.dp),
+                        .padding(vertical = 9.dp),
+                    contentAlignment = Alignment.Center,
                 ) {
                     Text(label, fontSize = 12.sp, fontWeight = FontWeight.Bold, color = fg)
                 }

@@ -31,8 +31,8 @@ android {
         applicationId = "com.eelan.musclediary"
         minSdk = 26
         targetSdk = 34
-        versionCode = 29
-        versionName = "0.7.13"
+        versionCode = 30
+        versionName = "0.7.14"
     }
 
     buildTypes {

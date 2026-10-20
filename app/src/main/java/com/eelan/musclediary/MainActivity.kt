@@ -6,11 +6,11 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
-import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.togetherWith
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
@@ -97,18 +97,29 @@ fun AppRoot(vm: AppViewModel) {
                 .fillMaxSize()
                 .background(Ink0)
         ) {
-            // 页面切换过渡：新页淡入 + 轻微上移（200ms），旧页直接让位
+            // 页面切换过渡：按导航方向水平滑动——向右切（序号增大）新页从右侧滑入，向左切从左侧滑入
+            val stateKey = if (records >= 0) "records$records" else "tab$tab$manage"
+            val prevKey = remember { mutableStateOf(stateKey) }
+            // 与上一状态比较：records 页视为更深一层（向右），返回视为向左
+            val forward = stateKey != prevKey.value && (
+                stateKey.startsWith("records") ||
+                    (stateKey.startsWith("tab") && prevKey.value.startsWith("tab") &&
+                        stateKey.removePrefix("tab").take(1).toIntOrNull()
+                            .let { it != null && prevKey.value.removePrefix("tab").take(1).toIntOrNull().let { p -> p != null && it > p } })
+                )
+            SideEffect { prevKey.value = stateKey }
             AnimatedContent(
-                targetState = if (records >= 0) "records$records" else "tab$tab$manage",
+                targetState = stateKey,
                 transitionSpec = {
-                    (fadeIn(tween(200)) + slideInVertically(tween(200)) { it / 24 })
+                    val enterX = if (forward) 1 else -1
+                    (fadeIn(tween(200)) + slideInHorizontally(tween(220)) { enterX * it / 3 })
                         .togetherWith(fadeOut(tween(90)))
                 },
                 label = "pageTransition",
-            ) { state ->
+            ) { key ->
                 Column(Modifier.fillMaxSize().padding(top = 12.dp)) {
                     when {
-                        state.startsWith("records") -> RecordsScreen(vm, records) { records = -1 }
+                        key.startsWith("records") -> RecordsScreen(vm, records) { records = -1 }
                         else -> when (tab) {
                             0 -> TodayScreen(vm, onGoWorkout = { tab = 2 }, onOpenWaterRecords = { records = 1 })
                             1 -> DietScreen(vm, onOpenRecords = { records = 2 })
