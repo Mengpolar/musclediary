@@ -160,7 +160,7 @@ fun MacroBar(
         Canvas(
             Modifier
                 .fillMaxWidth()
-                .height(14.dp)
+                .height(18.dp)
         ) {
             val w = size.width
             val h = size.height
@@ -184,43 +184,43 @@ fun MacroBar(
                 size = Size(fillW, h),
                 cornerRadius = r,
             )
-            // 填充区粒子：从左往右流动的小亮点（裁剪在填充区内）
+            // 填充区粒子：在【填充区内】从左往右流动的亮点（相对填充宽度流动，保证可见）
             clipRect(left = 0f, top = 0f, right = fillW, bottom = h) {
-                repeat(6) { i ->
-                    val speed = 0.55f + i * 0.13f
-                    val px = ((particlePhase * speed + i * 0.17f) % 1f) * w
-                    val py = h * (0.28f + 0.44f * ((i * 0.37f) % 1f))
-                    val pr = h * (0.055f + 0.03f * ((i * 0.53f) % 1f))
-                    drawCircle(Color.White.copy(alpha = 0.30f), radius = pr, center = Offset(px, py))
+                repeat(7) { i ->
+                    val speed = 0.5f + i * 0.14f
+                    val px = ((particlePhase * speed + i * 0.19f) % 1f) * fillW
+                    val py = h * (0.25f + 0.5f * ((i * 0.41f) % 1f))
+                    val pr = h * (0.10f + 0.05f * ((i * 0.53f) % 1f))
+                    // 拖尾：主亮点 + 后方两个渐弱小点
+                    drawCircle(Color.White.copy(alpha = 0.85f), radius = pr, center = Offset(px, py))
+                    drawCircle(Color.White.copy(alpha = 0.35f), radius = pr * 0.7f, center = Offset(px - h * 0.28f, py))
+                    drawCircle(Color.White.copy(alpha = 0.15f), radius = pr * 0.5f, center = Offset(px - h * 0.55f, py))
                 }
             }
-            // 进度末尾的滚动波浪：正弦波覆盖末尾一小段，随时间滚动
-            val waveW = h * 1.6f
-            if (fillW < w - 2f) {
-                val waveStart = (fillW - waveW * 0.4f).coerceAtLeast(0f)
+            // 进度末尾波浪：填充末端的"液面隆起"——一道竖向的亮色波包在末端处起伏流动
+            if (fillW < w - 1f && animFill > 0.01f) {
+                val waveCenter = fillW
+                val amp = h * 0.30f
+                val waveHalfW = h * 1.1f
                 val path = androidx.compose.ui.graphics.Path()
-                val amp = h * 0.16f
-                path.moveTo(waveStart, h / 2)
-                var x = waveStart
-                while (x <= fillW) {
-                    val phase = wavePhase + (x - waveStart) / waveW * (2f * Math.PI).toFloat() * 1.5f
-                    path.lineTo(x, h / 2 + amp * kotlin.math.sin(phase))
+                path.moveTo(waveCenter - waveHalfW, h)
+                var x = waveCenter - waveHalfW
+                while (x <= waveCenter + waveHalfW) {
+                    val d = (x - waveCenter) / waveHalfW
+                    val y = h / 2f + amp * kotlin.math.sin(d * (Math.PI / 2)).toFloat() *
+                        kotlin.math.sin(wavePhase + d * 1.2f).toFloat() - h * 0.06f * (1f - kotlin.math.abs(d).toFloat())
+                    path.lineTo(x, y)
                     x += 3f
                 }
-                path.lineTo(fillW, h)
-                path.lineTo(waveStart, h)
+                path.lineTo(waveCenter + waveHalfW, h)
                 path.close()
-                clipRect(left = waveStart, top = 0f, right = fillW, bottom = h) {
-                    drawPath(path, color.copy(alpha = 0.85f))
+                clipRect(left = 0f, top = 0f, right = fillW + waveHalfW, bottom = h) {
+                    drawPath(path, androidx.compose.ui.graphics.Brush.horizontalGradient(
+                        listOf(Color.Transparent, color, Color.Transparent),
+                        startX = waveCenter - waveHalfW, endX = waveCenter + waveHalfW,
+                    ))
                 }
             }
-            // 刻度：目标所需（白）/ 热量所需（主色）——短齿从轨道上缘垂下，只占一半高度
-            fun tick(t: Double, c: Color) {
-                val x = (t / scaleMax * w).toFloat().coerceIn(0f, w)
-                drawLine(c, Offset(x, -1f), Offset(x, h * 0.55f), strokeWidth = 2.5f)
-            }
-            tick(baseTarget, Color(0xFFB9BEC5))
-            if (kotlin.math.abs(scaledTarget - baseTarget) > 0.5) tick(scaledTarget, Accent)
         }
         Spacer(Modifier.height(2.dp))
     }
@@ -327,15 +327,15 @@ fun SwipeEntryRow(
     val density = LocalDensity.current
     val maxSwipePx = with(density) { 132.dp.toPx() }
     val offset = remember { Animatable(0f) }
-    // 粉碎删除：0=正常，1=粉碎完成。碎裂前沿从右往左推进，右侧先碎（下坠+缩小+淡出）
+    // 粉碎删除：0=正常，1=粉碎完成。卡片竖切 6 条碎块，从右往左依次脱落（下坠+旋转+淡出）
     val crush = remember { Animatable(0f) }
     var flying by remember { mutableStateOf(false) }
-    val cardW = with(density) { 300.dp.toPx() } // 估算宽度用于推进速度，实际以 draw 裁切为准
+    val CRUSH_PIECES = 6
 
     fun deleteWithCrush() {
         flying = true
         scope.launch {
-            crush.animateTo(1f, tween(420, easing = FastOutSlowInEasing))
+            crush.animateTo(1f, tween(560, easing = FastOutSlowInEasing))
             onDelete()
         }
     }
@@ -343,35 +343,40 @@ fun SwipeEntryRow(
     Box(
         Modifier
             .fillMaxWidth()
-            .graphicsLayer {
-                if (flying) {
-                    // 未碎区域整体：左移（被"吸"向碎裂口）+ 轻微下坠 + 缩小
-                    translationX = -size.width * 0.06f * crush.value
-                    translationY = size.height * 0.25f * crush.value
-                    val sc = 1f - 0.25f * crush.value
-                    scaleX = sc; scaleY = sc
-                    transformOrigin = TransformOrigin(0f, 0.5f)
-                }
-            }
             .clip(RoundedCornerShape(10.dp))
             .drawWithContent {
                 if (!flying) {
                     drawContent()
                 } else {
-                    // 碎裂进度：前沿从右往左，已碎区域不再绘制（露出列表底色）
-                    val front = 1f - crush.value
-                    val remainingW = size.width * front
-                    clipRect(left = 0f, top = 0f, right = remainingW, bottom = size.height) {
-                        this@drawWithContent.drawContent()
+                    // 碎块 j 的脱落进度：右边的块先动（j 从右往左 0..N-1）
+                    val p = crush.value
+                    fun pieceProgress(j: Int): Float {
+                        val start = j * (0.55f / CRUSH_PIECES)      // 右块 0 先开始
+                        return ((p - start) / 0.45f).coerceIn(0f, 1f)
                     }
-                    // 碎裂口的闪白前沿，推进时可见
-                    if (crush.value < 1f && crush.value > 0.02f) {
-                        drawLine(
-                            color = Color.White.copy(alpha = 0.55f * (1f - crush.value)),
-                            start = Offset(remainingW, 0f),
-                            end = Offset(remainingW, size.height),
-                            strokeWidth = 2f,
-                        )
+                    val pieceW = size.width / CRUSH_PIECES
+                    // 每个碎块独立绘制：裁出竖条 → 下坠 + 旋转 + 缩小；最左条最后动
+                    for (j in 0 until CRUSH_PIECES) {
+                        val jp = pieceProgress(j)
+                        val left = size.width - (j + 1) * pieceW
+                        if (jp >= 1f) continue
+                        clipRect(left = left, top = 0f, right = left + pieceW, bottom = size.height) {
+                            withTransform({
+                                rotate(
+                                    degrees = 14f * jp * (if (j % 2 == 0) 1f else -0.6f),
+                                    pivot = Offset(left + pieceW / 2f, size.height),
+                                )
+                                translate(left = 6f * jp, top = size.height * 1.15f * jp * jp)
+                                scale(scaleX = 1f - 0.15f * jp, scaleY = 1f - 0.15f * jp, pivot = Offset(left + pieceW / 2f, size.height / 2f))
+                            }) {
+                                this@drawWithContent.drawContent()
+                            }
+                            // 末段叠底色模拟淡出（drawContent 无法直接调 alpha）
+                            if (jp > 0.6f) {
+                                drawRect(Ink0, topLeft = Offset(left, 0f), size = Size(pieceW, size.height),
+                                    alpha = ((jp - 0.6f) / 0.4f).coerceIn(0f, 1f))
+                            }
+                        }
                     }
                 }
             },
