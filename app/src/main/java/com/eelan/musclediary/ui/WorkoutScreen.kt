@@ -56,7 +56,11 @@ fun WorkoutScreen(vm: AppViewModel, onOpenWeightRecords: () -> Unit = {}, onOpen
     Scaffold(
         containerColor = androidx.compose.ui.graphics.Color.Transparent,
         floatingActionButton = {
-            FloatingActionButton(onClick = { pickOpen = true }, containerColor = Accent) {
+            FloatingActionButton(
+                onClick = { pickOpen = true },
+                containerColor = Accent,
+                modifier = Modifier.padding(bottom = 6.dp),
+            ) {
                 Icon(Icons.Default.Add, "添加锻炼", tint = Ink0)
             }
         },

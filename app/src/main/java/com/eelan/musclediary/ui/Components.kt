@@ -126,6 +126,8 @@ fun MacroBar(
             )
         }
         Spacer(Modifier.height(4.dp))
+        // 图例：白=目标所需 · 橙=热量所需（只在本组条下方出现一次的语义说明由调用方补充，
+        // 这里把刻度线改为从顶部垂下的短齿，避免与填充混淆）
         Canvas(
             Modifier
                 .fillMaxWidth()
@@ -143,10 +145,10 @@ fun MacroBar(
                 size = Size((animFill * w).toFloat().coerceAtLeast(h), h),
                 cornerRadius = r,
             )
-            // 刻度：目标所需（白）/ 热量所需（主色）
+            // 刻度：目标所需（白）/ 热量所需（主色）——短齿从轨道上缘垂下，只占一半高度
             fun tick(t: Double, c: Color) {
                 val x = (t / scaleMax * w).toFloat().coerceIn(0f, w)
-                drawLine(c, Offset(x, -2f), Offset(x, h + 2f), strokeWidth = 2.5f)
+                drawLine(c, Offset(x, -1f), Offset(x, h * 0.55f), strokeWidth = 2.5f)
             }
             tick(baseTarget, Color(0xFFB9BEC5))
             if (kotlin.math.abs(scaledTarget - baseTarget) > 0.5) tick(scaledTarget, Accent)

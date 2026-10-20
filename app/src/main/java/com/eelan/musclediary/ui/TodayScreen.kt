@@ -14,14 +14,20 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import kotlin.math.roundToInt
 import com.eelan.musclediary.AppViewModel
 import com.eelan.musclediary.domain.Calc
 import com.eelan.musclediary.ui.theme.*
 import java.time.LocalDate
 
-/** 今日总览：目标环（可点击看推导）+ 饮水环 + 锻炼消耗环；点日期弹日历选择 */
+/** 今日总览（铁馆夜训）：灯牌大热量 + 宏量细条 + 双列状态；点日期弹日历选择 */
 @Composable
 fun TodayScreen(vm: AppViewModel, onGoWorkout: () -> Unit = {}, onOpenWaterRecords: () -> Unit = {}) {
     val date = vm.selectedDate
@@ -35,89 +41,121 @@ fun TodayScreen(vm: AppViewModel, onGoWorkout: () -> Unit = {}, onOpenWaterRecor
     val fat = food.sumOf { it.fat }
     val water = vm.waterOn(date)
     val waterTarget = Calc.waterTargetMl(p.weightKg)
+    val kcalProgress = if (targets.tdee > 0) (kcal / targets.tdee).coerceIn(0.0, 1.0) else 0.0
+    val kcalLeft = (targets.tdee - kcal).coerceAtLeast(0.0)
 
     var showSheet by remember { mutableStateOf(false) }
     var showCalendar by remember { mutableStateOf(false) }
     var showWater by remember { mutableStateOf(false) }
 
     Column(
-        Modifier.padding(horizontal = 16.dp)
+        Modifier.padding(horizontal = 20.dp)
             .verticalScroll(rememberScrollState())
     ) {
-        DateHeader(vm, onOpenCalendar = { showCalendar = true })
-        Spacer(Modifier.height(8.dp))
-        CardBox(title = "今日目标（${if (targets.isCut) "减脂期" else "增肌期"}）") {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                ProgressRing(
-                    progress = if (targets.tdee > 0) (kcal / targets.tdee).toFloat() else 0f,
-                    color = Accent, size = 130.dp, stroke = 12.dp,
-                    centerLabel = "热量", centerValue = "${fmt0(kcal)}",
-                    subValue = "目标 ${fmt0(targets.tdee)}",
-                    onClick = { showSheet = true },
-                )
-                Spacer(Modifier.width(16.dp))
-                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    MacroBar("蛋白质", protein, targets.baseProtein, targets.protein, Protein) { showSheet = true }
-                    MacroBar("碳水", carb, targets.baseCarb, targets.carb, CarbC) { showSheet = true }
-                    MacroBar("脂肪", fat, targets.baseFat, targets.fat, FatC) { showSheet = true }
-                }
+        // 日期头：英文字距星期 + 大日期 + 时期徽章
+        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+            Box(Modifier.weight(1f)) {
+                DateHeader(vm, onOpenCalendar = { showCalendar = true })
             }
-            Spacer(Modifier.height(6.dp))
-            Text(
-                "刻度：白=目标所需 · 橙=热量所需（按热量等比分摊）",
-                fontSize = 12.sp, color = TextLo,
-            )
-            Spacer(Modifier.height(2.dp))
-            Text(
-                "运动消耗 ${fmt0(exKcal)} kcal 已计入目标 · 点数值看推导",
-                fontSize = 12.sp, color = TextLo,
-            )
+            PhaseBadge(if (targets.isCut) "减脂期" else "增肌期")
         }
+        // 灯光短线
+        Box(
+            Modifier.padding(top = 10.dp)
+                .width(44.dp).height(2.dp)
+                .clip(RoundedCornerShape(2.dp))
+                .background(Accent),
+        )
+        Spacer(Modifier.height(14.dp))
 
-        Spacer(Modifier.height(12.dp))
-        CardBox(title = "今日状态") {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                // 饮水环（点击记录，下方入口看全部记录）
-                Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.weight(1f)) {
-                    ProgressRing(
-                        progress = if (waterTarget > 0) (water / waterTarget).toFloat() else 0f,
-                        color = Protein, size = 100.dp, stroke = 9.dp,
-                        centerLabel = "饮水", centerValue = "${fmt0(water)}",
-                        subValue = "目标 ${fmt0(waterTarget)}",
-                        onClick = { showWater = true },
-                        valueColor = if (water >= waterTarget) Good else TextHi,
-                    )
-                    Spacer(Modifier.height(6.dp))
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text("点环记录", fontSize = 12.sp, color = TextLo)
-                        Text(
-                            "全部记录 >",
-                            fontSize = 12.sp, color = Accent,
-                            modifier = Modifier
-                                .clickable(onClick = onOpenWaterRecords)
-                                .padding(horizontal = 6.dp, vertical = 6.dp),
-                        )
-                    }
-                }
-                // 锻炼消耗环
-                Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.weight(1f)) {
-                    ProgressRing(
-                        progress = if (p.exerciseGoalKcal > 0) (exKcal / p.exerciseGoalKcal).toFloat() else 0f,
-                        color = Warn, size = 100.dp, stroke = 9.dp,
-                        centerLabel = "锻炼", centerValue = "${fmt0(exKcal)}",
-                        subValue = "目标 ${fmt0(p.exerciseGoalKcal)}",
-                        onClick = onGoWorkout,
-                        valueColor = if (p.exerciseGoalKcal > 0 && exKcal >= p.exerciseGoalKcal) Good else TextHi,
-                    )
-                    Spacer(Modifier.height(6.dp))
-                    Text("点环去记录", fontSize = 12.sp, color = TextLo)
-                }
+        // 灯牌主区：大摄入数字 + 右侧小环
+        Row(verticalAlignment = Alignment.Bottom) {
+            Column(Modifier.weight(1f).clickable { showSheet = true }) {
+                Text("今日摄入", fontSize = 12.sp, color = TextLo)
+                Spacer(Modifier.height(2.dp))
+                HeroNumber(fmt0(kcal), "kcal", color = TextHi)
+                Spacer(Modifier.height(4.dp))
+                Text(
+                    buildAnnotatedString {
+                        append("目标 ${fmt0(targets.tdee)} · 还可吃 ")
+                        withStyle(SpanStyle(color = Accent, fontWeight = FontWeight.Bold)) {
+                            append(fmt0(kcalLeft))
+                        }
+                    },
+                    fontSize = 12.sp, color = TextLo,
+                )
             }
-            if (date != LocalDate.now()) {
-                Spacer(Modifier.height(6.dp))
-                Text("当前查看 ${date.monthValue}月${date.dayOfMonth}日 的数据", fontSize = 12.sp, color = Warn)
+            Box(Modifier.clickable { showSheet = true }) {
+                ProgressRing(
+                    progress = kcalProgress.toFloat(),
+                    color = Accent, size = 84.dp, stroke = 9.dp,
+                    centerLabel = "", centerValue = "${(kcalProgress * 100).roundToInt()}%", subValue = "",
+                    onClick = {},
+                )
             }
         }
+        Spacer(Modifier.height(18.dp))
+
+        // 三大宏量：细条 + 行内百分比
+        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            MacroBar("蛋白质", protein, targets.baseProtein, targets.protein, Protein) { showSheet = true }
+            MacroBar("碳水", carb, targets.baseCarb, targets.carb, CarbC) { showSheet = true }
+            MacroBar("脂肪", fat, targets.baseFat, targets.fat, FatC) { showSheet = true }
+        }
+        Spacer(Modifier.height(6.dp))
+        Text(
+            "刻度：白齿 = 目标所需 · 橙齿 = 热量所需",
+            fontSize = 11.sp, color = TextLo,
+        )
+        Text(
+            "运动消耗 ${fmt0(exKcal)} kcal 已计入目标 · 点数值看推导",
+            fontSize = 12.sp, color = TextLo,
+        )
+        Spacer(Modifier.height(18.dp))
+
+        // 今日状态：双列大数字分栏
+        Box(
+            Modifier.fillMaxWidth()
+                .clip(RoundedCornerShape(18.dp))
+                .background(Ink1)
+                .padding(vertical = 16.dp),
+        ) {
+            Row(Modifier.fillMaxWidth()) {
+                Column(
+                    Modifier.weight(1f).clickable { showWater = true },
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                ) {
+                    Text("饮水", fontSize = 11.sp, color = TextLo)
+                    Text(
+                        fmt0(water),
+                        fontSize = 24.sp, fontWeight = FontWeight.ExtraBold,
+                        color = if (water >= waterTarget) Good else Protein,
+                    )
+                    Text("目标 ${fmt0(waterTarget)} ml · 点+记录", fontSize = 11.sp, color = TextLo)
+                }
+                Box(
+                    Modifier.width(1.dp).height(52.dp)
+                        .background(Ink3).align(Alignment.CenterVertically),
+                )
+                Column(
+                    Modifier.weight(1f).clickable(onClick = onGoWorkout),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                ) {
+                    Text("锻炼消耗", fontSize = 11.sp, color = TextLo)
+                    Text(
+                        fmt0(exKcal),
+                        fontSize = 24.sp, fontWeight = FontWeight.ExtraBold,
+                        color = if (p.exerciseGoalKcal > 0 && exKcal >= p.exerciseGoalKcal) Good else Warn,
+                    )
+                    Text("目标 ${fmt0(p.exerciseGoalKcal)} kcal · 去记录", fontSize = 11.sp, color = TextLo)
+                }
+            }
+        }
+        if (date != LocalDate.now()) {
+            Spacer(Modifier.height(6.dp))
+            Text("当前查看 ${date.monthValue}月${date.dayOfMonth}日 的数据", fontSize = 12.sp, color = Warn)
+        }
+        Spacer(Modifier.height(12.dp))
     }
 
     if (showSheet) {
@@ -200,15 +238,28 @@ fun DateHeader(vm: AppViewModel, onOpenCalendar: () -> Unit = {}) {
     val d = vm.selectedDate
     val today = LocalDate.now()
     Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
-        Text(
-            "${d.year}年${d.monthValue}月${d.dayOfMonth}日 · ${
-                listOf("周一", "周二", "周三", "周四", "周五", "周六", "周日")[d.dayOfWeek.value - 1]
-            }",
-            fontSize = 16.sp, fontWeight = androidx.compose.ui.text.font.FontWeight.Bold, color = TextHi,
-            modifier = Modifier
+        Column(
+            Modifier
                 .weight(1f)
-                .clickable(enabled = onOpenCalendar != {}) { onOpenCalendar() },
-        )
+                .clickable(enabled = onOpenCalendar != {}) { onOpenCalendar() }
+        ) {
+            Text(
+                listOf("MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN")[d.dayOfWeek.value - 1] +
+                    if (d == today) " · 训练日" else "",
+                fontSize = 11.sp, color = TextLo, letterSpacing = 3.sp,
+            )
+            Spacer(Modifier.height(2.dp))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    "${d.monthValue}月${d.dayOfMonth}日",
+                    fontSize = 20.sp, fontWeight = FontWeight.ExtraBold, color = TextHi,
+                )
+                if (d != today) {
+                    Spacer(Modifier.width(8.dp))
+                    Text("查看历史", fontSize = 12.sp, color = Warn)
+                }
+            }
+        }
         IconButton(onClick = { vm.selectDate(d.minusDays(1)) }) {
             Icon(Icons.Default.ChevronLeft, "前一天", tint = TextLo)
         }
