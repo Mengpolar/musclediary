@@ -1,6 +1,9 @@
 package com.eelan.musclediary.ui
 
+import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -138,7 +141,16 @@ fun WorkoutScreen(vm: AppViewModel, onOpenWeightRecords: () -> Unit = {}, onOpen
                     onAction = { pickOpen = true },
                 )
             } else {
-                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                // 删除后列表高度以弹簧平滑收合（Column 无 animateItem，用 animateContentSize 补位）
+                Column(
+                    verticalArrangement = Arrangement.spacedBy(6.dp),
+                    modifier = Modifier.animateContentSize(
+                        animationSpec = spring(
+                            dampingRatio = Spring.DampingRatioMediumBouncy,
+                            stiffness = Spring.StiffnessMedium,
+                        ),
+                    ),
+                ) {
                     entries.forEach { e ->
                         key(e.id) {
                             SwipeEntryRow(

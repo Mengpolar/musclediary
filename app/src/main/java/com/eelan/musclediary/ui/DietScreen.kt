@@ -1,5 +1,7 @@
 package com.eelan.musclediary.ui
 
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.spring
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -78,13 +80,21 @@ fun DietScreen(vm: AppViewModel, onOpenRecords: () -> Unit = {}) {
                     contentPadding = PaddingValues(bottom = 80.dp),
                 ) {
                     items(entries, key = { it.id }) { f ->
-                        SwipeEntryRow(
-                            f.name,
-                            foodDetail(f),
-                            "${fmt0(f.kcal)} kcal",
-                            onEdit = { editingEntry = f },
-                            onDelete = { vm.deleteFood(f) },
-                        )
+                        // 删除后其余行以弹簧动效平滑补位
+                        Box(Modifier.animateItem(
+                            placementSpec = spring(
+                                dampingRatio = Spring.DampingRatioMediumBouncy,
+                                stiffness = Spring.StiffnessMedium,
+                            ),
+                        )) {
+                            SwipeEntryRow(
+                                f.name,
+                                foodDetail(f),
+                                "${fmt0(f.kcal)} kcal",
+                                onEdit = { editingEntry = f },
+                                onDelete = { vm.deleteFood(f) },
+                            )
+                        }
                     }
                 }
             }

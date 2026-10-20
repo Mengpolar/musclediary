@@ -1,8 +1,13 @@
 package com.eelan.musclediary.ui
 
 import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
+import androidx.compose.ui.graphics.TransformOrigin
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -245,7 +250,7 @@ fun NumberDialog(
     )
 }
 
-/** 左滑显示「修改」「删」按钮的记录卡片 */
+/** 左滑显示「修改」「删」按钮的记录卡片；删除时卡片绕右端点沿弧线飞出（缩小+旋转+淡出） */
 @Composable
 fun SwipeEntryRow(
     title: String,
@@ -258,11 +263,52 @@ fun SwipeEntryRow(
     val density = LocalDensity.current
     val maxSwipePx = with(density) { 132.dp.toPx() }
     val offset = remember { Animatable(0f) }
+    // 弧线删除动画状态：0=正常，1=飞出完成（围绕右端删除点旋转+缩小+淡出）
+    val flyOut = remember { Animatable(0f) }
+    var flying by remember { mutableStateOf(false) }
+    val flyRotation by animateFloatAsState(
+        targetValue = -8f * flyOut.value,
+        animationSpec = tween(280, easing = FastOutSlowInEasing),
+        label = "flyRotation",
+    )
+    val flyScale by animateFloatAsState(
+        targetValue = 1f - 0.4f * flyOut.value,
+        animationSpec = tween(280, easing = FastOutSlowInEasing),
+        label = "flyScale",
+    )
+    val flyAlpha by animateFloatAsState(
+        targetValue = 1f - flyOut.value,
+        animationSpec = tween(280, easing = FastOutSlowInEasing),
+        label = "flyAlpha",
+    )
+    // 弧线：删除点在卡片右端外侧，卡片绕它做圆弧运动 → 表现为水平飞出 + 轻微下沉
+    val flyArc = with(density) { 24.dp.toPx() }
+
+    fun deleteWithArc() {
+        flying = true
+        scope.launch {
+            flyOut.animateTo(1f, tween(280, easing = FastOutSlowInEasing))
+            onDelete()
+        }
+    }
 
     Box(
         Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(10.dp))
+            .graphicsLayer {
+                if (flying) {
+                    // 弧线轨迹：水平位移加大同时绕弧下沉，配合旋转/缩放/淡出
+                    translationX = flyOut.value * flyArc * 2f
+                    translationY = flyOut.value * flyArc
+                    rotationZ = flyRotation
+                    scaleX = flyScale
+                    scaleY = flyScale
+                    alpha = flyAlpha
+                    // 旋转中心移到卡片右端（删除点一侧），产生绕点弧线感
+                    transformOrigin = TransformOrigin(1f, 0.5f)
+                }
+            },
     ) {
         // 背景操作按钮（右侧）
         Row(
@@ -285,10 +331,7 @@ fun SwipeEntryRow(
                     .width(66.dp)
                     .fillMaxHeight()
                     .background(Color(0xFFEF5350))
-                    .clickable {
-                        scope.launch { offset.animateTo(0f) }
-                        onDelete()
-                    },
+                    .clickable { deleteWithArc() },
                 contentAlignment = Alignment.Center,
             ) { Text("删除", color = Ink0, fontSize = 13.sp, fontWeight = FontWeight.Bold) }
         }
@@ -369,11 +412,28 @@ fun QuickChips(
         Text("最近：", fontSize = 12.sp, color = TextLo,
             modifier = Modifier.align(Alignment.CenterVertically))
         chips.forEach { c ->
+            // 标签舒展：点中瞬间 1 → 1.08 → 1 弹性回落，其余项随布局弹簧让位
+            var pressed by remember(c) { mutableStateOf(false) }
+            val chipScale by animateFloatAsState(
+                targetValue = if (pressed) 0.92f else 1f,
+                animationSpec = spring(
+                    dampingRatio = Spring.DampingRatioMediumBouncy,
+                    stiffness = Spring.StiffnessMedium,
+                ),
+                label = "chipScale",
+            )
             Box(
                 modifier = Modifier
+                    .graphicsLayer {
+                        scaleX = chipScale
+                        scaleY = chipScale
+                    }
                     .clip(RoundedCornerShape(14.dp))
                     .background(Accent.copy(alpha = 0.15f))
-                    .clickable { onPick(c) }
+                    .clickable {
+                        pressed = true
+                        onPick(c)
+                    }
                     .padding(horizontal = 12.dp, vertical = 8.dp),
                 contentAlignment = Alignment.Center,
             ) {

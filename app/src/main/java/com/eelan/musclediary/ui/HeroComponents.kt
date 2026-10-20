@@ -1,6 +1,9 @@
 package com.eelan.musclediary.ui
 
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -13,6 +16,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -90,8 +94,21 @@ fun PillNavBar(
                     if (i == selected) Color(0xFF1A1208) else TextLo,
                     label = "navFg",
                 )
+                // 标签舒展：选中胶囊弹性放大突出，其余让位
+                val itemScale by animateFloatAsState(
+                    targetValue = if (i == selected) 1.06f else 1f,
+                    animationSpec = spring(
+                        dampingRatio = Spring.DampingRatioMediumBouncy,
+                        stiffness = Spring.StiffnessMedium,
+                    ),
+                    label = "navScale",
+                )
                 Box(
                     Modifier
+                        .graphicsLayer {
+                            scaleX = itemScale
+                            scaleY = itemScale
+                        }
                         .clip(RoundedCornerShape(99.dp))
                         .background(bg)
                         .clickable(
