@@ -81,20 +81,10 @@ fun DietScreen(vm: AppViewModel, onOpenRecords: () -> Unit = {}) {
                     onAction = { pickOpen = true },
                 )
             } else {
-                val listState = rememberLazyListState()
-                LazyColumn(
-                    state = listState,
-                    verticalArrangement = Arrangement.spacedBy(6.dp),
-                    contentPadding = PaddingValues(bottom = 80.dp),
-                ) {
-                    items(entries, key = { it.id }) { f ->
-                        // 删除后其余行以弹簧动效平滑补位；滚近顶部时缩小叠放
-                        Box(Modifier.animateItem(
-                            placementSpec = spring(
-                                dampingRatio = Spring.DampingRatioMediumBouncy,
-                                stiffness = Spring.StiffnessMedium,
-                            ),
-                        ).stackApproach(listState)) {
+                StackedColumn(contentPadding = PaddingValues(bottom = 80.dp)) {
+                    entries.forEach { f ->
+                        // 滚到容器顶部钉住、被后面卡片叠盖（删除由 SwipeEntryRow 弧线飞出表现）
+                        Box(Modifier.stackApproach()) {
                             SwipeEntryRow(
                                 f.name,
                                 foodDetail(f),

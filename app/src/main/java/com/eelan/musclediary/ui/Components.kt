@@ -7,6 +7,9 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.ui.composed
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.ui.zIndex
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.onGloballyPositioned
@@ -447,23 +450,66 @@ fun QuickChips(
 }
 
 /**
- * 堆叠滚动缩放：卡片滚到视口顶部附近时按接近程度缩小（最低 0.90，原点取顶边），
- * 配合 sticky 分组头形成「新卡片叠上来」的透视感；向下滚动时对称展开。
- * 用在 LazyColumn 的 item modifier 上，listState 为该列表状态。须在 Composable 上下文调用。
+ * 卡片堆叠滚动的宿主容器：Column + verticalScroll，把滚动锚点（容器顶部在窗口中的 y）
+ * 共享给子项。子项用 [stackApproach] 即可获得「滚到顶部钉住、被后面卡片叠盖」的堆叠效果。
  */
 @Composable
-fun Modifier.stackApproach(listState: androidx.compose.foundation.lazy.LazyListState): Modifier {
+fun StackedColumn(
+    modifier: Modifier = Modifier,
+    contentPadding: PaddingValues = PaddingValues(bottom = 32.dp),
+    content: @Composable ColumnScope.() -> Unit,
+) {
+    var anchorTop by remember { mutableStateOf(0f) }
+    val state = rememberScrollState()
+    Column(
+        modifier
+            .onGloballyPositioned { anchorTop = it.positionInWindow().y }
+            .verticalScroll(state),
+        verticalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        val pad = contentPadding
+        Spacer(Modifier.height(pad.calculateTopPadding()))
+        CompositionLocalProvider(LocalStackAnchor provides anchorTop) {
+            content()
+        }
+        Spacer(Modifier.height(pad.calculateBottomPadding()))
+    }
+}
+
+/** 当前堆叠锚点（容器顶部窗口 y） */
+private val LocalStackAnchor = compositionLocalOf { 0f }
+
+/**
+ * 卡片堆叠滚动：卡片滚到容器顶部（锚点）后钉住不再上移（translationY 补偿），
+ * 后面的卡片继续上滑叠盖在它上面；被叠住的卡片按堆叠深度轻微缩小、变暗，
+ * 形成边缘错开的一摞。向下滚动对称展开。须在 Composable 上下文调用。
+ */
+@Composable
+fun Modifier.stackApproach(peekDp: Float = 7f): Modifier {
     val density = LocalDensity.current
-    val rangePx = with(density) { 90.dp.toPx() }
+    val peekPx = with(density) { peekDp.dp.toPx() }
+    val maxSink = peekPx * 6f
+    val anchor = LocalStackAnchor.current
     var topY by remember { mutableStateOf(Float.MAX_VALUE) }
     return this
+        .zIndex(0f)
         .onGloballyPositioned { topY = it.positionInWindow().y }
         .graphicsLayer {
-            val distance = topY.coerceAtLeast(0f)
-            val t = (distance / rangePx).coerceIn(0f, 1f)
-            val scale = 0.90f + 0.10f * t
-            scaleX = scale
-            scaleY = scale
-            transformOrigin = TransformOrigin(0.5f, 0f)
+            if (topY == Float.MAX_VALUE) return@graphicsLayer
+            // 卡片顶边超出锚点的量：>0 表示应被钉住
+            val over = anchor - topY
+            if (over <= 0f) {
+                scaleX = 1f; scaleY = 1f; translationY = 0f; alpha = 1f
+            } else {
+                // 钉住：贴着锚点（补回滚动量），但随被压深度逐渐下沉——
+                // 后叠上来的卡停在锚点，先钉住的卡缓缓下沉露出顶部边缘 → 一摞错开的卡
+                val sink = (over * 0.18f).coerceAtMost(maxSink)
+                val layer = (sink / peekPx).coerceIn(0f, 6f)
+                val scale = 1f - 0.03f * layer
+                scaleX = scale; scaleY = scale
+                translationY = over - sink
+                alpha = 1f
+                transformOrigin = TransformOrigin(0.5f, 0f)
+            }
         }
 }

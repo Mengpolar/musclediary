@@ -173,8 +173,7 @@ private fun RecordsBody(
                 .filter { hit(it.date, "${fmt1(it.weightKg)}") }
             val byMonth = filtered.groupBy { YearMonth.from(LocalDate.parse(it.date)) }
                 .toSortedMap(compareByDescending { it })
-            val listState = rememberLazyListState()
-            LazyColumn(state = listState, verticalArrangement = Arrangement.spacedBy(6.dp), contentPadding = PaddingValues(bottom = 32.dp)) {
+            StackedColumn {
                 byMonth.forEach { (month, es) ->
                     val avg = es.map { it.weightKg }.average()
                     val prevMonthEs = vm.weightEntries.filter {
@@ -182,16 +181,14 @@ private fun RecordsBody(
                     }
                     val prevAvg = prevMonthEs.map { it.weightKg }.average()
                     val delta = if (prevMonthEs.isNotEmpty()) avg - prevAvg else null
-                    stickyHeader(key = "h$month") {
-                        GroupHeader(
-                            "${month.year}年${month.monthValue}月 · ${es.size} 条",
-                            "均值 ${fmt1(avg)} kg" + delta?.let { d -> " · 环比 ${if (d >= 0) "+" else "−"}${fmt1(kotlin.math.abs(d))} kg" }.orEmpty(),
-                        )
-                    }
-                    items(es, key = { "w${it.id}" }) { e ->
+                    GroupHeader(
+                        "${month.year}年${month.monthValue}月 · ${es.size} 条",
+                        "均值 ${fmt1(avg)} kg" + delta?.let { d -> " · 环比 ${if (d >= 0) "+" else "−"}${fmt1(kotlin.math.abs(d))} kg" }.orEmpty(),
+                    )
+                    es.forEach { e ->
                         val prev = vm.weightEntries.filter { it.date < e.date }.maxByOrNull { it.date }
                         val d = prev?.let { e.weightKg - it.weightKg }
-                        Box(Modifier.stackApproach(listState)) {
+                        Box(Modifier.stackApproach()) {
                             SwipeEntryRow(
                                 "${e.date.substring(5)} · ${fmt1(e.weightKg)} kg",
                                 d?.let { x -> "较上次 ${if (x >= 0) "+" else "−"}${fmt1(kotlin.math.abs(x))} kg" } ?: "首次记录",
@@ -202,7 +199,7 @@ private fun RecordsBody(
                         }
                     }
                 }
-                if (byMonth.isEmpty()) item { EmptyText("没有匹配的记录") }
+                if (byMonth.isEmpty()) EmptyText("没有匹配的记录")
             }
         }
         1 -> {
@@ -213,8 +210,7 @@ private fun RecordsBody(
             val byDay = filtered.groupBy { it.date }.toSortedMap(compareByDescending { it })
             val byMonth = filtered.groupBy { YearMonth.from(LocalDate.parse(it.date)) }
                 .toSortedMap(compareByDescending { it })
-            val listState = rememberLazyListState()
-            LazyColumn(state = listState, verticalArrangement = Arrangement.spacedBy(6.dp), contentPadding = PaddingValues(bottom = 32.dp)) {
+            StackedColumn {
                 byMonth.forEach { (month, monthEs) ->
                     val monthDays = monthEs.groupBy { it.date }
                     val avg = monthDays.values.map { g -> g.sumOf { it.ml } }.average()
@@ -227,31 +223,27 @@ private fun RecordsBody(
                         else -> month.atDay(1).minusDays(1) // 未来月（理论上不会出现）
                     }
                     val days = lastCounted.dayOfMonth.coerceAtLeast(1)
-                    stickyHeader(key = "h$month") {
-                        GroupHeader(
-                            "${month.year}年${month.monthValue}月",
-                            "日均 ${fmt0(avg)} ml · 达标 $okDays/$days 天",
-                        )
-                    }
+                    GroupHeader(
+                        "${month.year}年${month.monthValue}月",
+                        "日均 ${fmt0(avg)} ml · 达标 $okDays/$days 天",
+                    )
                     byDay.filterKeys { YearMonth.from(LocalDate.parse(it)) == month }.forEach { (day, es) ->
                         val total = es.sumOf { it.ml }
-                        item(key = "d$day") {
-                            Row(
-                                Modifier.fillMaxWidth().padding(vertical = 4.dp, horizontal = 4.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                            ) {
-                                Text(day.substring(5), fontSize = 13.sp, color = TextHi, fontWeight = FontWeight.Bold)
-                                Spacer(Modifier.weight(1f))
-                                Text("${fmt0(total)} ml",
-                                    fontSize = 13.sp,
-                                    color = if (total >= target) Good else Accent,
-                                    fontWeight = FontWeight.Bold)
-                            }
+                        Row(
+                            Modifier.fillMaxWidth().padding(vertical = 4.dp, horizontal = 4.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Text(day.substring(5), fontSize = 13.sp, color = TextHi, fontWeight = FontWeight.Bold)
+                            Spacer(Modifier.weight(1f))
+                            Text("${fmt0(total)} ml",
+                                fontSize = 13.sp,
+                                color = if (total >= target) Good else Accent,
+                                fontWeight = FontWeight.Bold)
                         }
-                        items(es, key = { "wl${it.id}" }) { e ->
+                        es.forEach { e ->
                             val t = java.time.Instant.ofEpochMilli(e.createdAt)
                                 .atZone(java.time.ZoneId.systemDefault())
-                            Box(Modifier.stackApproach(listState)) {
+                            Box(Modifier.stackApproach()) {
                                 SwipeEntryRow(
                                     String.format("%02d:%02d", t.hour, t.minute),
                                     "饮水",
@@ -263,7 +255,7 @@ private fun RecordsBody(
                         }
                     }
                 }
-                if (byMonth.isEmpty()) item { EmptyText("没有匹配的记录") }
+                if (byMonth.isEmpty()) EmptyText("没有匹配的记录")
             }
         }
         2 -> {
@@ -272,17 +264,14 @@ private fun RecordsBody(
                 .filter { hit(it.date, it.name) }
             val byMonth = filtered.groupBy { YearMonth.from(LocalDate.parse(it.date)) }
                 .toSortedMap(compareByDescending { it })
-            val listState = rememberLazyListState()
-            LazyColumn(state = listState, verticalArrangement = Arrangement.spacedBy(6.dp), contentPadding = PaddingValues(bottom = 32.dp)) {
+            StackedColumn {
                 byMonth.forEach { (month, es) ->
                     val days = es.map { it.date }.distinct().size.coerceAtLeast(1)
                     val avgKcal = es.sumOf { it.kcal } / days
-                    stickyHeader(key = "h$month") {
-                        GroupHeader("${month.year}年${month.monthValue}月 · ${es.size} 条",
-                            "日均 ${fmt0(avgKcal)} kcal")
-                    }
-                    items(es, key = { "f${it.id}" }) { e ->
-                        Box(Modifier.stackApproach(listState)) {
+                    GroupHeader("${month.year}年${month.monthValue}月 · ${es.size} 条",
+                        "日均 ${fmt0(avgKcal)} kcal")
+                    es.forEach { e ->
+                        Box(Modifier.stackApproach()) {
                             SwipeEntryRow(
                                 e.name,
                                 "${e.date.substring(5)} · " + foodDetail(e).trimStart(),
@@ -293,7 +282,7 @@ private fun RecordsBody(
                         }
                     }
                 }
-                if (byMonth.isEmpty()) item { EmptyText("没有匹配的记录") }
+                if (byMonth.isEmpty()) EmptyText("没有匹配的记录")
             }
         }
         else -> {
@@ -302,15 +291,12 @@ private fun RecordsBody(
                 .filter { hit(it.date, it.name) }
             val byMonth = filtered.groupBy { YearMonth.from(LocalDate.parse(it.date)) }
                 .toSortedMap(compareByDescending { it })
-            val listState = rememberLazyListState()
-            LazyColumn(state = listState, verticalArrangement = Arrangement.spacedBy(6.dp), contentPadding = PaddingValues(bottom = 32.dp)) {
+            StackedColumn {
                 byMonth.forEach { (month, es) ->
-                    stickyHeader(key = "h$month") {
-                        GroupHeader("${month.year}年${month.monthValue}月 · ${es.size} 条",
-                            "合计 ${fmt0(es.sumOf { it.calories })} kcal")
-                    }
-                    items(es, key = { "x${it.id}" }) { e ->
-                        Box(Modifier.stackApproach(listState)) {
+                    GroupHeader("${month.year}年${month.monthValue}月 · ${es.size} 条",
+                        "合计 ${fmt0(es.sumOf { it.calories })} kcal")
+                    es.forEach { e ->
+                        Box(Modifier.stackApproach()) {
                             SwipeEntryRow(
                                 e.name,
                                 "${e.date.substring(5)} · ${fmt0(e.calories)} kcal · ${fmt1(e.minutes)} 分钟",
@@ -321,7 +307,7 @@ private fun RecordsBody(
                         }
                     }
                 }
-                if (byMonth.isEmpty()) item { EmptyText("没有匹配的记录") }
+                if (byMonth.isEmpty()) EmptyText("没有匹配的记录")
             }
         }
     }

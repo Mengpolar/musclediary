@@ -142,7 +142,7 @@ fun WorkoutScreen(vm: AppViewModel, onOpenWeightRecords: () -> Unit = {}, onOpen
                     onAction = { pickOpen = true },
                 )
             } else {
-                // 删除后列表高度以弹簧平滑收合（Column 无 animateItem，用 animateContentSize 补位）
+                // 卡片滚到视口顶部钉住、被后面卡片叠盖（外层整页滚动提供位移）
                 Column(
                     verticalArrangement = Arrangement.spacedBy(6.dp),
                     modifier = Modifier.animateContentSize(
@@ -154,13 +154,15 @@ fun WorkoutScreen(vm: AppViewModel, onOpenWeightRecords: () -> Unit = {}, onOpen
                 ) {
                     entries.forEach { e ->
                         key(e.id) {
-                            SwipeEntryRow(
-                                e.name,
-                                workoutDetail(e, vm.exerciseTemplates),
-                                "${fmt0(e.calories)} kcal",
-                                onEdit = { editingEntry = e },
-                                onDelete = { vm.deleteExercise(e) },
-                            )
+                            Box(Modifier.stackApproach()) {
+                                SwipeEntryRow(
+                                    e.name,
+                                    workoutDetail(e, vm.exerciseTemplates),
+                                    "${fmt0(e.calories)} kcal",
+                                    onEdit = { editingEntry = e },
+                                    onDelete = { vm.deleteExercise(e) },
+                                )
+                            }
                         }
                     }
                 }

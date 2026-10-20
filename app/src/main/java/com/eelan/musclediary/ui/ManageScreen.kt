@@ -76,14 +76,9 @@ fun ManageTemplatesScreen(vm: AppViewModel, kind: Int, onClose: () -> Unit) {
             Text("新增${if (kind == 0) "食物" else "动作"}", color = Accent, fontSize = 13.sp)
         }
 
-        val listState = androidx.compose.foundation.lazy.rememberLazyListState()
-        LazyColumn(
-            state = listState,
-            verticalArrangement = Arrangement.spacedBy(6.dp),
-            contentPadding = PaddingValues(bottom = 32.dp),
-        ) {
-            items(filtered, key = { if (kind == 0) "f${(it as FoodTemplate).id}" else "x${(it as ExerciseTemplate).id}" }) { t ->
-                Box(Modifier.stackApproach(listState)) {
+        StackedColumn {
+            filtered.forEach { t ->
+                Box(Modifier.stackApproach()) {
                     if (kind == 0) FoodManageRow(t as FoodTemplate,
                         onEdit = { editFood = t },
                         onDelete = { confirmDelete = t })
