@@ -4,6 +4,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
@@ -12,6 +13,9 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInWindow
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -31,6 +35,7 @@ import java.time.YearMonth
  * 全屏记录历史页（仿模板管理）：搜索 + 按月分组（分组头带统计）+ 左滑修改/删除（删除带确认）。
  * kind 决定展示的数据与行内容：0 体重 / 1 饮水 / 2 饮食 / 3 锻炼。
  */
+@OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
 fun RecordsScreen(vm: AppViewModel, kind: Int, onClose: () -> Unit) {
     var search by remember { mutableStateOf("") }
@@ -150,6 +155,7 @@ private fun qtyLabel(e: ExerciseEntry, templates: List<ExerciseTemplate>): Strin
 }
 
 /** 分类型渲染正文（体重/饮水/饮食/锻炼各自实现分组与统计） */
+@OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
 private fun RecordsBody(
     vm: AppViewModel,
@@ -167,7 +173,8 @@ private fun RecordsBody(
                 .filter { hit(it.date, "${fmt1(it.weightKg)}") }
             val byMonth = filtered.groupBy { YearMonth.from(LocalDate.parse(it.date)) }
                 .toSortedMap(compareByDescending { it })
-            LazyColumn(verticalArrangement = Arrangement.spacedBy(6.dp), contentPadding = PaddingValues(bottom = 32.dp)) {
+            val listState = rememberLazyListState()
+            LazyColumn(state = listState, verticalArrangement = Arrangement.spacedBy(6.dp), contentPadding = PaddingValues(bottom = 32.dp)) {
                 byMonth.forEach { (month, es) ->
                     val avg = es.map { it.weightKg }.average()
                     val prevMonthEs = vm.weightEntries.filter {
@@ -175,7 +182,7 @@ private fun RecordsBody(
                     }
                     val prevAvg = prevMonthEs.map { it.weightKg }.average()
                     val delta = if (prevMonthEs.isNotEmpty()) avg - prevAvg else null
-                    item(key = "h$month") {
+                    stickyHeader(key = "h$month") {
                         GroupHeader(
                             "${month.year}年${month.monthValue}月 · ${es.size} 条",
                             "均值 ${fmt1(avg)} kg" + delta?.let { d -> " · 环比 ${if (d >= 0) "+" else "−"}${fmt1(kotlin.math.abs(d))} kg" }.orEmpty(),
@@ -184,13 +191,15 @@ private fun RecordsBody(
                     items(es, key = { "w${it.id}" }) { e ->
                         val prev = vm.weightEntries.filter { it.date < e.date }.maxByOrNull { it.date }
                         val d = prev?.let { e.weightKg - it.weightKg }
-                        SwipeEntryRow(
-                            "${e.date.substring(5)} · ${fmt1(e.weightKg)} kg",
-                            d?.let { x -> "较上次 ${if (x >= 0) "+" else "−"}${fmt1(kotlin.math.abs(x))} kg" } ?: "首次记录",
-                            "${fmt1(e.weightKg)} kg",
-                            onEdit = { onEdit(e) },
-                            onDelete = { onDelete(e) },
-                        )
+                        Box(Modifier.stackApproach(listState)) {
+                            SwipeEntryRow(
+                                "${e.date.substring(5)} · ${fmt1(e.weightKg)} kg",
+                                d?.let { x -> "较上次 ${if (x >= 0) "+" else "−"}${fmt1(kotlin.math.abs(x))} kg" } ?: "首次记录",
+                                "${fmt1(e.weightKg)} kg",
+                                onEdit = { onEdit(e) },
+                                onDelete = { onDelete(e) },
+                            )
+                        }
                     }
                 }
                 if (byMonth.isEmpty()) item { EmptyText("没有匹配的记录") }
@@ -204,7 +213,8 @@ private fun RecordsBody(
             val byDay = filtered.groupBy { it.date }.toSortedMap(compareByDescending { it })
             val byMonth = filtered.groupBy { YearMonth.from(LocalDate.parse(it.date)) }
                 .toSortedMap(compareByDescending { it })
-            LazyColumn(verticalArrangement = Arrangement.spacedBy(6.dp), contentPadding = PaddingValues(bottom = 32.dp)) {
+            val listState = rememberLazyListState()
+            LazyColumn(state = listState, verticalArrangement = Arrangement.spacedBy(6.dp), contentPadding = PaddingValues(bottom = 32.dp)) {
                 byMonth.forEach { (month, monthEs) ->
                     val monthDays = monthEs.groupBy { it.date }
                     val avg = monthDays.values.map { g -> g.sumOf { it.ml } }.average()
@@ -217,7 +227,7 @@ private fun RecordsBody(
                         else -> month.atDay(1).minusDays(1) // 未来月（理论上不会出现）
                     }
                     val days = lastCounted.dayOfMonth.coerceAtLeast(1)
-                    item(key = "h$month") {
+                    stickyHeader(key = "h$month") {
                         GroupHeader(
                             "${month.year}年${month.monthValue}月",
                             "日均 ${fmt0(avg)} ml · 达标 $okDays/$days 天",
@@ -241,13 +251,15 @@ private fun RecordsBody(
                         items(es, key = { "wl${it.id}" }) { e ->
                             val t = java.time.Instant.ofEpochMilli(e.createdAt)
                                 .atZone(java.time.ZoneId.systemDefault())
-                            SwipeEntryRow(
-                                String.format("%02d:%02d", t.hour, t.minute),
-                                "饮水",
-                                "+${fmt0(e.ml)} ml",
-                                onEdit = { onEdit(e) },
-                                onDelete = { onDelete(e) },
-                            )
+                            Box(Modifier.stackApproach(listState)) {
+                                SwipeEntryRow(
+                                    String.format("%02d:%02d", t.hour, t.minute),
+                                    "饮水",
+                                    "+${fmt0(e.ml)} ml",
+                                    onEdit = { onEdit(e) },
+                                    onDelete = { onDelete(e) },
+                                )
+                            }
                         }
                     }
                 }
@@ -260,22 +272,25 @@ private fun RecordsBody(
                 .filter { hit(it.date, it.name) }
             val byMonth = filtered.groupBy { YearMonth.from(LocalDate.parse(it.date)) }
                 .toSortedMap(compareByDescending { it })
-            LazyColumn(verticalArrangement = Arrangement.spacedBy(6.dp), contentPadding = PaddingValues(bottom = 32.dp)) {
+            val listState = rememberLazyListState()
+            LazyColumn(state = listState, verticalArrangement = Arrangement.spacedBy(6.dp), contentPadding = PaddingValues(bottom = 32.dp)) {
                 byMonth.forEach { (month, es) ->
                     val days = es.map { it.date }.distinct().size.coerceAtLeast(1)
                     val avgKcal = es.sumOf { it.kcal } / days
-                    item(key = "h$month") {
+                    stickyHeader(key = "h$month") {
                         GroupHeader("${month.year}年${month.monthValue}月 · ${es.size} 条",
                             "日均 ${fmt0(avgKcal)} kcal")
                     }
                     items(es, key = { "f${it.id}" }) { e ->
-                        SwipeEntryRow(
-                            e.name,
-                            "${e.date.substring(5)} · " + foodDetail(e).trimStart(),
-                            "${fmt0(e.kcal)} kcal",
-                            onEdit = { onEdit(e) },
-                            onDelete = { onDelete(e) },
-                        )
+                        Box(Modifier.stackApproach(listState)) {
+                            SwipeEntryRow(
+                                e.name,
+                                "${e.date.substring(5)} · " + foodDetail(e).trimStart(),
+                                "${fmt0(e.kcal)} kcal",
+                                onEdit = { onEdit(e) },
+                                onDelete = { onDelete(e) },
+                            )
+                        }
                     }
                 }
                 if (byMonth.isEmpty()) item { EmptyText("没有匹配的记录") }
@@ -287,20 +302,23 @@ private fun RecordsBody(
                 .filter { hit(it.date, it.name) }
             val byMonth = filtered.groupBy { YearMonth.from(LocalDate.parse(it.date)) }
                 .toSortedMap(compareByDescending { it })
-            LazyColumn(verticalArrangement = Arrangement.spacedBy(6.dp), contentPadding = PaddingValues(bottom = 32.dp)) {
+            val listState = rememberLazyListState()
+            LazyColumn(state = listState, verticalArrangement = Arrangement.spacedBy(6.dp), contentPadding = PaddingValues(bottom = 32.dp)) {
                 byMonth.forEach { (month, es) ->
-                    item(key = "h$month") {
+                    stickyHeader(key = "h$month") {
                         GroupHeader("${month.year}年${month.monthValue}月 · ${es.size} 条",
                             "合计 ${fmt0(es.sumOf { it.calories })} kcal")
                     }
                     items(es, key = { "x${it.id}" }) { e ->
-                        SwipeEntryRow(
-                            e.name,
-                            "${e.date.substring(5)} · ${fmt0(e.calories)} kcal · ${fmt1(e.minutes)} 分钟",
-                            "${fmt0(e.calories)} kcal",
-                            onEdit = { onEdit(e) },
-                            onDelete = { onDelete(e) },
-                        )
+                        Box(Modifier.stackApproach(listState)) {
+                            SwipeEntryRow(
+                                e.name,
+                                "${e.date.substring(5)} · ${fmt0(e.calories)} kcal · ${fmt1(e.minutes)} 分钟",
+                                "${fmt0(e.calories)} kcal",
+                                onEdit = { onEdit(e) },
+                                onDelete = { onDelete(e) },
+                            )
+                        }
                     }
                 }
                 if (byMonth.isEmpty()) item { EmptyText("没有匹配的记录") }

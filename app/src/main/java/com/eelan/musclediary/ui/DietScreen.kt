@@ -7,6 +7,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
@@ -80,18 +81,20 @@ fun DietScreen(vm: AppViewModel, onOpenRecords: () -> Unit = {}) {
                     onAction = { pickOpen = true },
                 )
             } else {
+                val listState = rememberLazyListState()
                 LazyColumn(
+                    state = listState,
                     verticalArrangement = Arrangement.spacedBy(6.dp),
                     contentPadding = PaddingValues(bottom = 80.dp),
                 ) {
                     items(entries, key = { it.id }) { f ->
-                        // 删除后其余行以弹簧动效平滑补位
+                        // 删除后其余行以弹簧动效平滑补位；滚近顶部时缩小叠放
                         Box(Modifier.animateItem(
                             placementSpec = spring(
                                 dampingRatio = Spring.DampingRatioMediumBouncy,
                                 stiffness = Spring.StiffnessMedium,
                             ),
-                        )) {
+                        ).stackApproach(listState)) {
                             SwipeEntryRow(
                                 f.name,
                                 foodDetail(f),

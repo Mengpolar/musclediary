@@ -6,8 +6,11 @@ import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
+import androidx.compose.ui.composed
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInWindow
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -441,4 +444,26 @@ fun QuickChips(
             }
         }
     }
+}
+
+/**
+ * 堆叠滚动缩放：卡片滚到视口顶部附近时按接近程度缩小（最低 0.90，原点取顶边），
+ * 配合 sticky 分组头形成「新卡片叠上来」的透视感；向下滚动时对称展开。
+ * 用在 LazyColumn 的 item modifier 上，listState 为该列表状态。须在 Composable 上下文调用。
+ */
+@Composable
+fun Modifier.stackApproach(listState: androidx.compose.foundation.lazy.LazyListState): Modifier {
+    val density = LocalDensity.current
+    val rangePx = with(density) { 90.dp.toPx() }
+    var topY by remember { mutableStateOf(Float.MAX_VALUE) }
+    return this
+        .onGloballyPositioned { topY = it.positionInWindow().y }
+        .graphicsLayer {
+            val distance = topY.coerceAtLeast(0f)
+            val t = (distance / rangePx).coerceIn(0f, 1f)
+            val scale = 0.90f + 0.10f * t
+            scaleX = scale
+            scaleY = scale
+            transformOrigin = TransformOrigin(0.5f, 0f)
+        }
 }
