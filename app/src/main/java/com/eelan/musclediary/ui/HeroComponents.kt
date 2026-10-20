@@ -1,9 +1,12 @@
 package com.eelan.musclediary.ui
 
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.animateIntAsState
 import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -21,6 +24,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.eelan.musclediary.ui.theme.*
+import kotlin.math.roundToInt
 
 /**
  * 「铁馆夜训」方向专属组件：
@@ -29,7 +33,7 @@ import com.eelan.musclediary.ui.theme.*
  * - [PillNavBar] 底部悬浮胶囊导航（选中色块平滑移动）
  */
 
-/** 灯牌大数字：热量等核心指标的主展示 */
+/** 灯牌大数字：热量等核心指标的主展示；数值变化时从旧值滚动到新值（450ms） */
 @Composable
 fun HeroNumber(
     value: String,
@@ -38,9 +42,19 @@ fun HeroNumber(
     color: Color = TextHi,
     unitColor: Color = TextLo,
 ) {
+    val target = value.toDoubleOrNull()
+    // 非数字内容直接静态展示；数字则滚动计数
+    val shown = if (target != null) {
+        val anim by animateIntAsState(
+            targetValue = target.roundToInt(),
+            animationSpec = tween(450, easing = FastOutSlowInEasing),
+            label = "heroCount",
+        )
+        anim.toString()
+    } else value
     Row(modifier, verticalAlignment = Alignment.Bottom) {
         Text(
-            value,
+            shown,
             fontSize = 46.sp, fontWeight = FontWeight.ExtraBold,
             letterSpacing = (-1.5).sp, color = color,
             lineHeight = 46.sp,

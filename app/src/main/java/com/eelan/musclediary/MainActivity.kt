@@ -5,6 +5,12 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.togetherWith
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
@@ -91,21 +97,31 @@ fun AppRoot(vm: AppViewModel) {
                 .fillMaxSize()
                 .background(Ink0)
         ) {
-            Column(Modifier.fillMaxSize().padding(top = 12.dp)) {
-                when {
-                    records >= 0 -> RecordsScreen(vm, records) { records = -1 }
-                    else -> when (tab) {
-                        0 -> TodayScreen(vm, onGoWorkout = { tab = 2 }, onOpenWaterRecords = { records = 1 })
-                        1 -> DietScreen(vm, onOpenRecords = { records = 2 })
-                        2 -> WorkoutScreen(vm, onOpenWeightRecords = { records = 0 }, onOpenRecords = { records = 3 })
-                        3 -> when (manage) {
-                            0 -> ManageTemplatesScreen(vm, 0, onClose = { manage = -1 })
-                            1 -> ManageTemplatesScreen(vm, 1, onClose = { manage = -1 })
-                            else -> SettingsScreen(
-                                vm,
-                                onManageFood = { manage = 0 },
-                                onManageExercise = { manage = 1 },
-                            )
+            // 页面切换过渡：新页淡入 + 轻微上移（200ms），旧页直接让位
+            AnimatedContent(
+                targetState = if (records >= 0) "records$records" else "tab$tab$manage",
+                transitionSpec = {
+                    (fadeIn(tween(200)) + slideInVertically(tween(200)) { it / 24 })
+                        .togetherWith(fadeOut(tween(90)))
+                },
+                label = "pageTransition",
+            ) { state ->
+                Column(Modifier.fillMaxSize().padding(top = 12.dp)) {
+                    when {
+                        state.startsWith("records") -> RecordsScreen(vm, records) { records = -1 }
+                        else -> when (tab) {
+                            0 -> TodayScreen(vm, onGoWorkout = { tab = 2 }, onOpenWaterRecords = { records = 1 })
+                            1 -> DietScreen(vm, onOpenRecords = { records = 2 })
+                            2 -> WorkoutScreen(vm, onOpenWeightRecords = { records = 0 }, onOpenRecords = { records = 3 })
+                            3 -> when (manage) {
+                                0 -> ManageTemplatesScreen(vm, 0, onClose = { manage = -1 })
+                                1 -> ManageTemplatesScreen(vm, 1, onClose = { manage = -1 })
+                                else -> SettingsScreen(
+                                    vm,
+                                    onManageFood = { manage = 0 },
+                                    onManageExercise = { manage = 1 },
+                                )
+                            }
                         }
                     }
                 }
