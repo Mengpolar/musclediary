@@ -145,80 +145,46 @@ fun MacroBar(
             )
         }
         Spacer(Modifier.height(4.dp))
-        // 质感宏量条：加宽轨道 + 填充区从左往右流动的粒子 + 进度末尾滚动波浪
+        // 宏量条：克制风格——纯色填充 + 少量随机流动微粒（每条独立随机轨迹），无波浪无高光
         val infinite = rememberInfiniteTransition(label = "macroFx")
-        val wavePhase by infinite.animateFloat(
-            initialValue = 0f, targetValue = (2f * Math.PI).toFloat(),
-            animationSpec = infiniteRepeatable(tween(1600, easing = LinearEasing)),
-            label = "wavePhase",
-        )
         val particlePhase by infinite.animateFloat(
             initialValue = 0f, targetValue = 1f,
-            animationSpec = infiniteRepeatable(tween(2200, easing = LinearEasing)),
+            animationSpec = infiniteRepeatable(tween(2600, easing = LinearEasing)),
             label = "particlePhase",
         )
+        // 每个条用 label+color 的稳定种子生成随机参数，三条互不相同且重组稳定
+        val rand = remember(color) { java.util.Random(31L * color.hashCode() + label.hashCode()) }
+        val seeds = remember(color) {
+            List(5) {
+                Triple(rand.nextFloat(), rand.nextFloat(), 0.6f + rand.nextFloat() * 0.8f)
+            }
+        }
         Canvas(
             Modifier
                 .fillMaxWidth()
-                .height(18.dp)
+                .height(16.dp)
         ) {
             val w = size.width
             val h = size.height
             val r = androidx.compose.ui.geometry.CornerRadius(h / 2, h / 2)
             val fillW = (animFill * w).toFloat().coerceAtLeast(h)
-            // 底槽（内描高光增加立体感）
+            // 底槽
             drawRoundRect(Ink2, topLeft = Offset(0f, 0f), size = Size(w, h), cornerRadius = r)
+            // 纯色填充（不透明度略降，与底槽区分即可）
             drawRoundRect(
-                Color.White.copy(alpha = 0.05f),
-                topLeft = Offset(h * 0.12f, h * 0.10f),
-                size = Size(w - h * 0.24f, h * 0.34f),
-                cornerRadius = r,
-            )
-            // 已摄入填充（带纵向渐变：上亮下暗，液体感）
-            drawRoundRect(
-                androidx.compose.ui.graphics.Brush.verticalGradient(
-                    listOf(color.copy(alpha = 0.95f), color.copy(alpha = 0.65f)),
-                    startY = 0f, endY = h,
-                ),
+                color.copy(alpha = 0.9f),
                 topLeft = Offset(0f, 0f),
                 size = Size(fillW, h),
                 cornerRadius = r,
             )
-            // 填充区粒子：在【填充区内】从左往右流动的亮点（相对填充宽度流动，保证可见）
-            clipRect(left = 0f, top = 0f, right = fillW, bottom = h) {
-                repeat(7) { i ->
-                    val speed = 0.5f + i * 0.14f
-                    val px = ((particlePhase * speed + i * 0.19f) % 1f) * fillW
-                    val py = h * (0.25f + 0.5f * ((i * 0.41f) % 1f))
-                    val pr = h * (0.10f + 0.05f * ((i * 0.53f) % 1f))
-                    // 拖尾：主亮点 + 后方两个渐弱小点
-                    drawCircle(Color.White.copy(alpha = 0.85f), radius = pr, center = Offset(px, py))
-                    drawCircle(Color.White.copy(alpha = 0.35f), radius = pr * 0.7f, center = Offset(px - h * 0.28f, py))
-                    drawCircle(Color.White.copy(alpha = 0.15f), radius = pr * 0.5f, center = Offset(px - h * 0.55f, py))
-                }
-            }
-            // 进度末尾波浪：填充末端的"液面隆起"——一道竖向的亮色波包在末端处起伏流动
-            if (fillW < w - 1f && animFill > 0.01f) {
-                val waveCenter = fillW
-                val amp = h * 0.30f
-                val waveHalfW = h * 1.1f
-                val path = androidx.compose.ui.graphics.Path()
-                path.moveTo(waveCenter - waveHalfW, h)
-                var x = waveCenter - waveHalfW
-                while (x <= waveCenter + waveHalfW) {
-                    val d = (x - waveCenter) / waveHalfW
-                    val y = h / 2f + amp * kotlin.math.sin(d * (Math.PI / 2)).toFloat() *
-                        kotlin.math.sin(wavePhase + d * 1.2f).toFloat() - h * 0.06f * (1f - kotlin.math.abs(d).toFloat())
-                    path.lineTo(x, y)
-                    x += 3f
-                }
-                path.lineTo(waveCenter + waveHalfW, h)
-                path.close()
-                clipRect(left = 0f, top = 0f, right = fillW + waveHalfW, bottom = h) {
-                    drawPath(path, androidx.compose.ui.graphics.Brush.horizontalGradient(
-                        listOf(Color.Transparent, color, Color.Transparent),
-                        startX = waveCenter - waveHalfW, endX = waveCenter + waveHalfW,
-                    ))
+            // 微粒：小、半透明、随机 y 与速度，在填充区内从左往右缓慢漂移
+            if (animFill > 0.03f) {
+                clipRect(left = 0f, top = 0f, right = fillW, bottom = h) {
+                    seeds.forEachIndexed { i, (p0, yF, sF) ->
+                        val px = ((particlePhase * sF + p0) % 1f) * fillW
+                        val py = h * (0.22f + 0.56f * yF)
+                        drawCircle(Color.White.copy(alpha = 0.28f), radius = h * 0.07f, center = Offset(px, py))
+                    }
                 }
             }
         }
@@ -618,72 +584,36 @@ fun LiquidGlobe(
             val c = Offset(cx, cy)
             // 球体底色（深色玻璃）
             drawCircle(Ink2, radius = r, center = c)
-            // 液体：以液面 y 裁剪画圆形液体，液面为两段叠加正弦波
+            // 液体：以液面 y 裁剪画圆形液体，液面为单一缓正弦波
             val surfaceY = cy + r - (2f * r) * liquid
             // 圆形裁剪：液体只画在球内
             val circleClip = androidx.compose.ui.graphics.Path().apply { addOval(androidx.compose.ui.geometry.Rect(cx - r, cy - r, cx + r, cy + r)) }
             clipPath(circleClip) {
-                drawCircle(color.copy(alpha = 0.38f), radius = r, center = c)
+                drawCircle(color.copy(alpha = 0.32f), radius = r, center = c)
                 val wavePath = androidx.compose.ui.graphics.Path()
-                val amp = r * 0.06f
+                val amp = r * 0.035f
                 wavePath.moveTo(cx - r, surfaceY)
                 var x = cx - r
                 while (x <= cx + r) {
                     val t = (x - (cx - r)) / (2f * r)
-                    val y = surfaceY + amp * kotlin.math.sin(t * (2f * Math.PI).toFloat() * 1.6f + wavePhase) +
-                        amp * 0.6f * kotlin.math.sin(t * (2f * Math.PI).toFloat() * 2.7f - wavePhase * 0.7f)
+                    val y = surfaceY + amp * kotlin.math.sin(t * (2f * Math.PI).toFloat() * 1.4f + wavePhase)
                     wavePath.lineTo(x, y)
                     x += 4f
                 }
                 wavePath.lineTo(cx + r, cy + r)
                 wavePath.lineTo(cx - r, cy + r)
                 wavePath.close()
-                drawPath(wavePath, color.copy(alpha = 0.85f))
-                // 液面下的次级波浪（错相位，浅色）增加流动层次
-                val wave2 = androidx.compose.ui.graphics.Path()
-                wave2.moveTo(cx - r, surfaceY + r * 0.05f)
-                x = cx - r
-                while (x <= cx + r) {
-                    val t = (x - (cx - r)) / (2f * r)
-                    val y = surfaceY + r * 0.05f + amp * kotlin.math.sin(t * (2f * Math.PI).toFloat() * 2.1f - wavePhase * 1.3f)
-                    wave2.lineTo(x, y)
-                    x += 4f
-                }
-                wave2.lineTo(cx + r, cy + r)
-                wave2.lineTo(cx - r, cy + r)
-                wave2.close()
-                drawPath(wave2, color.copy(alpha = 0.45f))
-                // 液面高光线
-                drawLine(
-                    Color.White.copy(alpha = 0.35f),
-                    Offset(cx - r * 0.7f, surfaceY + amp * 0.3f),
-                    Offset(cx + r * 0.7f, surfaceY + amp * 0.3f),
-                    strokeWidth = 1.5f,
-                )
+                drawPath(wavePath, color.copy(alpha = 0.62f))
             }
-            // 玻璃质感：外环描边 + 左上高光弧 + 右下内阴影弧
+            // 玻璃质感收敛：一圈细描边 + 左上一小块柔和高光渐变（无弧线、无内阴影）
+            drawCircle(Color(0xFF3A3F47), radius = r, center = c, style = Stroke(1f))
             drawCircle(
                 androidx.compose.ui.graphics.Brush.radialGradient(
-                    listOf(Color.White.copy(alpha = 0.14f), Color.Transparent),
-                    center = Offset(cx - r * 0.35f, cy - r * 0.4f),
-                    radius = r * 0.9f,
+                    listOf(Color.White.copy(alpha = 0.10f), Color.Transparent),
+                    center = Offset(cx - r * 0.35f, cy - r * 0.42f),
+                    radius = r * 0.75f,
                 ),
                 radius = r, center = c,
-            )
-            drawCircle(Color(0xFF3A3F47), radius = r, center = c, style = Stroke(1.5f))
-            drawArc(
-                Color.White.copy(alpha = 0.30f),
-                startAngle = -140f, sweepAngle = 70f, useCenter = false,
-                topLeft = Offset(cx - r * 0.78f, cy - r * 0.78f),
-                size = Size(r * 1.56f, r * 1.56f),
-                style = Stroke(r * 0.09f, cap = StrokeCap.Round),
-            )
-            drawArc(
-                Color.Black.copy(alpha = 0.25f),
-                startAngle = 40f, sweepAngle = 60f, useCenter = false,
-                topLeft = Offset(cx - r * 0.78f, cy - r * 0.78f),
-                size = Size(r * 1.56f, r * 1.56f),
-                style = Stroke(r * 0.06f, cap = StrokeCap.Round),
             )
         }
         if (centerText != null) {
