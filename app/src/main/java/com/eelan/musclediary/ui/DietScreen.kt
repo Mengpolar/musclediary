@@ -23,6 +23,8 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.eelan.musclediary.AppViewModel
+import com.eelan.musclediary.L
+import com.eelan.musclediary.tagLabel
 import com.eelan.musclediary.data.FoodEntry
 import com.eelan.musclediary.data.FoodTemplate
 import com.eelan.musclediary.ui.theme.*
@@ -53,31 +55,31 @@ fun DietScreen(vm: AppViewModel, onOpenRecords: () -> Unit = {}) {
                 containerColor = Accent,
                 modifier = Modifier.padding(bottom = 6.dp),
             ) {
-                Icon(Icons.Default.Add, "添加饮食", tint = Ink0)
+                Icon(Icons.Default.Add, L("添加饮食", "Add food"), tint = Ink0)
             }
         },
     ) { pad ->
         Column(Modifier.padding(pad).padding(horizontal = 16.dp)) {
             DateHeader(vm, onOpenCalendar = { showCalendar = true })
             Spacer(Modifier.height(8.dp))
-            CardBox(title = "当日摄入") {
+            CardBox(title = L("当日摄入", "Today's intake")) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Column(Modifier.weight(1f)) {
                         Text("${fmt0(kcal)} kcal", fontSize = 22.sp, fontWeight = FontWeight.Bold, color = Accent)
                     }
                     Column(horizontalAlignment = Alignment.End) {
-                        Text("蛋白质 ${fmt1(protein)}g", fontSize = 12.sp, color = Protein)
-                        Text("碳水 ${fmt1(carb)}g", fontSize = 12.sp, color = CarbC)
-                        Text("脂肪 ${fmt1(fat)}g", fontSize = 12.sp, color = FatC)
+                        Text(L("蛋白质 ", "Protein ") + "${fmt1(protein)}g", fontSize = 12.sp, color = Protein)
+                        Text(L("碳水 ", "Carbs ") + "${fmt1(carb)}g", fontSize = 12.sp, color = CarbC)
+                        Text(L("脂肪 ", "Fat ") + "${fmt1(fat)}g", fontSize = 12.sp, color = FatC)
                     }
                 }
             }
-            SectionTitleRow("饮食记录（${entries.size}）", "全部 >", onMore = onOpenRecords)
+            SectionTitleRow(L("饮食记录（", "Food records (") + "${entries.size})", L("全部 >", "All >"), onMore = onOpenRecords)
             if (entries.isEmpty()) {
                 EmptyState(
                     icon = Icons.Default.Restaurant,
-                    text = "还没有记录，从内置模板快速添加",
-                    actionText = "添加饮食",
+                    text = L("还没有记录，从内置模板快速添加", "No records yet — add from built-in templates"),
+                    actionText = L("添加饮食", "Add food"),
                     onAction = { pickOpen = true },
                 )
             } else {
@@ -103,9 +105,10 @@ fun DietScreen(vm: AppViewModel, onOpenRecords: () -> Unit = {}) {
 
     if (pickOpen) {
         TemplatePickerDialog(
-            title = "选择食物（每100g营养）",
+            title = L("选择食物（每100g营养）", "Pick a food (per 100g)"),
             templates = vm.foodTemplates,
-            detail = { t -> "蛋白${fmt1(t.protein)} 碳水${fmt1(t.carb)} 脂肪${fmt1(t.fat)}" },
+            detail = { t -> L("蛋白", "P") + "${fmt1(t.protein)} " + L("碳水", "C") + "${fmt1(t.carb)} " +
+                    L("脂肪", "F") + "${fmt1(t.fat)}" },
             trailing = { t -> "${fmt0(t.kcal)} kcal" },
             onPick = { pickOpen = false; pendingTemplate = it },
             onCustom = { pickOpen = false; customOpen = true },
@@ -120,7 +123,7 @@ fun DietScreen(vm: AppViewModel, onOpenRecords: () -> Unit = {}) {
             template = t,
             initialGrams = vm.recentFoodGrams(t).firstOrNull() ?: 100.0,
             recent = vm.recentFoodGrams(t),
-            confirmText = "记录",
+            confirmText = L("记录", "Log"),
             onDismiss = { pendingTemplate = null },
             onConfirm = { grams -> vm.addFood(t, grams, vm.selectedDate); pendingTemplate = null },
         )
@@ -192,7 +195,7 @@ fun TemplatePickerDialog(
             Column {
                 OutlinedTextField(
                     value = search, onValueChange = { search = it },
-                    placeholder = { Text("搜索", color = TextLo) },
+                    placeholder = { Text(L("搜索", "Search"), color = TextLo) },
                     singleLine = true,
                     colors = fieldColors(),
                 )
@@ -206,7 +209,7 @@ fun TemplatePickerDialog(
                         FilterChip(
                             selected = tagFilter == tag,
                             onClick = { tagFilter = if (tagFilter == tag) null else tag },
-                            label = { Text(tag, fontSize = 12.sp) },
+                            label = { Text(tagLabel(tag), fontSize = 12.sp) },
                             colors = FilterChipDefaults.filterChipColors(
                                 selectedContainerColor = Accent.copy(alpha = 0.35f),
                                 selectedLabelColor = Accent,
@@ -235,7 +238,7 @@ fun TemplatePickerDialog(
                                         Spacer(Modifier.width(6.dp))
                                         t.tag.split(',').filter { it.isNotBlank() }.forEach { tg ->
                                             Text(
-                                                tg, fontSize = 12.sp, color = Accent,
+                                                tagLabel(tg), fontSize = 12.sp, color = Accent,
                                                 modifier = Modifier
                                                     .padding(end = 4.dp)
                                                     .background(Accent.copy(alpha = 0.15f),
@@ -256,10 +259,10 @@ fun TemplatePickerDialog(
                     horizontalArrangement = Arrangement.spacedBy(4.dp),
                 ) {
                     TextButton(onClick = onCustom, modifier = Modifier.weight(1f)) {
-                        Text("＋ 新建自定义", color = Accent, fontSize = 13.sp)
+                        Text(L("＋ 新建自定义", "＋ New custom"), color = Accent, fontSize = 13.sp)
                     }
                     TextButton(onClick = onMeal, modifier = Modifier.weight(1f)) {
-                        Text("＋ 快速记录一餐", color = Accent, fontSize = 13.sp)
+                        Text(L("＋ 快速记录一餐", "＋ Quick meal"), color = Accent, fontSize = 13.sp)
                     }
                 }
             }
@@ -299,11 +302,14 @@ fun CustomFoodDialog(
     AlertDialog(
         onDismissRequest = onDismiss,
         containerColor = Ink2,
-        title = { Text(if (initial == null) "自定义食物（每100g）" else "修改「${initial.name}」（每100g）", color = TextHi, fontSize = 16.sp) },
+        title = { Text(
+            if (initial == null) L("自定义食物（每100g）", "Custom food (per 100g)")
+            else L("修改「", "Edit \"") + initial.name + L("」（每100g）", "\" (per 100g)"),
+            color = TextHi, fontSize = 16.sp) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 OutlinedTextField(value = name, onValueChange = { name = it },
-                    label = { Text("名称", color = TextLo) }, singleLine = true, colors = fieldColors())
+                    label = { Text(L("名称", "Name"), color = TextLo) }, singleLine = true, colors = fieldColors())
                 // 能量直填：包装标签单位是千焦（kJ），填后按 15/50/35 能量占比反推三维营养
                 OutlinedTextField(
                     value = kJ, onValueChange = { v ->
@@ -317,27 +323,27 @@ fun CustomFoodDialog(
                             }
                         }
                     },
-                    label = { Text("能量 kJ", color = TextLo, fontSize = 12.sp) },
+                    label = { Text(L("能量 kJ", "Energy kJ"), color = TextLo, fontSize = 12.sp) },
                     singleLine = true,
                     keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
                         keyboardType = KeyboardType.Decimal), colors = fieldColors(),
                 )
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     OutlinedTextField(value = p, onValueChange = { p = it },
-                        label = { Text("蛋白g", color = TextLo, fontSize = 12.sp) }, singleLine = true,
+                        label = { Text(L("蛋白g", "P g"), color = TextLo, fontSize = 12.sp) }, singleLine = true,
                         keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
                             keyboardType = KeyboardType.Decimal), modifier = Modifier.weight(1f), colors = fieldColors())
                     OutlinedTextField(value = c, onValueChange = { c = it },
-                        label = { Text("碳水g", color = TextLo, fontSize = 12.sp) }, singleLine = true,
+                        label = { Text(L("碳水g", "C g"), color = TextLo, fontSize = 12.sp) }, singleLine = true,
                         keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
                             keyboardType = KeyboardType.Decimal), modifier = Modifier.weight(1f), colors = fieldColors())
                     OutlinedTextField(value = f, onValueChange = { f = it },
-                        label = { Text("脂肪g", color = TextLo, fontSize = 12.sp) }, singleLine = true,
+                        label = { Text(L("脂肪g", "F g"), color = TextLo, fontSize = 12.sp) }, singleLine = true,
                         keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
                             keyboardType = KeyboardType.Decimal), modifier = Modifier.weight(1f), colors = fieldColors())
                 }
                 // 标签选择（可多选）
-                Text("标签（可多选）", fontSize = 12.sp, color = TextLo)
+                Text(L("标签（可多选）", "Tags (multi-select)"), fontSize = 12.sp, color = TextLo)
                 Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                     com.eelan.musclediary.data.ALL_TAGS.take(3).forEach { tg ->
                         FilterChip(
@@ -375,10 +381,10 @@ fun CustomFoodDialog(
                 // 量词单位（可选）：如名称填「个」、等于填 50，表示 1个=50g
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
                     OutlinedTextField(value = unitName, onValueChange = { unitName = it },
-                        label = { Text("量词单位（可选，如：个/盒/碗）", color = TextLo, fontSize = 12.sp) },
+                        label = { Text(L("量词单位（可选，如：个/盒/碗）", "Unit (optional: pc/box/bowl)"), color = TextLo, fontSize = 12.sp) },
                         singleLine = true, modifier = Modifier.weight(1.4f), colors = fieldColors())
                     OutlinedTextField(value = unitGrams, onValueChange = { unitGrams = it },
-                        label = { Text("1单位=?g", color = TextLo, fontSize = 12.sp) },
+                        label = { Text(L("1单位=?g", "1 unit = ? g"), color = TextLo, fontSize = 12.sp) },
                         singleLine = true,
                         enabled = unitName.isNotBlank(),
                         keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
@@ -388,9 +394,9 @@ fun CustomFoodDialog(
                 if (pd != null && cd != null && fd != null) {
                     val formula = pd * 4 + cd * 4 + fd * 9
                     val hint = if (kJ.toDoubleOrNull()?.let { it > 0 } == true)
-                        "（包装 ${fmt0(kJ.toDoubleOrNull()!!)} kJ ≈ ${fmt0(kJ.toDoubleOrNull()!! / 4.184)} kcal）"
+                        "(" + L("包装 ", "package ") + "${fmt0(kJ.toDoubleOrNull()!!)} kJ ≈ ${fmt0(kJ.toDoubleOrNull()!! / 4.184)} kcal)"
                     else ""
-                    Text("热量 ≈ ${fmt0(formula)} kcal/100g $hint",
+                    Text(L("热量 ≈ ", "~") + "${fmt0(formula)} kcal/100g $hint",
                         color = Accent, fontSize = 13.sp)
                 }
             }
@@ -399,9 +405,9 @@ fun CustomFoodDialog(
             TextButton(enabled = valid, onClick = {
                 onConfirm(name.trim(), pd!!, cd!!, fd!!, tag,
                     unitName.trim(), if (unitName.isNotBlank()) (ug ?: 0.0) else 0.0)
-            }) { Text("保存", color = if (valid) Accent else TextLo) }
+            }) { Text(L("保存", "Save"), color = if (valid) Accent else TextLo) }
         },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("取消", color = TextLo) } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(L("取消", "Cancel"), color = TextLo) } },
     )
 }
 
@@ -414,12 +420,13 @@ fun MealQuickDialog(
     onDismiss: () -> Unit,
     onConfirm: (String, Double, Double, Double, Double) -> Unit,
 ) {
-    val meals = listOf("早餐", "午餐", "晚餐", "加餐")
+    val meals = listOf(L("早餐", "Breakfast"), L("午餐", "Lunch"), L("晚餐", "Dinner"), L("加餐", "Snack"))
     // 按当前时间默认选中餐次
     val hour = remember { java.util.Calendar.getInstance().get(java.util.Calendar.HOUR_OF_DAY) }
     var meal by remember {
         mutableStateOf(when {
-            hour < 10 -> "早餐"; hour < 15 -> "午餐"; hour < 21 -> "晚餐"; else -> "加餐"
+            hour < 10 -> L("早餐", "Breakfast"); hour < 15 -> L("午餐", "Lunch")
+            hour < 21 -> L("晚餐", "Dinner"); else -> L("加餐", "Snack")
         })
     }
     var kcal by remember { mutableStateOf("") }
@@ -436,7 +443,7 @@ fun MealQuickDialog(
     AlertDialog(
         onDismissRequest = onDismiss,
         containerColor = Ink2,
-        title = { Text("快速记录一餐", color = TextHi, fontSize = 16.sp) },
+        title = { Text(L("快速记录一餐", "Quick meal"), color = TextHi, fontSize = 16.sp) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 // 餐次选择
@@ -455,7 +462,7 @@ fun MealQuickDialog(
                 }
                 OutlinedTextField(
                     value = kcal, onValueChange = { kcal = it },
-                    label = { Text("这一餐多少热量 kcal（推荐填）", color = TextLo) },
+                    label = { Text(L("这一餐多少热量 kcal（推荐填）", "Calories for this meal (recommended)"), color = TextLo) },
                     singleLine = true,
                     keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
                         keyboardType = KeyboardType.Decimal),
@@ -463,42 +470,42 @@ fun MealQuickDialog(
                 )
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     OutlinedTextField(value = p, onValueChange = { p = it },
-                        label = { Text("蛋白g", color = TextLo, fontSize = 12.sp) }, singleLine = true,
+                        label = { Text(L("蛋白g", "P g"), color = TextLo, fontSize = 12.sp) }, singleLine = true,
                         keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
                             keyboardType = KeyboardType.Decimal),
                         modifier = Modifier.weight(1f), colors = fieldColors())
                     OutlinedTextField(value = c, onValueChange = { c = it },
-                        label = { Text("碳水g", color = TextLo, fontSize = 12.sp) }, singleLine = true,
+                        label = { Text(L("碳水g", "C g"), color = TextLo, fontSize = 12.sp) }, singleLine = true,
                         keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
                             keyboardType = KeyboardType.Decimal),
                         modifier = Modifier.weight(1f), colors = fieldColors())
                     OutlinedTextField(value = f, onValueChange = { f = it },
-                        label = { Text("脂肪g", color = TextLo, fontSize = 12.sp) }, singleLine = true,
+                        label = { Text(L("脂肪g", "F g"), color = TextLo, fontSize = 12.sp) }, singleLine = true,
                         keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
                             keyboardType = KeyboardType.Decimal),
                         modifier = Modifier.weight(1f), colors = fieldColors())
                 }
                 if (calcKcal != null) {
-                    Text("按三维推算 ≈ ${fmt0(calcKcal)} kcal（热量没填时会用它）",
+                    Text(L("按三维推算 ≈ ", "From macros ≈ ") + "${fmt0(calcKcal)} kcal" + L("（热量没填时会用它）", " (used if calories empty)"),
                         fontSize = 12.sp, color = TextLo)
                 }
-                if (!valid) Text("至少填写热量或任一营养素", fontSize = 12.sp, color = Warn)
+                if (!valid) Text(L("至少填写热量或任一营养素", "Fill calories or any macro"), fontSize = 12.sp, color = Warn)
             }
         },
         confirmButton = {
             TextButton(enabled = valid, onClick = {
                 val k = kd ?: calcKcal ?: 0.0
                 onConfirm(meal, k, pd ?: 0.0, cd ?: 0.0, fd ?: 0.0)
-            }) { Text("记录", color = if (valid) Accent else TextLo) }
+            }) { Text(L("记录", "Log"), color = if (valid) Accent else TextLo) }
         },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("取消", color = TextLo) } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(L("取消", "Cancel"), color = TextLo) } },
     )
 }
 
 /** 饮食记录行 detail：按克录入显示克数，快速记录的餐食（grams=0）只显示营养 */
 internal fun foodDetail(f: com.eelan.musclediary.data.FoodEntry): String {
     val head = if (f.grams > 0) "${fmt0(f.grams)}g · " else ""
-    return "${head}蛋白${fmt1(f.protein)} 碳水${fmt1(f.carb)} 脂肪${fmt1(f.fat)}"
+    return head + L("蛋白", "P") + "${fmt1(f.protein)} " + L("碳水", "C") + "${fmt1(f.carb)} " + L("脂肪", "F") + "${fmt1(f.fat)}"
 }
 
 /** 修改快速记录的餐食：热量（参考）与三维营养均可编辑，实际热量按三维计算落库 */
@@ -521,12 +528,12 @@ internal fun MealEditDialog(
     AlertDialog(
         onDismissRequest = onDismiss,
         containerColor = Ink2,
-        title = { Text("修改「${entry.name}」", color = TextHi, fontSize = 16.sp) },
+        title = { Text(L("修改「", "Edit [") + "${entry.name}" + L("」", "]"), color = TextHi, fontSize = 16.sp) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 OutlinedTextField(
                     value = kcal, onValueChange = { kcal = it },
-                    label = { Text("热量 kcal（参考）", color = TextLo) },
+                    label = { Text(L("热量 kcal（参考）", "Calories kcal (reference)"), color = TextLo) },
                     singleLine = true,
                     keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
                         keyboardType = KeyboardType.Decimal),
@@ -534,23 +541,23 @@ internal fun MealEditDialog(
                 )
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     OutlinedTextField(value = p, onValueChange = { p = it },
-                        label = { Text("蛋白g", color = TextLo, fontSize = 12.sp) }, singleLine = true,
+                        label = { Text(L("蛋白g", "P g"), color = TextLo, fontSize = 12.sp) }, singleLine = true,
                         keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
                             keyboardType = KeyboardType.Decimal),
                         modifier = Modifier.weight(1f), colors = fieldColors())
                     OutlinedTextField(value = c, onValueChange = { c = it },
-                        label = { Text("碳水g", color = TextLo, fontSize = 12.sp) }, singleLine = true,
+                        label = { Text(L("碳水g", "C g"), color = TextLo, fontSize = 12.sp) }, singleLine = true,
                         keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
                             keyboardType = KeyboardType.Decimal),
                         modifier = Modifier.weight(1f), colors = fieldColors())
                     OutlinedTextField(value = f, onValueChange = { f = it },
-                        label = { Text("脂肪g", color = TextLo, fontSize = 12.sp) }, singleLine = true,
+                        label = { Text(L("脂肪g", "F g"), color = TextLo, fontSize = 12.sp) }, singleLine = true,
                         keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
                             keyboardType = KeyboardType.Decimal),
                         modifier = Modifier.weight(1f), colors = fieldColors())
                 }
                 if (realKcal != null && kotlin.math.abs(realKcal - (kd ?: 0.0)) > 0.5) {
-                    Text("实际热量按三维计算 ≈ ${fmt0(realKcal)} kcal",
+                    Text(L("实际热量按三维计算 ≈ ", "Actual calories from macros ≈ ") + "${fmt0(realKcal)} kcal",
                         fontSize = 12.sp, color = Warn)
                 }
             }
@@ -558,8 +565,8 @@ internal fun MealEditDialog(
         confirmButton = {
             TextButton(enabled = valid, onClick = {
                 onConfirm(kd!!, pd!!, cd!!, fd!!); onDismiss()
-            }) { Text("确定", color = if (valid) Accent else TextLo) }
+            }) { Text(L("确定", "OK"), color = if (valid) Accent else TextLo) }
         },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("取消", color = TextLo) } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(L("取消", "Cancel"), color = TextLo) } },
     )
 }

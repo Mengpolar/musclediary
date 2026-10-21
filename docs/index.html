@@ -1,0 +1,500 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>增肌日记 Muscle Diary — 不用联网的增肌日记（Android · 开源免费）</title>
+<meta name="description" content="不用联网的增肌日记：饮食、锻炼、饮水、体重，一次记录 30 秒完成。没有账号，没有上传，断网照常记。GitHub Releases 免费下载。">
+<style>
+  :root{
+    --paper:#F4F1EA; --black:#121212; --acc:#FF7A45; --accDeep:#E85D20;
+    --blue:#4FC3F7; --grey:#6F6A61; --line:#121212;
+  }
+  *{margin:0;padding:0;box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{
+    background:var(--paper); color:var(--black);
+    font-family:"Segoe UI","Microsoft YaHei","PingFang SC",sans-serif;
+    overflow-x:hidden;
+  }
+  .num{font-variant-numeric:tabular-nums}
+  ::selection{background:var(--acc);color:var(--paper)}
+  a:focus-visible,button:focus-visible{outline:3px solid var(--acc);outline-offset:3px}
+
+  /* ====== 滚动进度条 ====== */
+  .prog{position:fixed;top:0;left:0;height:4px;width:0;background:var(--acc);z-index:100}
+
+  /* ====== 滚动显现（仅 js 环境） ====== */
+  .js .rv{opacity:0;transform:translateY(26px);
+    transition:opacity .7s ease,transform .7s cubic-bezier(.22,.61,.36,1)}
+  .js .rv.in{opacity:1;transform:none}
+  .js h1 .sq{transform:scale(0);transition:transform .45s cubic-bezier(.34,1.56,.64,1) .55s}
+  .js h1 .row2.in .sq{transform:scale(1)}
+
+  /* ============ 顶栏 ============ */
+  .top{display:flex;justify-content:space-between;align-items:center;
+    padding:18px clamp(16px,4vw,64px);border-bottom:2px solid var(--line);
+    position:sticky;top:0;background:var(--paper);z-index:50}
+  .top .l{font-weight:800;font-size:15px;letter-spacing:2px}
+  .top .l i{font-style:normal;color:var(--acc)}
+  .top .r{display:flex;align-items:center;gap:10px;font-size:12px;letter-spacing:1.5px}
+  .top .badge{background:var(--black);color:var(--paper);font-weight:700;text-decoration:none;
+    padding:5px 12px;border-radius:999px;letter-spacing:1px;transition:background .2s,color .2s}
+  .top .langBtn{border:2px solid var(--line);background:transparent;color:var(--black);
+    font-weight:800;font-size:12px;letter-spacing:1px;padding:4px 12px;border-radius:999px;cursor:pointer;
+    transition:background .2s,color .2s}
+  .top .langBtn:hover{background:var(--acc)}
+  .top .badge:hover{background:var(--acc);color:var(--black)}
+  @media(max-width:560px){.top .r .free{display:none}}
+
+  /* ============ HERO ============ */
+  .hero{display:grid;grid-template-columns:1.12fr .88fr;gap:clamp(20px,3vw,56px);
+    padding:clamp(34px,5.2vh,72px) clamp(16px,4vw,64px) clamp(28px,4vh,56px);
+    align-items:center;min-height:calc(100vh - 220px)}
+  @media(max-width:960px){.hero{grid-template-columns:1fr;min-height:0}}
+
+  .kicker{font-size:clamp(12px,1.1vw,14px);letter-spacing:5px;font-weight:700;color:var(--grey)}
+  .kicker b{color:var(--black)}
+  h1{font-size:clamp(52px,8.6vw,138px);line-height:1.02;font-weight:900;
+    letter-spacing:.01em;margin:14px 0 0}
+  h1 .row2{display:flex;align-items:center;gap:.12em}
+  h1 .sq{display:inline-block;width:.5em;height:.5em;background:var(--acc);flex:none}
+  .sub{margin-top:clamp(18px,2.6vh,30px);font-size:clamp(15px,1.5vw,19px);
+    line-height:1.9;max-width:34em}
+  .sub .punch{background:var(--black);color:var(--paper);padding:2px 10px;
+    box-decoration-break:clone;-webkit-box-decoration-break:clone}
+  .sub .punch b{color:var(--acc)}
+
+  .ctaRow{display:flex;gap:14px;margin-top:clamp(22px,3.4vh,36px);flex-wrap:wrap}
+  .btn{display:inline-flex;align-items:center;gap:10px;text-decoration:none;
+    font-weight:800;font-size:clamp(14px,1.35vw,17px);letter-spacing:1px;
+    padding:16px 30px;border:2.5px solid var(--line);
+    transition:transform .18s ease,background .18s ease,color .18s ease,border-color .18s ease}
+  .btn .ar{display:inline-block;transition:transform .2s ease}
+  .btn:hover .ar{transform:translateY(3px)}
+  .btn:active{transform:translate(1px,1px)}
+  .btn.dark{background:var(--black);color:var(--paper)}
+  .btn.dark:hover{background:var(--acc);border-color:var(--acc);color:var(--black);transform:translate(-2px,-2px)}
+  .btn.ghost{background:transparent;color:var(--black)}
+  .btn.ghost:hover{background:var(--black);color:var(--paper);transform:translate(-2px,-2px)}
+  .meta{margin-top:16px;font-size:12px;color:var(--grey);letter-spacing:1.5px}
+
+  /* ---- 右侧视觉：杠铃片（有含义的橙圆） ---- */
+  .visual{position:relative;height:clamp(440px,60vh,660px)}
+  .sticker{position:absolute;left:-2%;top:1%;z-index:6;background:var(--black);color:var(--paper);
+    padding:10px 16px;font-weight:800;font-size:12px;letter-spacing:2px;transform:rotate(-6deg)}
+  .sticker i{font-style:normal;color:var(--acc)}
+  .plateOuter{position:absolute;right:-1%;top:47%;transform:translateY(-50%);
+    width:clamp(330px,33vw,580px);aspect-ratio:1;
+    transition:translate .45s ease-out}
+  .plate{width:100%;height:100%;border-radius:50%;background:var(--acc);position:relative;
+    box-shadow:0 28px 60px rgba(18,18,18,.16);cursor:pointer;
+    transition:transform .35s cubic-bezier(.34,1.56,.64,1)}
+  .plate::before{content:"";position:absolute;inset:6.5%;border-radius:50%;
+    border:2px solid rgba(18,18,18,.28)}
+  .plate::after{content:"";position:absolute;inset:2.5%;border-radius:50%;
+    border:1px solid rgba(18,18,18,.2)}
+  .plateOuter:hover .plate{transform:rotate(-3deg)}
+  .plateOuter:active .plate{animation:wob .5s cubic-bezier(.36,.07,.19,.97)}
+  @keyframes wob{20%{transform:rotate(-6deg)}45%{transform:rotate(4deg)}
+    70%{transform:rotate(-2deg)}100%{transform:rotate(0)}}
+  .plate .t1{position:absolute;left:6%;right:6%;top:14%;text-align:center;
+    font-weight:900;font-size:clamp(28px,3.1vw,50px);letter-spacing:.16em}
+  .plate .hole{position:absolute;left:50%;top:53%;transform:translate(-50%,-50%);
+    width:23%;aspect-ratio:1;border-radius:50%;background:var(--paper);
+    box-shadow:inset 0 5px 14px rgba(18,18,18,.28),inset 0 0 0 2px rgba(18,18,18,.35)}
+  .plate .t2{position:absolute;left:6%;right:6%;top:70%;text-align:center;
+    font-weight:900;font-size:clamp(14px,1.4vw,21px);letter-spacing:.22em}
+
+  .photo{position:absolute;background:#fff;padding:8px 8px 26px;
+    box-shadow:0 22px 48px rgba(18,18,18,.28);
+    transition:transform .25s ease,translate .45s ease-out}
+  .photo:hover{transform:rotate(0deg) scale(1.02)!important}
+  .photo img{display:block;width:100%}
+  .photo .cap{position:absolute;left:0;right:0;bottom:6px;text-align:center;
+    font-size:10px;letter-spacing:2px;color:#8A8272}
+  .ph1{width:clamp(170px,16vw,240px);left:0;bottom:4%;transform:rotate(-4.5deg);z-index:3}
+  .ph2{width:clamp(148px,13.5vw,200px);right:0;bottom:-3%;transform:rotate(3.5deg);z-index:4}
+  @media(max-width:960px){
+    .visual{height:auto;min-height:430px;margin-top:14px}
+    .plateOuter{right:50%;top:46%;transform:translate(50%,-50%);width:min(76vw,430px)}
+    .sticker{left:2%;top:0}
+    .ph1{left:3%;bottom:1%}
+    .ph2{right:3%;bottom:-5%}
+  }
+
+  .side{position:absolute;right:10px;top:46%;writing-mode:vertical-rl;
+    font-size:11px;letter-spacing:6px;color:var(--grey);font-weight:700}
+  @media(max-width:1200px){.side{display:none}}
+
+  /* ============ 跑马灯 ============ */
+  .marquee{overflow:hidden;background:var(--black);color:var(--paper);
+    border-top:3px solid var(--acc);border-bottom:3px solid var(--acc)}
+  .track{display:flex;width:max-content;animation:roll 100s linear infinite}
+  .marquee:hover .track{animation-play-state:paused}
+  .marquee.rev .track{animation-direction:reverse}
+  .track span{padding:13px 0;font-weight:800;font-size:14px;letter-spacing:3px;white-space:nowrap}
+  .track i{font-style:normal;color:var(--acc);margin:0 18px}
+  @keyframes roll{to{transform:translateX(-50%)}}
+
+  /* ============ 大数字 ============ */
+  .stats{display:grid;grid-template-columns:repeat(5,1fr);
+    border-bottom:2px solid var(--line)}
+  .stat{padding:clamp(26px,3.6vh,48px) clamp(14px,1.8vw,30px);
+    border-right:2px solid var(--line);transition:background .25s ease}
+  .stat:hover{background:#ECE7DC}
+  .stat:last-child{border-right:none}
+  .stat .n{font-size:clamp(44px,5.6vw,88px);font-weight:900;line-height:1;
+    color:transparent;-webkit-text-stroke:2.5px var(--black);transition:color .2s ease,-webkit-text-stroke .2s ease}
+  .stat:hover .n{color:var(--acc);-webkit-text-stroke:2.5px var(--acc)}
+  .stat .t{margin-top:12px;font-weight:800;font-size:clamp(13px,1.2vw,15px);letter-spacing:1px}
+  .stat .d{margin-top:6px;font-size:clamp(11px,1vw,12.5px);color:var(--grey);line-height:1.7}
+  @media(max-width:860px){
+    .stats{grid-template-columns:repeat(2,1fr)}
+    .stat{border-bottom:2px solid var(--line)}
+    .stat:nth-child(2n){border-right:none}
+    .stat:nth-child(5){grid-column:1/-1;border-bottom:none;text-align:center}
+  }
+
+  /* ============ 黑底问答 ============ */
+  .qa{background:var(--black);color:var(--paper);
+    padding:clamp(48px,7vh,96px) clamp(16px,4vw,64px)}
+  .qa .wrap{max-width:1180px;margin:0 auto}
+  .qa .head{font-size:clamp(24px,3vw,42px);font-weight:900;letter-spacing:1px;margin-bottom:clamp(28px,4vh,52px)}
+  .qa .head i{font-style:normal;color:var(--acc)}
+  .qrow{display:grid;grid-template-columns:clamp(70px,8vw,120px) 1fr;gap:clamp(16px,2.4vw,40px);
+    padding:clamp(22px,3.2vh,38px) 0;border-top:1px solid #333;transition:background .25s ease}
+  .qrow:hover{background:#1A1A1A}
+  .qrow .no{font-size:clamp(20px,2.4vw,34px);font-weight:900;color:var(--acc);line-height:1.1;
+    transition:color .2s ease,-webkit-text-stroke .2s ease}
+  .qrow:hover .no{color:transparent;-webkit-text-stroke:2px var(--acc)}
+  .qrow .q{font-size:clamp(19px,2.1vw,30px);font-weight:900;letter-spacing:.5px}
+  .qrow .a{margin-top:12px;font-size:clamp(14px,1.4vw,16.5px);line-height:2;color:#B9B4AA;max-width:52em}
+  .qrow .a b{color:var(--paper)}
+  .qrow .a .hl{color:var(--acc);font-weight:700}
+
+  /* ============ 结尾 CTA ============ */
+  .fin{padding:clamp(48px,7vh,96px) clamp(16px,4vw,64px);text-align:center;
+    border-bottom:2px solid var(--line)}
+  .fin .big{font-size:clamp(34px,5.4vw,84px);font-weight:900;line-height:1.12;letter-spacing:.01em}
+  .fin .big i{font-style:normal;color:var(--accDeep)}
+  .fin .btn{margin-top:clamp(24px,3.6vh,40px)}
+  .fin .meta{margin-top:18px}
+  .fin .links{margin-top:24px;display:flex;gap:22px;justify-content:center;flex-wrap:wrap;
+    font-size:13px;letter-spacing:1px}
+  .fin .links a{color:var(--black);text-decoration:none;border-bottom:2px solid var(--acc);padding-bottom:2px;
+    transition:color .2s}
+  .fin .links a:hover{color:var(--accDeep)}
+
+  footer{padding:24px clamp(16px,4vw,64px);display:flex;justify-content:space-between;
+    gap:14px;flex-wrap:wrap;font-size:12px;color:var(--grey);letter-spacing:1.5px}
+
+  /* ====== 回到顶部 ====== */
+  .topBtn{position:fixed;right:26px;bottom:26px;width:52px;height:52px;border-radius:50%;
+    border:2.5px solid var(--line);background:var(--paper);color:var(--black);
+    font-size:20px;font-weight:900;display:flex;align-items:center;justify-content:center;
+    cursor:pointer;opacity:0;pointer-events:none;transform:translateY(12px);
+    transition:opacity .25s ease,transform .25s ease,background .2s ease;z-index:90}
+  .topBtn.show{opacity:1;pointer-events:auto;transform:none}
+  .topBtn:hover{background:var(--acc)}
+
+  @media (prefers-reduced-motion: reduce){
+    *{animation:none!important;transition:none!important}
+    .js .rv{opacity:1!important;transform:none!important}
+    .js h1 .sq{transform:none!important}
+    html{scroll-behavior:auto}
+  }
+</style>
+</head>
+<body>
+<script>document.documentElement.classList.add('js')</script>
+
+<div class="prog" aria-hidden="true"></div>
+
+<header class="top">
+  <div class="l">增肌日记 <i>■</i> MUSCLE DIARY</div>
+  <div class="r">
+    <span class="free" data-i18n="free">免费 · 开源 · 无广告</span>
+    <button class="langBtn" id="langBtn" type="button">EN</button>
+    <a class="badge num" href="https://github.com/Mengpolar/musclediary/releases/latest">v0.7.21</a>
+  </div>
+</header>
+
+<section class="hero" id="top">
+  <div>
+    <div class="kicker rv">MUSCLE DIARY · <b data-i18n="kickerB">不用联网的训练记录</b> · ANDROID</div>
+    <h1>
+      <span class="rv" style="display:block;transition-delay:.08s" data-i18n="h1a">不用联网的</span>
+      <span class="row2 rv" style="transition-delay:.18s"><span data-i18n="h1b">增肌日记</span><span class="sq"></span></span>
+    </h1>
+    <p class="sub rv" style="transition-delay:.3s">
+      <span data-i18n="sub1">记一餐比吃一餐快，数据只在你手机里。</span><br>
+      <span class="punch"><span data-i18n="sub2a">服务器宕机？</span><b data-i18n="sub2b">不存在的，我们根本没有服务器。</b></span>
+    </p>
+    <div class="ctaRow rv" style="transition-delay:.42s">
+      <a class="btn dark" href="https://github.com/Mengpolar/musclediary/releases/latest"><span class="ar">↓</span> <span data-i18n="btnDl">下载 APK · 10.6 MB</span></a>
+      <a class="btn ghost" href="https://github.com/Mengpolar/musclediary"><span data-i18n="btnSrc">查看源码</span></a>
+    </div>
+    <div class="meta rv" style="transition-delay:.52s" data-i18n="meta1">Android 8.0+ · MIT 开源 · SHA-256 安装前校验 · App 内可检查更新</div>
+  </div>
+
+  <div class="visual">
+    <div class="sticker"><span data-i18n="sticker">断网照常记</span> <i>✓</i></div>
+    <div class="plateOuter">
+      <div class="plate" role="button" tabindex="0" aria-label="点击去下载">
+        <div class="t1" data-i18n="plateT1">纯本地</div>
+        <div class="hole"></div>
+        <div class="t2 num">NET 10.6 MB</div>
+      </div>
+    </div>
+    <div class="photo ph1"><img src="v_current_today.png" alt="app screenshot"><div class="cap" data-i18n="cap1">今日页 · 实机</div></div>
+    <div class="photo ph2"><img src="v_current_workout.png" alt="muscle map screenshot"><div class="cap" data-i18n="cap2">肌肉概览 · 实机</div></div>
+  </div>
+</section>
+<div class="side">OFFLINE FIRST · NO ACCOUNT · OPEN SOURCE</div>
+
+<div class="marquee" aria-hidden="true">
+  <div class="track">
+    <span class="mq" data-mq="zh">纯本地<i>◆</i>无账号<i>◆</i>不上传<i>◆</i>断网可用<i>◆</i>开源免费<i>◆</i>没有服务器<i>◆</i>186 种中文食物<i>◆</i>公式全透明<i>◆</i>纯本地<i>◆</i>无账号<i>◆</i>不上传<i>◆</i>断网可用<i>◆</i>开源免费<i>◆</i>没有服务器<i>◆</i>186 种中文食物<i>◆</i>公式全透明<i>◆</i></span>
+    <span class="mq" data-mq="zh">纯本地<i>◆</i>无账号<i>◆</i>不上传<i>◆</i>断网可用<i>◆</i>开源免费<i>◆</i>没有服务器<i>◆</i>186 种中文食物<i>◆</i>公式全透明<i>◆</i>纯本地<i>◆</i>无账号<i>◆</i>不上传<i>◆</i>断网可用<i>◆</i>开源免费<i>◆</i>没有服务器<i>◆</i>186 种中文食物<i>◆</i>公式全透明<i>◆</i></span>
+  </div>
+</div>
+
+<section class="stats" data-stagger>
+  <div class="stat rv"><div class="n num" data-count="186">186</div>
+    <div class="t" data-i18n="st1t">种食物模板</div><div class="d" data-i18n="st1d">鸡胸肉、兰州拉面、煎饼果子——都是中国胃认识的</div></div>
+  <div class="stat rv"><div class="n num" data-count="58">58</div>
+    <div class="t" data-i18n="st2t">种动作模板</div><div class="d" data-i18n="st2d">按次 / 按公里 / 按秒都能记，MET 自动换算消耗</div></div>
+  <div class="stat rv"><div class="n num" data-count="13">13</div>
+    <div class="t" data-i18n="st3t">块肌群着色</div><div class="d" data-i18n="st3d">练完看一眼人体图，今天哪里充血一目了然</div></div>
+  <div class="stat rv"><div class="n num">30<small style="font-size:.38em" data-i18n="secSmall">秒</small></div>
+    <div class="t" data-i18n="st4t">记完一餐</div><div class="d" data-i18n="st4d">量词单位自动换算，最近录入一键即填</div></div>
+  <div class="stat rv"><div class="n num">0</div>
+    <div class="t" data-i18n="st5t">字节上传</div><div class="d" data-i18n="st5d">唯一联网是检查更新，安装包先验 SHA-256</div></div>
+</section>
+
+<section class="qa">
+  <div class="wrap" data-stagger>
+    <div class="head rv"><span data-i18n="qaHead">四个</span><span style="color:var(--acc)" data-i18n="qaHeadAcc">反常识</span></div>
+
+    <div class="qrow rv">
+      <div class="no num">01</div>
+      <div>
+        <div class="q" data-i18n="q1">为什么敢说「不用联网」？</div>
+        <div class="a"><span data-i18n="a1a">训练、饮食、体重全部存在手机本地。</span><b data-i18n="a1b">没有账号，没有云同步，没有「服务条款已更新」弹窗。</b><span data-i18n="a1c">飞行模式下照样记满今天的三组卧推。</span><span class="hl" data-i18n="a1d">数据是你的，不是平台的。</span></div>
+      </div>
+    </div>
+
+    <div class="qrow rv">
+      <div class="no num">02</div>
+      <div>
+        <div class="q" data-i18n="q2">今天为什么能吃 2176 kcal？</div>
+        <div class="a"><span data-i18n="a2a">BMR 公式 + 活动系数 + 增肌盈余——</span><b data-i18n="a2b">点击 App 里任意目标数字，都能看到带真实数据的完整推导。</b><span data-i18n="a2c">练得多，当天目标自动上调。计算不搞黑箱。</span></div>
+      </div>
+    </div>
+
+    <div class="qrow rv">
+      <div class="no num">03</div>
+      <div>
+        <div class="q" data-i18n="q3">练完只知道「累」？</div>
+        <div class="a"><span data-i18n="a3a">13 块肌群按当天刺激分着色：</span><span class="hl" data-i18n="a3b">灰 → 绿 → 橙 → 红</span><span data-i18n="a3c">。正面背面看一眼，今天胸是不是没练到、背是不是练透了，图上说话。</span></div>
+      </div>
+    </div>
+
+    <div class="qrow rv">
+      <div class="no num">04</div>
+      <div>
+        <div class="q" data-i18n="q4">换手机，数据会丢吗？</div>
+        <div class="a"><span data-i18n="a4a">一键导出 CSV，存到你想存的任何地方——网盘、U 盘、或者你家冰箱贴。</span><b data-i18n="a4b">没有云，也就没有人能锁住你的数据。</b></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="fin">
+  <div class="big rv"><span data-i18n="finA">装上就用，</span><i data-i18n="finB">一次记录 30 秒。</i></div>
+  <a class="btn dark rv" id="download" style="transition-delay:.12s" href="https://github.com/Mengpolar/musclediary/releases/latest"><span class="ar">↓</span> <span data-i18n="finBtn">从 GitHub Releases 下载 · 10.6 MB</span></a>
+  <div class="meta rv num" style="transition-delay:.22s" data-i18n="finMeta">v0.7.21 · versionCode 037 · Android 8.0+ · 也可以在 App 内「检查更新」直升</div>
+  <div class="links rv" style="transition-delay:.3s">
+    <a href="https://github.com/Mengpolar/musclediary/releases">Releases</a>
+    <a href="https://github.com/Mengpolar/musclediary">源码</a>
+    <a href="https://github.com/Mengpolar/musclediary/issues">反馈问题</a>
+  </div>
+</section>
+
+<div class="marquee rev" aria-hidden="true">
+  <div class="track">
+    <span class="mq" data-mq="zh">纯本地<i>◆</i>无账号<i>◆</i>不上传<i>◆</i>断网可用<i>◆</i>开源免费<i>◆</i>没有服务器<i>◆</i>186 种中文食物<i>◆</i>公式全透明<i>◆</i>纯本地<i>◆</i>无账号<i>◆</i>不上传<i>◆</i>断网可用<i>◆</i>开源免费<i>◆</i>没有服务器<i>◆</i>186 种中文食物<i>◆</i>公式全透明<i>◆</i></span>
+    <span class="mq" data-mq="zh">纯本地<i>◆</i>无账号<i>◆</i>不上传<i>◆</i>断网可用<i>◆</i>开源免费<i>◆</i>没有服务器<i>◆</i>186 种中文食物<i>◆</i>公式全透明<i>◆</i>纯本地<i>◆</i>无账号<i>◆</i>不上传<i>◆</i>断网可用<i>◆</i>开源免费<i>◆</i>没有服务器<i>◆</i>186 种中文食物<i>◆</i>公式全透明<i>◆</i></span>
+  </div>
+</div>
+
+<footer>
+  <div>© 2026 Mengpolar · MIT License</div>
+  <div data-i18n="foot">增肌这件事：App 管记录，你管举铁。</div>
+</footer>
+
+<button class="topBtn" aria-label="回到顶部">↑</button>
+
+<script>
+  var RM = matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  /* ---- 滚动显现 + 分组错峰 ---- */
+  document.querySelectorAll('[data-stagger]').forEach(function(c){
+    Array.prototype.forEach.call(c.children, function(ch,i){ ch.style.transitionDelay = (i*90)+'ms'; });
+  });
+  var rvs = document.querySelectorAll('.rv');
+  if (RM || !('IntersectionObserver' in window)) {
+    rvs.forEach(function(el){ el.classList.add('in'); });
+  } else {
+    var io = new IntersectionObserver(function(es){
+      es.forEach(function(e){
+        if(!e.isIntersecting) return;
+        e.target.classList.add('in');
+        io.unobserve(e.target);
+      });
+    }, {threshold:.15, rootMargin:'0px 0px -8% 0px'});
+    rvs.forEach(function(el){ io.observe(el); });
+  }
+
+  /* ---- 数字滚动 ---- */
+  (function(){
+    var els=document.querySelectorAll('[data-count]');
+    if(!('IntersectionObserver' in window)) return;
+    var io2=new IntersectionObserver(function(es){
+      es.forEach(function(e){
+        if(!e.isIntersecting) return;
+        io2.unobserve(e.target);
+        var el=e.target, end=+el.getAttribute('data-count');
+        if(RM){ el.textContent=end; return; }
+        var t0=null, dur=900;
+        requestAnimationFrame(function f(t){
+          if(t0===null) t0=t;
+          var p=Math.min(1,(t-t0)/dur);
+          el.textContent=Math.round(end*(1-Math.pow(1-p,3)));
+          if(p<1) requestAnimationFrame(f);
+        });
+      });
+    },{threshold:.4});
+    els.forEach(function(el){io2.observe(el)});
+  })();
+
+  /* ---- 顶部进度条 + 回到顶部 ---- */
+  (function(){
+    var prog=document.querySelector('.prog'), btn=document.querySelector('.topBtn');
+    var h=document.documentElement, ticking=false;
+    function update(){
+      var p=h.scrollTop/Math.max(1,h.scrollHeight-h.clientHeight);
+      prog.style.width=(p*100)+'%';
+      btn.classList.toggle('show', h.scrollTop>560);
+      ticking=false;
+    }
+    addEventListener('scroll',function(){
+      if(!ticking){ requestAnimationFrame(update); ticking=true; }
+    },{passive:true});
+    update();
+    btn.addEventListener('click',function(){ scrollTo({top:0,behavior:RM?'auto':'smooth'}); });
+  })();
+
+  /* ---- 鼠标视差（仅精确指针 + 未减动效） ---- */
+  (function(){
+    if(RM || !matchMedia('(pointer:fine)').matches) return;
+    var hero=document.querySelector('.hero');
+    var plateO=document.querySelector('.plateOuter');
+    var ph1=document.querySelector('.ph1'), ph2=document.querySelector('.ph2');
+    if(!hero) return;
+    hero.addEventListener('mousemove',function(e){
+      var r=hero.getBoundingClientRect();
+      var nx=(e.clientX-r.left)/r.width-.5, ny=(e.clientY-r.top)/r.height-.5;
+      plateO.style.translate=(nx*-14)+'px '+(ny*-10)+'px';
+      ph1.style.translate=(nx*20)+'px '+(ny*14)+'px';
+      ph2.style.translate=(nx*28)+'px '+(ny*20)+'px';
+    });
+    hero.addEventListener('mouseleave',function(){
+      plateO.style.translate=''; ph1.style.translate=''; ph2.style.translate='';
+    });
+  })();
+
+  /* ---- 杠铃片彩蛋：点击去下载 ---- */
+  (function(){
+    var plate=document.querySelector('.plate'), target=document.getElementById('download');
+    if(!plate||!target) return;
+    function go(){ target.scrollIntoView({behavior:RM?'auto':'smooth',block:'center'}); }
+    plate.addEventListener('click',go);
+    plate.addEventListener('keydown',function(e){
+      if(e.key==='Enter'||e.key===' '){ e.preventDefault(); go(); }
+    });
+  })();
+</script>
+<script>
+  // ====== 中英切换：内存态（发布页无后端），按钮 EN/中 互切，即时生效 ======
+  var I18N = {
+    free:      ["免费 · 开源 · 无广告", "Free · Open source · No ads"],
+    kickerB:   ["不用联网的训练记录", "Offline workout logging"],
+    h1a:       ["不用联网的", "The offline"],
+    h1b:       ["增肌日记", "muscle diary"],
+    sub1:      ["记一餐比吃一餐快，数据只在你手机里。", "Logging a meal is faster than eating one. Your data stays on your phone."],
+    sub2a:     ["服务器宕机？", "Server down? "],
+    sub2b:     ["不存在的，我们根本没有服务器。", "Impossible — there is no server."],
+    btnDl:     ["下载 APK · 10.6 MB", "Download APK · 10.6 MB"],
+    btnSrc:    ["查看源码", "Source code"],
+    meta1:     ["Android 8.0+ · MIT 开源 · SHA-256 安装前校验 · App 内可检查更新", "Android 8.0+ · MIT · SHA-256 verified before install · in-app updates"],
+    sticker:   ["断网照常记", "Works offline"],
+    plateT1:   ["纯本地", "LOCAL ONLY"],
+    cap1:      ["今日页 · 实机", "Today · real device"],
+    cap2:      ["肌肉概览 · 实机", "Muscle map · real device"],
+    st1t:      ["种食物模板", "food templates"], st1d: ["鸡胸肉、兰州拉面、煎饼果子——都是中国胃认识的", "Chicken breast, Lanzhou noodles, jianbing — food you actually eat"],
+    st2t:      ["种动作模板", "exercise templates"], st2d: ["按次 / 按公里 / 按秒都能记，MET 自动换算消耗", "By reps / km / seconds, MET auto-converts to calories"],
+    st3t:      ["块肌群着色", "muscle groups"], st3d: ["练完看一眼人体图，今天哪里充血一目了然", "One glance at the body map shows what you trained today"],
+    st4t:      ["记完一餐", "to log a meal"], st4d: ["量词单位自动换算，最近录入一键即填", "Unit conversions and one-tap recent values"],
+    secSmall:  ["秒", "s"],
+    st5t:      ["字节上传", "bytes uploaded"], st5d: ["唯一联网是检查更新，安装包先验 SHA-256", "Only network use is update checks; APK verified with SHA-256"],
+    qaHead:    ["四个", "Four "], qaHeadAcc: ["反常识", "truths"],
+    q1: ["为什么敢说「不用联网」？", "Why \"no internet\" is literal"],
+    a1a: ["训练、饮食、体重全部存在手机本地。", "Training, meals and weight all live on your phone. "],
+    a1b: ["没有账号，没有云同步，没有「服务条款已更新」弹窗。", "No account, no cloud sync, no \"terms have updated\" popups. "],
+    a1c: ["飞行模式下照样记满今天的三组卧推。", "Airplane mode handles your three sets of bench just fine. "],
+    a1d: ["数据是你的，不是平台的。", "Your data belongs to you, not a platform."],
+    q2: ["今天为什么能吃 2176 kcal？", "Why can you eat 2176 kcal today?"],
+    a2a: ["BMR 公式 + 活动系数 + 增肌盈余——", "BMR + activity factor + bulk surplus — "],
+    a2b: ["点击 App 里任意目标数字，都能看到带真实数据的完整推导。", "Tap any target number in the app for the full derivation with your real numbers. "],
+    a2c: ["练得多，当天目标自动上调。计算不搞黑箱。", "Train more, that day's target rises. No black box."],
+    q3: ["练完只知道「累」？", "Only know that you are \"tired\"?"],
+    a3a: ["13 块肌群按当天刺激分着色：", "13 muscle groups colored by today's stimulus: "],
+    a3b: ["灰 → 绿 → 橙 → 红", "gray → green → orange → red"],
+    a3c: ["。正面背面看一眼，今天胸是不是没练到、背是不是练透了，图上说话。", ". One look at the body map tells if chest got skipped or back got worked."],
+    q4: ["换手机，数据会丢吗？", "Switching phones — will data be lost?"],
+    a4a: ["一键导出 CSV，存到你想存的任何地方——网盘、U 盘、或者你家冰箱贴。", "One-tap CSV export to anywhere you like — cloud drive, USB stick, or your fridge door. "],
+    a4b: ["没有云，也就没有人能锁住你的数据。", "No cloud means no one can hold your data hostage."],
+    finA: ["装上就用，", "Install and go. "],
+    finB: ["一次记录 30 秒。", "30 seconds per entry."],
+    finBtn: ["从 GitHub Releases 下载 · 10.6 MB", "Download from GitHub Releases · 10.6 MB"],
+    finMeta: ["v0.7.21 · versionCode 037 · Android 8.0+ · 也可以在 App 内「检查更新」直升", "v0.7.21 · versionCode 037 · Android 8.0+ · or update in-app via \"Check for updates\""],
+    foot: ["增肌这件事：App 管记录，你管举铁。", "Muscle building: the app logs, you lift."],
+    mqZh: "纯本地<i>◆</i>无账号<i>◆</i>不上传<i>◆</i>断网可用<i>◆</i>开源免费<i>◆</i>没有服务器<i>◆</i>186 种中文食物<i>◆</i>公式全透明<i>◆</i>",
+    mqEn: "Offline<i>◆</i>No account<i>◆</i>No upload<i>◆</i>Works in airplane mode<i>◆</i>Free & open source<i>◆</i>There is no server<i>◆</i>186 Chinese food templates<i>◆</i>Transparent math<i>◆</i>",
+    langBtnTo: ["EN", "中"], title: ["增肌日记 Muscle Diary — 不用联网的增肌日记（Android · 开源免费）", "Muscle Diary — the offline workout log for Android · free & open source"]
+  };
+
+  (function(){
+    var btn = document.getElementById('langBtn');
+    if (!btn) return;
+    var en = false;
+    function apply(){
+      document.querySelectorAll('[data-i18n]').forEach(function(el){
+        var v = I18N[el.getAttribute('data-i18n')];
+        if (v) el.textContent = v[en?1:0];
+      });
+      // 跑马灯：两处 track 各两个 span 同步替换
+      var mq = I18N.mqZh.replace(/</g,'<i>').replace(/>/g,'></i>'); // noop safety
+      document.querySelectorAll('.track span').forEach(function(el){
+        el.innerHTML = en ? I18N.mqEn + I18N.mqEn : I18N.mqZh + I18N.mqZh;
+      });
+      btn.textContent = I18N.langBtnTo[en?0:1];
+      document.title = I18N.title[en?1:0];
+    }
+    btn.addEventListener('click', function(){ en = !en; apply(); });
+  })();
+</script>
+</body>
+</html>

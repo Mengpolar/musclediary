@@ -14,6 +14,8 @@ import androidx.core.app.NotificationManagerCompat
 import com.eelan.musclediary.MainActivity
 import com.eelan.musclediary.R
 import com.eelan.musclediary.data.AppDatabase
+import com.eelan.musclediary.L
+import com.eelan.musclediary.Lang
 
 /**
  * 饮水分时段提醒（可扩展更多提醒类型）：
@@ -38,8 +40,8 @@ object WaterReminder {
     fun ensureChannel(ctx: Context) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val ch = NotificationChannel(
-                CHANNEL_ID, "喝水提醒", NotificationManager.IMPORTANCE_DEFAULT
-            ).apply { description = "按时段检查饮水量，落后时提醒" }
+                CHANNEL_ID, "Water reminder", NotificationManager.IMPORTANCE_DEFAULT
+            ).apply { description = "Checks water intake by time slot and reminds when behind" }
             ctx.getSystemService(NotificationManager::class.java)
                 .createNotificationChannel(ch)
         }
@@ -61,10 +63,10 @@ object WaterReminder {
             ctx, 0, intent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
         )
-        val text = "$slotLabel 应喝约 ${shouldMl}ml，目前 ${actualMl}ml，喝杯水吧"
+        val text = "$slotLabel " + L("应喝约 ", "target ~") + "${shouldMl}ml, " + L("目前 ", "drank ") + "${actualMl}ml, " + L("喝杯水吧", "time for a glass of water")
         val n = NotificationCompat.Builder(ctx, CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_launcher)
-            .setContentTitle("该喝水了")
+            .setContentTitle(L("该喝水了", "Time to hydrate"))
             .setContentText(text)
             .setStyle(NotificationCompat.BigTextStyle().bigText(text))
             .setContentIntent(pi)
@@ -86,7 +88,12 @@ object WaterReminder {
         val today = java.time.LocalDate.now().toString()
         val actual = db.dao().waterEntriesOn(today).sumOf { it.ml }.toInt()
         if (actual < shouldMl) {
-            val label = when (slot.endHour) {
+            val label = if (Lang.isEn) when (slot.endHour) {
+                11 -> "Morning (wake~11am)"
+                15 -> "Midday (11am~3pm)"
+                19 -> "Evening (3~7pm)"
+                else -> "Night (7~10pm)"
+            } else when (slot.endHour) {
                 11 -> "上午时段（起床~11点）"
                 15 -> "午后时段（11~15点）"
                 19 -> "傍晚时段（15~19点）"

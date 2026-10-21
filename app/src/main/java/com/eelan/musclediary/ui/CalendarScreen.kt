@@ -24,6 +24,9 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.eelan.musclediary.AppViewModel
+import com.eelan.musclediary.L
+import com.eelan.musclediary.dYM
+import com.eelan.musclediary.dMD
 import com.eelan.musclediary.domain.Calc
 import com.eelan.musclediary.ui.theme.*
 import java.time.LocalDate
@@ -41,20 +44,20 @@ fun CalendarSheet(vm: AppViewModel, onDismiss: () -> Unit) {
         Column(Modifier.padding(horizontal = 16.dp).padding(bottom = 24.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
                 IconButton(onClick = { month = month.minusMonths(1) }) {
-                    Icon(Icons.Default.ChevronLeft, "上个月", tint = TextLo)
+                    Icon(Icons.Default.ChevronLeft, L("上个月", "Previous month"), tint = TextLo)
                 }
                 Text(
-                    "${month.year}年${month.monthValue}月",
+                    dYM(month.year, month.monthValue),
                     fontSize = 16.sp, fontWeight = FontWeight.Bold, color = TextHi,
                     modifier = Modifier.weight(1f), textAlign = TextAlign.Center,
                 )
                 IconButton(onClick = { month = month.plusMonths(1) }) {
-                    Icon(Icons.Default.ChevronRight, "下个月", tint = TextLo)
+                    Icon(Icons.Default.ChevronRight, L("下个月", "Next month"), tint = TextLo)
                 }
             }
             if (selected != today) {
                 Text(
-                    "回到今天（${today.monthValue}月${today.dayOfMonth}日）",
+                    L("回到今天（", "Back to today (") + "${dMD(today.monthValue, today.dayOfMonth)})",
                     fontSize = 13.sp, color = Accent,
                     modifier = Modifier
                         .clickable { vm.selectDate(today); onDismiss() }
@@ -64,7 +67,7 @@ fun CalendarSheet(vm: AppViewModel, onDismiss: () -> Unit) {
 
             Spacer(Modifier.height(8.dp))
             Row(Modifier.fillMaxWidth()) {
-                listOf("一", "二", "三", "四", "五", "六", "日").forEach {
+                listOf(L("一", "Mo"), L("二", "Tu"), L("三", "We"), L("四", "Th"), L("五", "Fr"), L("六", "Sa"), L("日", "Su")).forEach {
                     Text(it, fontSize = 12.sp, color = TextLo, textAlign = TextAlign.Center,
                         modifier = Modifier.weight(1f))
                 }
@@ -99,10 +102,10 @@ fun CalendarSheet(vm: AppViewModel, onDismiss: () -> Unit) {
 
             Spacer(Modifier.height(8.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                LegendDot(Good, "全部达标")
-                LegendDot(Warn, "部分达标")
-                LegendDot(Ink3, "有记录未达标")
-                LegendDot(null, "无记录")
+                LegendDot(Good, L("全部达标", "All met"))
+                LegendDot(Warn, L("部分达标", "Partial"))
+                LegendDot(Ink3, L("有记录未达标", "Logged, not met"))
+                LegendDot(null, L("无记录", "No records"))
             }
         }
     }

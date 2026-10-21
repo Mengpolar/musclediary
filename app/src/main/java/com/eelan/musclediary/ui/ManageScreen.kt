@@ -18,6 +18,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.eelan.musclediary.AppViewModel
+import com.eelan.musclediary.L
+import com.eelan.musclediary.tagLabel
 import com.eelan.musclediary.data.ExerciseTemplate
 import com.eelan.musclediary.data.FoodTemplate
 import com.eelan.musclediary.data.QtyType
@@ -44,26 +46,26 @@ fun ManageTemplatesScreen(vm: AppViewModel, kind: Int, onClose: () -> Unit) {
 
     Column(Modifier.fillMaxSize().padding(horizontal = 16.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
-            IconButton(onClick = onClose) { Icon(Icons.Default.ArrowBack, "返回", tint = TextLo) }
+            IconButton(onClick = onClose) { Icon(Icons.Default.ArrowBack, L("返回", "Back"), tint = TextLo) }
             Text(
-                if (kind == 0) "食物模板管理" else "锻炼模板管理",
+                if (kind == 0) L("食物模板管理", "Food Templates") else L("锻炼模板管理", "Exercise Templates"),
                 fontSize = 16.sp, fontWeight = FontWeight.Bold, color = TextHi,
                 modifier = Modifier.weight(1f),
             )
             TextButton(onClick = {
                 vm.restoreBuiltins { }
-            }) { Text("补回内置", color = Accent, fontSize = 13.sp) }
+            }) { Text(L("补回内置", "Restore built-ins"), color = Accent, fontSize = 13.sp) }
         }
         Spacer(Modifier.height(4.dp))
         Text(
-            "共 ${filtered.size} 个 · 左滑可编辑或删除模板，历史记录不受影响",
+            L("共 ", "Total ") + "${filtered.size}" + L(" 个 · 左滑可编辑或删除模板，历史记录不受影响", " · swipe left to edit or delete; history unaffected"),
             fontSize = 12.sp, color = TextLo,
         )
         Spacer(Modifier.height(8.dp))
 
         OutlinedTextField(
             value = search, onValueChange = { search = it },
-            placeholder = { Text("搜索", color = TextLo) },
+            placeholder = { Text(L("搜索", "Search"), color = TextLo) },
             singleLine = true,
             colors = fieldColors(),
             modifier = Modifier.fillMaxWidth(),
@@ -73,7 +75,7 @@ fun ManageTemplatesScreen(vm: AppViewModel, kind: Int, onClose: () -> Unit) {
         TextButton(onClick = { if (kind == 0) addFood = true else addExercise = true }) {
             Icon(Icons.Default.Add, null, tint = Accent, modifier = Modifier.size(16.dp))
             Spacer(Modifier.width(4.dp))
-            Text("新增${if (kind == 0) "食物" else "动作"}", color = Accent, fontSize = 13.sp)
+            Text(L("新增", "New ") + (if (kind == 0) L("食物", "food") else L("动作", "exercise")), color = Accent, fontSize = 13.sp)
         }
 
         StackedColumn {
@@ -125,13 +127,13 @@ fun ManageTemplatesScreen(vm: AppViewModel, kind: Int, onClose: () -> Unit) {
         AlertDialog(
             onDismissRequest = { confirmDelete = null },
             containerColor = Ink2,
-            title = { Text("删除「${nameOf(t)}」？", color = TextHi, fontSize = 16.sp) },
-            text = { Text("只删除模板，已记录的历史数据保留。", fontSize = 13.sp, color = TextLo) },
+            title = { Text(L("删除「", "Delete [") + "${nameOf(t)}" + L("」", "]") + L("？", "?"), color = TextHi, fontSize = 16.sp) },
+            text = { Text(L("只删除模板，已记录的历史数据保留。", "Only the template is deleted; logged history is kept."), fontSize = 13.sp, color = TextLo) },
             confirmButton = {
                 TextButton(onClick = {
                     if (t is FoodTemplate) vm.deleteFoodTemplate(t) else vm.deleteExerciseTemplate(t as ExerciseTemplate)
                     confirmDelete = null
-                }) { Text("删除", color = MaterialTheme.colorScheme.error) }
+                }) { Text(L("删除", "Delete"), color = MaterialTheme.colorScheme.error) }
             },
             dismissButton = {
                 TextButton(onClick = { confirmDelete = null }) { Text("取消", color = TextLo) }
@@ -167,8 +169,8 @@ private fun ActionChip(label: String, color: Color, onClick: () -> Unit) {
 private fun FoodManageRow(t: FoodTemplate, onEdit: () -> Unit, onDelete: () -> Unit) {
     val unitInfo = if (t.unitName.isNotBlank() && t.unitGrams > 0) " · 1${t.unitName}=${fmt0(t.unitGrams)}g" else ""
     SwipeEntryRow(
-        title = t.name + if (t.isCustom) " · 自定义" else "",
-        detail = "蛋白${fmt1(t.protein)} 碳水${fmt1(t.carb)} 脂肪${fmt1(t.fat)}$unitInfo",
+        title = t.name + if (t.isCustom) L(" · 自定义", " · custom") else "",
+        detail = L("蛋白", "P") + "${fmt1(t.protein)} " + L("碳水", "C") + "${fmt1(t.carb)} " + L("脂肪", "F") + "${fmt1(t.fat)}$unitInfo",
         trailing = "${fmt0(t.kcal)} kcal",
         onEdit = onEdit,
         onDelete = onDelete,
@@ -178,8 +180,8 @@ private fun FoodManageRow(t: FoodTemplate, onEdit: () -> Unit, onDelete: () -> U
 @Composable
 private fun ExerciseManageRow(t: ExerciseTemplate, onEdit: () -> Unit, onDelete: () -> Unit) {
     SwipeEntryRow(
-        title = t.name + if (t.isCustom) " · 自定义" else "",
-        detail = "${Calc.unitLabel(t)} · MET ${fmt1(t.met)} · 主练${Muscle.labelOf(t.primaryMuscle)}",
+        title = t.name + if (t.isCustom) L(" · 自定义", " · custom") else "",
+        detail = "${Calc.unitLabel(t)} · MET ${fmt1(t.met)} · " + L("主练", "primary: ") + "${Muscle.labelOf(t.primaryMuscle)}",
         trailing = "MET ${fmt1(t.met)}",
         onEdit = onEdit,
         onDelete = onDelete,

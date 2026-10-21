@@ -2,6 +2,7 @@ package com.eelan.musclediary.domain
 
 import com.eelan.musclediary.data.ExerciseTemplate
 import com.eelan.musclediary.data.Profile
+import com.eelan.musclediary.L
 import com.eelan.musclediary.data.QtyType
 import kotlin.math.min
 
@@ -108,8 +109,8 @@ object Calc {
     }
 
     fun unitLabel(t: ExerciseTemplate): String = when (t.qtyType) {
-        QtyType.REPS -> "个"
-        QtyType.DISTANCE -> "公里"
-        QtyType.SECONDS -> "秒"
+        QtyType.REPS -> L("个", " reps")
+        QtyType.DISTANCE -> L("公里", "km")
+        QtyType.SECONDS -> L("秒", "s")
     }
 }

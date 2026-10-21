@@ -17,6 +17,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.eelan.musclediary.AppViewModel
+import com.eelan.musclediary.L
 import com.eelan.musclediary.data.WeightEntry
 import com.eelan.musclediary.domain.Calc
 import com.eelan.musclediary.ui.theme.*
@@ -29,17 +30,17 @@ fun WeightCard(vm: AppViewModel, onOpenRecords: () -> Unit = {}) {
     val entries = vm.weightEntries.sortedBy { it.date }
     val latest = entries.lastOrNull()
 
-    CardBox(title = "体重记录") {
+    CardBox(title = L("体重记录", "Weight")) {
         Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
                 Text(
-                    latest?.let { "最近 ${it.date.substring(5)} · ${fmt1(it.weightKg)} kg" }
-                        ?: "还没有记录",
+                    latest?.let { L("最近 ", "Latest ") + "${it.date.substring(5)} · ${fmt1(it.weightKg)} kg" }
+                        ?: L("还没有记录", "No records yet"),
                     fontSize = 12.sp, color = TextLo,
                 )
             }
             Text(
-                "＋ 记录今日体重", fontSize = 13.sp, color = Accent, fontWeight = FontWeight.Medium,
+                L("＋ 记录今日体重", "+ Log today's weight"), fontSize = 13.sp, color = Accent, fontWeight = FontWeight.Medium,
                 modifier = Modifier
                     .clickable { recordOpen = true }
                     .padding(start = 8.dp, top = 10.dp, bottom = 10.dp, end = 2.dp),
@@ -50,7 +51,7 @@ fun WeightCard(vm: AppViewModel, onOpenRecords: () -> Unit = {}) {
         if (entries.isNotEmpty()) {
             Spacer(Modifier.height(8.dp))
             Text(
-                "全部记录（${entries.size} 条）>",
+                L("全部记录（", "All records (") + "${entries.size}" + L(" 条）", ")") + ">",
                 fontSize = 12.sp, color = Accent,
                 modifier = Modifier
                     .clickable(onClick = onOpenRecords)
@@ -61,7 +62,7 @@ fun WeightCard(vm: AppViewModel, onOpenRecords: () -> Unit = {}) {
 
     if (recordOpen) {
         NumberDialog(
-            title = "记录今日体重", label = "公斤",
+            title = L("记录今日体重", "Log today's weight"), label = L("公斤", "kg"),
             initial = vm.profile.let { fmt1(it.weightKg) },
             onDismiss = { recordOpen = false },
             onConfirm = { vm.addWeight(it); recordOpen = false },
@@ -73,7 +74,7 @@ fun WeightCard(vm: AppViewModel, onOpenRecords: () -> Unit = {}) {
 @Composable
 fun BmiBar(bmi: Double, weightKg: Double, heightCm: Double) {
     val zone = Calc.bmiZone(bmi)
-    val zoneNames = listOf("偏瘦", "正常", "超重", "肥胖")
+    val zoneNames = listOf(L("偏瘦", "Under"), L("正常", "Normal"), L("超重", "Over"), L("肥胖", "Obese"))
     val zoneColors = listOf(Protein, Good, Warn, Color(0xFFEF5350))
     val bmiMin = 14.0
     val bmiMax = 36.0
@@ -91,7 +92,7 @@ fun BmiBar(bmi: Double, weightKg: Double, heightCm: Double) {
                 fontSize = 13.sp, color = zoneColors[zone],
             )
             Spacer(Modifier.weight(1f))
-            Text("体重 ${fmt1(weightKg)}kg · 身高 ${fmt1(heightCm)}cm",
+            Text(L("体重 ", "Wt ") + "${fmt1(weightKg)}kg · " + L("身高 ", "Ht ") + "${fmt1(heightCm)}cm",
                 fontSize = 12.sp, color = TextLo)
         }
         Spacer(Modifier.height(6.dp))
@@ -131,7 +132,7 @@ fun BmiBar(bmi: Double, weightKg: Double, heightCm: Double) {
 @Composable
 fun WeightChart(entries: List<WeightEntry>) {
     if (entries.isEmpty()) {
-        Text("记录 2 次后生成曲线", fontSize = 12.sp, color = TextLo)
+        Text(L("记录 2 次后生成曲线", "Chart appears after 2 entries"), fontSize = 12.sp, color = TextLo)
         return
     }
     val sorted = entries.sortedBy { it.date }

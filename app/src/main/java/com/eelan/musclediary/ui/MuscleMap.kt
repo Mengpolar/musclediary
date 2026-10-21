@@ -22,6 +22,7 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.eelan.musclediary.L
 import com.eelan.musclediary.domain.Muscle
 import com.eelan.musclediary.domain.Side
 import com.eelan.musclediary.ui.theme.Ink1
@@ -165,7 +166,7 @@ fun intensityColor(level: Int): Color = when (level) {
     else -> IdleColor
 }
 
-val intensityLabels = listOf("未锻炼", "轻度", "中度", "高强度")
+val intensityLabels = listOf(L("未锻炼", "Idle"), L("轻度", "Light"), L("中度", "Moderate"), L("高强度", "Intense"))
 
 @Composable
 fun MuscleMap(
@@ -193,18 +194,18 @@ fun MuscleMap(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Box(Modifier.size(8.dp).background(intensityColor(1), CircleShape))
-            Text("轻度", fontSize = 11.sp, color = TextLo, modifier = Modifier.padding(start = 3.dp, end = 10.dp))
+            Text(L("轻度", "Light"), fontSize = 11.sp, color = TextLo, modifier = Modifier.padding(start = 3.dp, end = 10.dp))
             Box(Modifier.size(8.dp).background(intensityColor(2), CircleShape))
-            Text("中度", fontSize = 11.sp, color = TextLo, modifier = Modifier.padding(start = 3.dp, end = 10.dp))
+            Text(L("中度", "Moderate"), fontSize = 11.sp, color = TextLo, modifier = Modifier.padding(start = 3.dp, end = 10.dp))
             Box(Modifier.size(8.dp).background(intensityColor(3), CircleShape))
-            Text("高强度", fontSize = 11.sp, color = TextLo, modifier = Modifier.padding(start = 3.dp))
+            Text(L("高强度", "Intense"), fontSize = 11.sp, color = TextLo, modifier = Modifier.padding(start = 3.dp))
         }
         Spacer(Modifier.height(4.dp))
         if (picked != null) {
             val score = scores[picked!!.id] ?: 0.0
             val level = intensityOf(score)
             Text(
-                "${picked!!.label} · ${intensityLabels[level]} · 刺激分 ${fmt1(score)}",
+                "${picked!!.label} · ${intensityLabels[level]} · " + L("刺激分 ", "score ") + "${fmt1(score)}",
                 fontSize = 13.sp, color = if (level == 0) TextHi else intensityColor(level),
                 modifier = Modifier.align(Alignment.CenterHorizontally)
                     .clip(RoundedCornerShape(8.dp))
@@ -212,7 +213,7 @@ fun MuscleMap(
             )
         } else {
             Text(
-                "点击肌肉部位查看当天刺激情况",
+                L("点击肌肉部位查看当天刺激情况", "Tap a muscle to see today's stimulus"),
                 fontSize = 12.sp, color = TextLo,
                 modifier = Modifier.align(Alignment.CenterHorizontally).padding(top = 4.dp),
             )
@@ -231,7 +232,7 @@ private fun MuscleView(
 ) {
     val shapes = if (side == Side.FRONT) frontShapes else backShapes
     Column(modifier, horizontalAlignment = Alignment.CenterHorizontally) {
-        Text(if (side == Side.FRONT) "正面" else "背面", fontSize = 12.sp, color = TextLo)
+        Text(if (side == Side.FRONT) L("正面", "Front") else L("背面", "Back"), fontSize = 12.sp, color = TextLo)
         Canvas(
             Modifier
                 .fillMaxSize()

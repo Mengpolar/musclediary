@@ -20,6 +20,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.eelan.musclediary.AppViewModel
+import com.eelan.musclediary.L
+import com.eelan.musclediary.dYM
+import com.eelan.musclediary.dMD
 import com.eelan.musclediary.data.ExerciseEntry
 import com.eelan.musclediary.data.ExerciseTemplate
 import com.eelan.musclediary.data.FoodEntry
@@ -48,17 +51,18 @@ fun RecordsScreen(vm: AppViewModel, kind: Int, onClose: () -> Unit) {
     var editingExercise by remember { mutableStateOf<ExerciseEntry?>(null) }
 
     val title = when (kind) {
-        0 -> "体重记录"; 1 -> "饮水记录"; 2 -> "饮食记录"; else -> "锻炼记录"
+        0 -> L("体重记录", "Weight Records"); 1 -> L("饮水记录", "Water Records")
+        2 -> L("饮食记录", "Food Records"); else -> L("锻炼记录", "Workout Records")
     }
 
     Column(Modifier.fillMaxSize().padding(horizontal = 16.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
-            IconButton(onClick = onClose) { Icon(Icons.Default.ArrowBack, "返回", tint = TextLo) }
+            IconButton(onClick = onClose) { Icon(Icons.Default.ArrowBack, L("返回", "Back"), tint = TextLo) }
             Text(title, fontSize = 16.sp, fontWeight = FontWeight.Bold, color = TextHi, modifier = Modifier.weight(1f))
         }
         OutlinedTextField(
             value = search, onValueChange = { search = it },
-            placeholder = { Text("搜索日期（如 10-16 或 2026-10）", color = TextLo) },
+            placeholder = { Text(L("搜索日期（如 10-16 或 2026-10）", "Search date (e.g. 10-16 or 2026-10)"), color = TextLo) },
             singleLine = true, colors = fieldColors(), modifier = Modifier.fillMaxWidth(),
         )
         Spacer(Modifier.height(8.dp))
@@ -78,15 +82,15 @@ fun RecordsScreen(vm: AppViewModel, kind: Int, onClose: () -> Unit) {
 
     pendingDelete?.let { entry ->
         val name = when (entry) {
-            is WeightEntry -> "${entry.date} 体重 ${fmt1(entry.weightKg)}kg"
-            is WaterEntry -> "${entry.date} 饮水 ${fmt0(entry.ml)}ml"
+            is WeightEntry -> "${entry.date} " + L("体重", "weight") + " ${fmt1(entry.weightKg)}kg"
+            is WaterEntry -> "${entry.date} " + L("饮水", "water") + " ${fmt0(entry.ml)}ml"
             is FoodEntry -> "${entry.date} ${entry.name}"
             else -> (entry as ExerciseEntry).let { "${entry.date} ${it.name}" }
         }
         AlertDialog(
             onDismissRequest = { pendingDelete = null },
             containerColor = Ink2,
-            title = { Text("删除这条记录？", color = TextHi, fontSize = 16.sp) },
+            title = { Text(L("删除这条记录？", "Delete this record?"), color = TextHi, fontSize = 16.sp) },
             text = { Text(name, color = TextLo, fontSize = 13.sp) },
             confirmButton = {
                 TextButton(onClick = {
@@ -97,7 +101,7 @@ fun RecordsScreen(vm: AppViewModel, kind: Int, onClose: () -> Unit) {
                         is ExerciseEntry -> vm.deleteExercise(entry)
                     }
                     pendingDelete = null
-                }) { Text("删除", color = Color(0xFFEF5350)) }
+                }) { Text(L("删除", "Delete"), color = Color(0xFFEF5350)) }
             },
             dismissButton = {
                 TextButton(onClick = { pendingDelete = null }) { Text("取消", color = TextLo) }
@@ -107,14 +111,14 @@ fun RecordsScreen(vm: AppViewModel, kind: Int, onClose: () -> Unit) {
 
     editingWeight?.let { e ->
         NumberDialog(
-            title = "修改体重（${e.date}）", label = "公斤", initial = fmt1(e.weightKg),
+            title = L("修改体重（", "Edit weight (") + "${e.date})", label = L("公斤", "kg"), initial = fmt1(e.weightKg),
             onDismiss = { editingWeight = null },
             onConfirm = { v -> vm.updateWeight(e, v); editingWeight = null },
         )
     }
     editingWater?.let { e ->
         NumberDialog(
-            title = "修改饮水量（${e.date}）", label = "毫升", initial = fmt0(e.ml),
+            title = L("修改饮水量（", "Edit water (") + "${e.date})", label = L("毫升", "ml"), initial = fmt0(e.ml),
             onDismiss = { editingWater = null },
             onConfirm = { v -> vm.updateWater(e, v); editingWater = null },
         )
@@ -150,8 +154,8 @@ fun RecordsScreen(vm: AppViewModel, kind: Int, onClose: () -> Unit) {
 private fun qtyLabel(e: ExerciseEntry, templates: List<ExerciseTemplate>): String {
     val unit = templates.firstOrNull { it.id == e.templateId }
         ?.let { Calc.unitLabel(it) }
-        ?: if (e.name.contains("跑") || e.name.contains("步") || e.name.contains("骑")) "公里" else "数量"
-    return if (unit == "数量") "数量" else "数量（$unit）"
+        ?: if (e.name.contains("跑") || e.name.contains("步") || e.name.contains("骑")) L("公里", "km") else L("数量", "qty")
+    return if (unit == L("数量", "qty")) L("数量", "qty") else L("数量（", "Qty (") + "$unit)"
 }
 
 /** 分类型渲染正文（体重/饮水/饮食/锻炼各自实现分组与统计） */
@@ -182,8 +186,8 @@ private fun RecordsBody(
                     val prevAvg = prevMonthEs.map { it.weightKg }.average()
                     val delta = if (prevMonthEs.isNotEmpty()) avg - prevAvg else null
                     GroupHeader(
-                        "${month.year}年${month.monthValue}月 · ${es.size} 条",
-                        "均值 ${fmt1(avg)} kg" + delta?.let { d -> " · 环比 ${if (d >= 0) "+" else "−"}${fmt1(kotlin.math.abs(d))} kg" }.orEmpty(),
+                        "${dYM(month.year, month.monthValue)} · ${es.size} " + L("条", ""),
+                        L("均值 ", "avg ") + "${fmt1(avg)} kg" + delta?.let { d -> " · " + L("环比", "vs prev") + " ${if (d >= 0) "+" else "-"}${fmt1(kotlin.math.abs(d))} kg" }.orEmpty(),
                     )
                     es.forEach { e ->
                         val prev = vm.weightEntries.filter { it.date < e.date }.maxByOrNull { it.date }
@@ -192,7 +196,7 @@ private fun RecordsBody(
                         Box(Modifier.stackApproach()) {
                             SwipeEntryRow(
                                 "${e.date.substring(5)} · ${fmt1(e.weightKg)} kg",
-                                d?.let { x -> "较上次 ${if (x >= 0) "+" else "−"}${fmt1(kotlin.math.abs(x))} kg" } ?: "首次记录",
+                                d?.let { x -> L("较上次 ", "vs last ") + "${if (x >= 0) "+" else "-"}${fmt1(kotlin.math.abs(x))} kg" } ?: L("首次记录", "first entry"),
                                 "${fmt1(e.weightKg)} kg",
                                 onEdit = { onEdit(e) },
                                 onDelete = { onDelete(e) },
@@ -201,7 +205,7 @@ private fun RecordsBody(
                         }
                     }
                 }
-                if (byMonth.isEmpty()) EmptyText("没有匹配的记录")
+                if (byMonth.isEmpty()) EmptyText(L("没有匹配的记录", "No matching records"))
             }
         }
         1 -> {
@@ -226,8 +230,8 @@ private fun RecordsBody(
                     }
                     val days = lastCounted.dayOfMonth.coerceAtLeast(1)
                     GroupHeader(
-                        "${month.year}年${month.monthValue}月",
-                        "日均 ${fmt0(avg)} ml · 达标 $okDays/$days 天",
+                        dYM(month.year, month.monthValue),
+                        L("日均 ", "daily avg ") + "${fmt0(avg)} ml · " + L("达标 ", "goal met ") + "$okDays/$days" + L(" 天", " days"),
                     )
                     byDay.filterKeys { YearMonth.from(LocalDate.parse(it)) == month }.forEach { (day, es) ->
                         val total = es.sumOf { it.ml }
@@ -249,7 +253,7 @@ private fun RecordsBody(
                             Box(Modifier.stackApproach()) {
                                 SwipeEntryRow(
                                     String.format("%02d:%02d", t.hour, t.minute),
-                                    "饮水",
+                                    L("饮水", "Water"),
                                     "+${fmt0(e.ml)} ml",
                                     onEdit = { onEdit(e) },
                                     onDelete = { onDelete(e) },
@@ -259,7 +263,7 @@ private fun RecordsBody(
                         }
                     }
                 }
-                if (byMonth.isEmpty()) EmptyText("没有匹配的记录")
+                if (byMonth.isEmpty()) EmptyText(L("没有匹配的记录", "No matching records"))
             }
         }
         2 -> {
@@ -272,8 +276,8 @@ private fun RecordsBody(
                 byMonth.forEach { (month, es) ->
                     val days = es.map { it.date }.distinct().size.coerceAtLeast(1)
                     val avgKcal = es.sumOf { it.kcal } / days
-                    GroupHeader("${month.year}年${month.monthValue}月 · ${es.size} 条",
-                        "日均 ${fmt0(avgKcal)} kcal")
+                    GroupHeader("${dYM(month.year, month.monthValue)} · ${es.size} " + L("条", ""),
+                        L("日均 ", "daily avg ") + "${fmt0(avgKcal)} kcal")
                     es.forEach { e ->
                         key(e.id) {
                         Box(Modifier.stackApproach()) {
@@ -288,7 +292,7 @@ private fun RecordsBody(
                         }
                     }
                 }
-                if (byMonth.isEmpty()) EmptyText("没有匹配的记录")
+                if (byMonth.isEmpty()) EmptyText(L("没有匹配的记录", "No matching records"))
             }
         }
         else -> {
@@ -299,14 +303,14 @@ private fun RecordsBody(
                 .toSortedMap(compareByDescending { it })
             StackedColumn {
                 byMonth.forEach { (month, es) ->
-                    GroupHeader("${month.year}年${month.monthValue}月 · ${es.size} 条",
-                        "合计 ${fmt0(es.sumOf { it.calories })} kcal")
+                    GroupHeader("${dYM(month.year, month.monthValue)} · ${es.size} " + L("条", ""),
+                        L("合计 ", "total ") + "${fmt0(es.sumOf { it.calories })} kcal")
                     es.forEach { e ->
                         key(e.id) {
                         Box(Modifier.stackApproach()) {
                             SwipeEntryRow(
                                 e.name,
-                                "${e.date.substring(5)} · ${fmt0(e.calories)} kcal · ${fmt1(e.minutes)} 分钟",
+                                "${e.date.substring(5)} · ${fmt0(e.calories)} kcal · ${fmt1(e.minutes)} " + L("分钟", "min"),
                                 "${fmt0(e.calories)} kcal",
                                 onEdit = { onEdit(e) },
                                 onDelete = { onDelete(e) },
@@ -315,7 +319,7 @@ private fun RecordsBody(
                         }
                     }
                 }
-                if (byMonth.isEmpty()) EmptyText("没有匹配的记录")
+                if (byMonth.isEmpty()) EmptyText(L("没有匹配的记录", "No matching records"))
             }
         }
     }

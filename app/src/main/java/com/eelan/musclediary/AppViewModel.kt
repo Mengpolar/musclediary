@@ -48,6 +48,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             if (dao.foodTemplateCount() == 0) dao.insertFoodTemplates(FoodSeed.items)
             if (dao.exerciseTemplateCount() == 0) dao.insertExerciseTemplates(ExerciseSeed.items)
             profile = dao.getProfile() ?: Profile().also { dao.upsertProfile(it) }
+            // 同步语言偏好到全局（切换语言后所有 L() 取词自动刷新）
+            Lang.set(profile.lang)
             // 老版本升级：盈余数值对齐新模式区间（增肌 200~300 / 减脂 −300~−500）
             if (profile.surplusKcal > 300) profile = profile.copy(surplusKcal = 250.0)
             // 内置食物数据源升级：重建内置模板（自定义模板与历史记录不受影响）
@@ -100,6 +102,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     fun updateProfile(p: Profile) {
         profile = p
+        Lang.set(p.lang)
         viewModelScope.launch(Dispatchers.IO) { dao.upsertProfile(p) }
     }
 
@@ -112,7 +115,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             dao.insertWeightEntry(e)
             dao.upsertProfile(updated)
             val list = dao.allWeightEntries()
-            withContext(Dispatchers.Main) { weightEntries = list; profile = updated }
+            withContext(Dispatchers.Main) { weightEntries = list; profile = updated; Lang.set(updated.lang) }
         }
     }
 

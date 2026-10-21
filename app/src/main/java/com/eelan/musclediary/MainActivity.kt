@@ -78,7 +78,7 @@ fun AppRoot(vm: AppViewModel) {
     var tab by remember { mutableIntStateOf(0) }
     var manage by remember { mutableIntStateOf(-1) } // -1 无；0 食物模板管理；1 锻炼模板管理
     var records by remember { mutableIntStateOf(-1) } // -1 无；0 体重；1 饮水；2 饮食；3 锻炼 记录历史页
-    val tabs = listOf("今日", "饮食", "锻炼", "我的")
+    val tabs = listOf(L("今日", "Today"), L("饮食", "Diet"), L("锻炼", "Workout"), L("我的", "Me"))
 
     Scaffold(
         containerColor = Ink0,

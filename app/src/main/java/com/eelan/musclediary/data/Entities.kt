@@ -17,6 +17,7 @@ data class Profile(
     val setupDone: Int = 0, // 0 未完成首次引导
     val waterReminder: Int = 1, // 0 关 / 1 开（需系统通知权限）
     val voiceId: String = "default", // 旧训练模式遗留字段，已废弃
+    val lang: Int = 0, // 界面语言：0 中文 / 1 English
 )
 
 /** 每日体重记录（每天最多一条，不必天天记） */
@@ -226,7 +227,7 @@ interface AppDao {
 @Database(
     entities = [Profile::class, FoodTemplate::class, FoodEntry::class,
         ExerciseTemplate::class, ExerciseEntry::class, WeightEntry::class, WaterEntry::class],
-    version = 7,
+    version = 8,
     exportSchema = false,
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -307,11 +308,19 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        val MIGRATION_7_8 = object : androidx.room.migration.Migration(7, 8) {
+            override fun migrate(db: androidx.sqlite.db.SupportSQLiteDatabase) {
+                // 界面语言偏好（0 中文 / 1 English）
+                db.execSQL("ALTER TABLE `profile` ADD COLUMN `lang` INTEGER NOT NULL DEFAULT 0")
+            }
+        }
+
         fun get(ctx: Context): AppDatabase =
             inst ?: synchronized(this) {
                 inst ?: Room.databaseBuilder(
                     ctx.applicationContext, AppDatabase::class.java, "musclediary.db"
-                ).addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7)
+                ).addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6,
+                    MIGRATION_6_7, MIGRATION_7_8)
                     .build().also { inst = it }
             }
     }

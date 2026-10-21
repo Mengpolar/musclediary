@@ -19,6 +19,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.eelan.musclediary.data.FoodTemplate
+import com.eelan.musclediary.L
 import com.eelan.musclediary.ui.theme.*
 
 /**
@@ -37,7 +38,7 @@ fun FoodGramsDialog(
     onConfirm: (Double) -> Unit,
 ) {
     val hasUnit = template != null && template.unitName.isNotBlank() && template.unitGrams > 0
-    val unitName = template?.unitName?.ifBlank { "份" } ?: "份"
+    val unitName = template?.unitName?.ifBlank { L("份", "serving") } ?: L("份", "serving")
 
     var gramsText by remember { mutableStateOf(fmt1(initialGrams)) }
     var unitText by remember {
@@ -59,7 +60,7 @@ fun FoodGramsDialog(
                                 unitText = v
                                 v.toDoubleOrNull()?.let { u -> gramsText = fmt1(u * template!!.unitGrams) }
                             },
-                            label = { Text("吃了多少$unitName？", color = TextLo) },
+                            label = { Text(L("吃了多少", "How many ") + "$unitName" + L("？", "?"), color = TextLo) },
                             singleLine = true,
                             keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
                                 keyboardType = KeyboardType.Decimal),
@@ -76,7 +77,7 @@ fun FoodGramsDialog(
                             v.toDoubleOrNull()?.let { g -> unitText = fmt1(g / template!!.unitGrams) }
                         }
                     },
-                    label = { Text(if (hasUnit) "或输入克数 g" else "克数", color = TextLo) },
+                    label = { Text(if (hasUnit) L("或输入克数 g", "or grams") else L("克数", "Grams"), color = TextLo) },
                     singleLine = true,
                     keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
                         keyboardType = KeyboardType.Decimal),
@@ -101,8 +102,8 @@ fun FoodGramsDialog(
                 if (valid && template != null) {
                     val k = grams!! / 100.0
                     Text(
-                        "蛋白${fmt1(template.protein * k)}g · 碳水${fmt1(template.carb * k)}g · " +
-                                "脂肪${fmt1(template.fat * k)}g · ${fmt0(template.kcal * k)} kcal",
+                        L("蛋白", "P") + "${fmt1(template.protein * k)}g · " + L("碳水", "C") + "${fmt1(template.carb * k)}g · " +
+                                L("脂肪", "F") + "${fmt1(template.fat * k)}g · ${fmt0(template.kcal * k)} kcal",
                         color = Accent, fontSize = 13.sp,
                     )
                 }
@@ -113,7 +114,7 @@ fun FoodGramsDialog(
                 onConfirm(grams!!); onDismiss()
             }) { Text(confirmText, color = if (valid) Accent else TextLo) }
         },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("取消", color = TextLo) } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(L("取消", "Cancel"), color = TextLo) } },
     )
 }
 
@@ -127,7 +128,7 @@ fun FoodEditDialog(
     onConfirm: (Double) -> Unit,
 ) {
     FoodGramsDialog(
-        title = "修改「$entryName」",
+        title = L("修改「", "Edit [") + "$entryName" + L("」", "]"),
         template = template,
         initialGrams = currentGrams,
         onDismiss = onDismiss,

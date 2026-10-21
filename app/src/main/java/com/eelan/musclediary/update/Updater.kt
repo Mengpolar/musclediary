@@ -16,11 +16,19 @@ object Updater {
     const val REPO = "Mengpolar/musclediary"
     const val RELEASES_URL = "https://github.com/$REPO/releases"
 
+    /** 更新源：0 GitHub 官方 / 1 gh-proxy.com 加速代理（https://gh-proxy.com/docs/github-accelerator） */
+    const val SRC_OFFICIAL = 0
+    const val SRC_PROXY = 1
+
     data class UpdateInfo(val version: String, val notes: String, val apkUrl: String, val sizeBytes: Long, val sha256: String)
 
+    /** 按更新源包装 URL：官方直连原样返回；代理源在完整 URL 前拼接 https://gh-proxy.com/ 前缀 */
+    fun srcUrl(url: String, source: Int): String =
+        if (source == SRC_PROXY) "https://gh-proxy.com/$url" else url
+
     /** 查询最新版本；无更新返回 null；网络失败抛异常由调用方提示 */
-    suspend fun check(currentVersion: String): UpdateInfo? = withContext(Dispatchers.IO) {
-        val json = httpGet("https://api.github.com/repos/$REPO/releases/latest")
+    suspend fun check(currentVersion: String, source: Int = SRC_OFFICIAL): UpdateInfo? = withContext(Dispatchers.IO) {
+        val json = httpGet(srcUrl("https://api.github.com/repos/$REPO/releases/latest", source))
         val obj = JSONObject(json)
         val tag = obj.optString("tag_name").removePrefix("v")
         if (tag.isEmpty()) throw IllegalStateException("仓库还没有发布过 Release")
@@ -41,11 +49,11 @@ object Updater {
         else -> "$bytes B"
     }
 
-    suspend fun downloadApk(ctx: Context, url: String, onProgress: (Int) -> Unit): File =
+    suspend fun downloadApk(ctx: Context, url: String, onProgress: (Int) -> Unit, source: Int = SRC_OFFICIAL): File =
         withContext(Dispatchers.IO) {
             val dir = File(ctx.cacheDir, "apks").apply { mkdirs() }
             val out = File(dir, "update.apk")
-            val conn = URL(url).openConnection() as HttpURLConnection
+            val conn = URL(srcUrl(url, source)).openConnection() as HttpURLConnection
             conn.connectTimeout = 15000
             conn.readTimeout = 30000
             conn.instanceFollowRedirects = true

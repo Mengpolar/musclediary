@@ -13,6 +13,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.eelan.musclediary.AppViewModel
+import com.eelan.musclediary.L
 import com.eelan.musclediary.ui.theme.*
 
 /** 首次启动引导：填写性别/年龄/身高/体重，避免用默认值算错目标 */
@@ -37,28 +38,28 @@ fun SetupScreen(vm: AppViewModel) {
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         Spacer(Modifier.height(48.dp))
-        Text("欢迎使用增肌日记", fontSize = 24.sp, fontWeight = FontWeight.Bold, color = TextHi)
+        Text(L("欢迎使用增肌日记", "Welcome to Muscle Diary"), fontSize = 24.sp, fontWeight = FontWeight.Bold, color = TextHi)
         Spacer(Modifier.height(8.dp))
-        Text("先填一下身体数据，热量和营养目标才能算得准", fontSize = 13.sp, color = TextLo)
+        Text(L("先填一下身体数据，热量和营养目标才能算得准", "Enter your body stats so calorie & macro targets are accurate"), fontSize = 13.sp, color = TextLo)
         Spacer(Modifier.height(32.dp))
 
         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
-            Text("性别", fontSize = 14.sp, color = TextHi, modifier = Modifier.weight(1f))
+            Text(L("性别", "Sex"), fontSize = 14.sp, color = TextHi, modifier = Modifier.weight(1f))
             FilterChip(
-                selected = male, onClick = { male = true }, label = { Text("男") },
+                selected = male, onClick = { male = true }, label = { Text(L("男", "Male")) },
                 colors = FilterChipDefaults.filterChipColors(selectedContainerColor = Accent.copy(alpha = 0.35f)),
             )
             Spacer(Modifier.width(8.dp))
             FilterChip(
-                selected = !male, onClick = { male = false }, label = { Text("女") },
+                selected = !male, onClick = { male = false }, label = { Text(L("女", "Female")) },
                 colors = FilterChipDefaults.filterChipColors(selectedContainerColor = Accent.copy(alpha = 0.35f)),
             )
         }
         Spacer(Modifier.height(16.dp))
 
-        SetupField("年龄（岁）", age) { age = it }
-        SetupField("身高（cm）", height) { height = it }
-        SetupField("体重（kg）", weight) { weight = it }
+        SetupField(L("年龄（岁）", "Age (years)"), age) { age = it }
+        SetupField(L("身高（cm）", "Height (cm)"), height) { height = it }
+        SetupField(L("体重（kg）", "Weight (kg)"), weight) { weight = it }
 
         Spacer(Modifier.height(32.dp))
         Button(
@@ -72,9 +73,9 @@ fun SetupScreen(vm: AppViewModel) {
             },
             colors = ButtonDefaults.buttonColors(containerColor = Accent, contentColor = Ink0),
             modifier = Modifier.fillMaxWidth().height(48.dp),
-        ) { Text("开始使用", fontSize = 16.sp, fontWeight = FontWeight.Bold) }
+        ) { Text(L("开始使用", "Get started"), fontSize = 16.sp, fontWeight = FontWeight.Bold) }
         Spacer(Modifier.height(24.dp))
-        Text("这些数据之后可以在「我的」页随时修改", fontSize = 12.sp, color = TextLo)
+        Text(L("这些数据之后可以在「我的」页随时修改", "You can edit these anytime on the Me tab"), fontSize = 12.sp, color = TextLo)
     }
 }
 

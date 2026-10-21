@@ -25,6 +25,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.eelan.musclediary.AppViewModel
+import com.eelan.musclediary.L
 import com.eelan.musclediary.data.ExerciseTemplate
 import com.eelan.musclediary.data.QtyType
 import com.eelan.musclediary.domain.Calc
@@ -65,7 +66,7 @@ fun WorkoutScreen(vm: AppViewModel, onOpenWeightRecords: () -> Unit = {}, onOpen
                 containerColor = Accent,
                 modifier = Modifier.padding(bottom = 6.dp),
             ) {
-                Icon(Icons.Default.Add, "添加锻炼", tint = Ink0)
+                Icon(Icons.Default.Add, L("添加锻炼", "Add exercise"), tint = Ink0)
             }
         },
     ) { pad ->
@@ -76,7 +77,7 @@ fun WorkoutScreen(vm: AppViewModel, onOpenWeightRecords: () -> Unit = {}, onOpen
             DateHeader(vm, onOpenCalendar = { showCalendar = true })
             Spacer(Modifier.height(8.dp))
             CardBox {
-                Text("肌肉概览", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = TextHi)
+                Text(L("肌肉概览", "Muscle map"), fontSize = 14.sp, fontWeight = FontWeight.Bold, color = TextHi)
                 Spacer(Modifier.height(4.dp))
                 MuscleMap(scores, { Calc.intensity(it) }, onPick = { })
             }
@@ -89,9 +90,9 @@ fun WorkoutScreen(vm: AppViewModel, onOpenWeightRecords: () -> Unit = {}, onOpen
             }
             Spacer(Modifier.height(12.dp))
             WeightCard(vm, onOpenRecords = onOpenWeightRecords)
-            SectionTitle("消耗统计")
+            SectionTitle(L("消耗统计", "Calories Burned"))
             if (entries.isEmpty()) {
-                Text("当天还没有锻炼记录", fontSize = 12.sp, color = TextLo)
+                Text(L("当天还没有锻炼记录", "No exercise recorded for this day"), fontSize = 12.sp, color = TextLo)
             } else {
                 CardBox {
                     // 同名动作合并为一条统计项，n 为该动作当天记录条数
@@ -133,12 +134,12 @@ fun WorkoutScreen(vm: AppViewModel, onOpenWeightRecords: () -> Unit = {}, onOpen
                 }
             }
 
-            SectionTitleRow("锻炼记录（${entries.size}）", "全部 >", onMore = onOpenRecords)
+            SectionTitleRow(L("锻炼记录（", "Workout records (") + "${entries.size})", L("全部 >", "All >"), onMore = onOpenRecords)
             if (entries.isEmpty()) {
                 EmptyState(
                     icon = Icons.Default.FitnessCenter,
-                    text = "今天还没练，选个动作开始记录",
-                    actionText = "添加锻炼",
+                    text = L("今天还没练，选个动作开始记录", "No workout yet - pick an exercise to log"),
+                    actionText = L("添加锻炼", "Add exercise"),
                     onAction = { pickOpen = true },
                 )
             } else {
@@ -201,10 +202,10 @@ fun WorkoutScreen(vm: AppViewModel, onOpenWeightRecords: () -> Unit = {}, onOpen
     editingEntry?.let { e ->
         val unit = vm.exerciseTemplates.firstOrNull { it.id == e.templateId }
             ?.let { Calc.unitLabel(it) }
-            ?: if (e.name.contains("跑") || e.name.contains("步") || e.name.contains("骑")) "公里" else "数量"
+            ?: if (e.name.contains("跑") || e.name.contains("步") || e.name.contains("骑")) L("公里", "km") else L("数量", "qty")
         NumberDialog(
-            title = "修改「${e.name}」",
-            label = if (unit == "数量") "数量" else "数量（$unit）",
+            title = L("修改「", "Edit 「") + "${e.name}" + L("」", "」"),
+            label = if (unit == L("数量", "qty")) L("数量", "qty") else L("数量（", "Qty (") + "$unit)",
             initial = fmt1(e.qty),
             onDismiss = { editingEntry = null },
             onConfirm = { qty -> vm.updateExerciseEntry(e, qty); editingEntry = null },
@@ -227,17 +228,17 @@ private fun workoutDetail(e: com.eelan.musclediary.data.ExerciseEntry, templates
     // 模板可能已被删，找不到时按名称兜底
     val unit = templates.firstOrNull { it.id == e.templateId }
         ?.let { Calc.unitLabel(it) }
-        ?: if (e.name.contains("跑") || e.name.contains("步") || e.name.contains("骑")) "公里" else "个"
+        ?: if (e.name.contains("跑") || e.name.contains("步") || e.name.contains("骑")) L("公里", "km") else L("个", " reps")
     val qty = when {
-        e.weightKg > 0 -> "${fmt1(e.qty)}个×${fmt1(e.weightKg)}kg"
+        e.weightKg > 0 -> "${fmt1(e.qty)}" + L("个", " reps") + "x${fmt1(e.weightKg)}kg"
         else -> "${fmt1(e.qty)}$unit"
     }
     val muscles = runCatching {
         JSONObject(e.musclesJson).keys().asSequence().toList()
             .sortedByDescending { JSONObject(e.musclesJson).optDouble(it, 0.0) }
-            .take(2).joinToString("、") { Muscle.labelOf(it) }
+            .take(2).joinToString(", ") { Muscle.labelOf(it) }
     }.getOrDefault("")
-    return "$qty · ${fmt1(e.minutes)} 分钟" + if (muscles.isNotBlank()) " · $muscles" else ""
+    return "$qty · ${fmt1(e.minutes)} " + L("分钟", "min") + if (muscles.isNotBlank()) " · $muscles" else ""
 }
 
 @Composable
@@ -251,12 +252,12 @@ private fun ExercisePickerDialog(
     AlertDialog(
         onDismissRequest = onDismiss,
         containerColor = Ink2,
-        title = { Text("选择锻炼", color = TextHi, fontSize = 16.sp) },
+        title = { Text(L("选择锻炼", "Pick an exercise"), color = TextHi, fontSize = 16.sp) },
         text = {
             Column {
                 OutlinedTextField(
                     value = search, onValueChange = { search = it },
-                    placeholder = { Text("搜索", color = TextLo) },
+                    placeholder = { Text(L("搜索", "Search"), color = TextLo) },
                     singleLine = true, colors = com.eelan.musclediary.ui.fieldColors(),
                 )
                 Spacer(Modifier.height(8.dp))
@@ -271,11 +272,11 @@ private fun ExercisePickerDialog(
                             Column(Modifier.weight(1f)) {
                                 Text(t.name, color = TextHi, fontSize = 14.sp)
                                 Text(
-                                    "主练${Muscle.labelOf(t.primaryMuscle)} · ${
+                                    L("主练", "Primary: ") + "${Muscle.labelOf(t.primaryMuscle)} · ${
                                         when (t.qtyType) {
-                                            QtyType.REPS -> "按次"
-                                            QtyType.DISTANCE -> "按公里"
-                                            QtyType.SECONDS -> "按秒"
+                                            QtyType.REPS -> L("按次", "reps")
+                                            QtyType.DISTANCE -> L("按公里", "km")
+                                            QtyType.SECONDS -> L("按秒", "sec")
                                         }
                                     }",
                                     color = TextLo, fontSize = 12.sp,
@@ -285,7 +286,7 @@ private fun ExercisePickerDialog(
                         }
                     }
                 }
-                TextButton(onClick = onCustom) { Text("＋ 新建自定义动作", color = Accent, fontSize = 13.sp) }
+                TextButton(onClick = onCustom) { Text(L("＋ 新建自定义动作", "+ New custom exercise"), color = Accent, fontSize = 13.sp) }
             }
         },
         confirmButton = {},
@@ -320,7 +321,7 @@ private fun WorkoutQtyDialog(
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 OutlinedTextField(
                     value = qty, onValueChange = { qty = it },
-                    label = { Text(if (unitLabel == "个") "做了多少个？" else if (unitLabel == "公里") "多少公里？" else "坚持了多少秒？", color = TextLo) },
+                    label = { Text(if (unitLabel == "个") L("做了多少个？", "How many reps?") else if (unitLabel == "公里") L("多少公里？", "How many km?") else L("坚持了多少秒？", "How many seconds?"), color = TextLo) },
                     singleLine = true,
                     keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = KeyboardType.Decimal),
                     colors = com.eelan.musclediary.ui.fieldColors(),
@@ -328,7 +329,7 @@ private fun WorkoutQtyDialog(
                 if (template.name.contains("哑铃")) {
                     OutlinedTextField(
                         value = weight, onValueChange = { weight = it },
-                        label = { Text("哑铃单只重量 kg（可选）", color = TextLo) },
+                        label = { Text(L("哑铃单只重量 kg（可选）", "Dumbbell weight kg (optional)"), color = TextLo) },
                         singleLine = true,
                         keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = KeyboardType.Decimal),
                         colors = com.eelan.musclediary.ui.fieldColors(),
@@ -337,15 +338,15 @@ private fun WorkoutQtyDialog(
                 // 最近 3 次记录（去重）：点击直接填入
                 QuickChips(
                     chips = recent.map { (qty0, w0) ->
-                        val base = if (unitLabel == "公里") "${fmt1(qty0)}公里"
-                            else if (unitLabel == "秒") "${fmt0(qty0)}秒"
-                            else "${fmt0(qty0)}个"
-                        if (w0 > 0) "$base（×${fmt1(w0)}kg）" else base
+                        val base = if (unitLabel == "公里") "${fmt1(qty0)}" + L("公里", "km")
+                            else if (unitLabel == "秒") "${fmt0(qty0)}" + L("秒", "s")
+                            else "${fmt0(qty0)}" + L("个", " reps")
+                        if (w0 > 0) "$base(x${fmt1(w0)}kg)" else base
                     },
                     onPick = { c ->
                         // 形如 "40个（×10kg）" / "40个" / "5公里"
                         val w = Regex("×([0-9.]+)kg").find(c)?.groupValues?.get(1)?.toDoubleOrNull()
-                        val base = c.substringBefore("（")
+                        val base = c.substringBefore("(").substringBefore("（")
                         val num = Regex("^([0-9.]+)").find(base)?.groupValues?.get(1)?.toDoubleOrNull()
                         num?.let { qty = fmt1(it) }
                         if (w != null) weight = fmt1(w)
@@ -353,7 +354,7 @@ private fun WorkoutQtyDialog(
                 )
                 if (preview != null) {
                     Text(
-                        "预计消耗 ${fmt0(preview.first)} kcal · ${fmt1(preview.second)} 分钟 · 主练${Muscle.labelOf(template.primaryMuscle)}",
+                        L("预计消耗 ", "Est. burn ") + "${fmt0(preview.first)} kcal · ${fmt1(preview.second)} " + L("分钟", "min") + " · " + L("主练", "primary: ") + "${Muscle.labelOf(template.primaryMuscle)}",
                         color = Accent, fontSize = 13.sp,
                     )
                 }
@@ -362,9 +363,9 @@ private fun WorkoutQtyDialog(
         confirmButton = {
             TextButton(enabled = valid, onClick = {
                 onConfirm(q!!, weight.toDoubleOrNull() ?: 0.0)
-            }) { Text("记录", color = if (valid) Accent else TextLo) }
+            }) { Text(L("记录", "Log"), color = if (valid) Accent else TextLo) }
         },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("取消", color = TextLo) } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(L("取消", "Cancel"), color = TextLo) } },
     )
 }
 
@@ -391,40 +392,40 @@ fun CustomExerciseDialog(
     AlertDialog(
         onDismissRequest = onDismiss,
         containerColor = Ink2,
-        title = { Text(if (initial == null) "自定义动作" else "修改「${initial.name}」", color = TextHi, fontSize = 16.sp) },
+        title = { Text(if (initial == null) L("自定义动作", "Custom exercise") else L("修改「", "Edit [") + "${initial.name}" + L("」", "]"), color = TextHi, fontSize = 16.sp) },
         text = {
             Column(
                 verticalArrangement = Arrangement.spacedBy(8.dp),
                 modifier = Modifier.verticalScroll(rememberScrollState()),
             ) {
                 OutlinedTextField(value = name, onValueChange = { name = it },
-                    label = { Text("名称", color = TextLo) }, singleLine = true,
+                    label = { Text(L("名称", "Name"), color = TextLo) }, singleLine = true,
                     colors = com.eelan.musclediary.ui.fieldColors())
                 Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     FilterChip(selected = type == QtyType.REPS, onClick = { type = QtyType.REPS },
-                        label = { Text("按次", fontSize = 12.sp) })
+                        label = { Text(L("按次", "Reps"), fontSize = 12.sp) })
                     FilterChip(selected = type == QtyType.DISTANCE, onClick = { type = QtyType.DISTANCE },
-                        label = { Text("按公里", fontSize = 12.sp) })
+                        label = { Text(L("按公里", "Km"), fontSize = 12.sp) })
                     FilterChip(selected = type == QtyType.SECONDS, onClick = { type = QtyType.SECONDS },
-                        label = { Text("按秒", fontSize = 12.sp) })
+                        label = { Text(L("按秒", "Sec"), fontSize = 12.sp) })
                 }
                 OutlinedTextField(value = met, onValueChange = { met = it },
-                    label = { Text("MET 强度（走路3.5 慢跑8 力量训练5~8）", color = TextLo) },
+                    label = { Text(L("MET 强度（走路3.5 慢跑8 力量训练5~8）", "MET intensity (walk 3.5 jog 8 lifting 5~8)"), color = TextLo) },
                     singleLine = true,
                     keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = KeyboardType.Decimal),
                     colors = com.eelan.musclediary.ui.fieldColors())
                 when (type) {
                     QtyType.REPS -> OutlinedTextField(value = perRep, onValueChange = { perRep = it },
-                        label = { Text("单次耗时（秒，默认3）", color = TextLo) }, singleLine = true,
+                        label = { Text(L("单次耗时（秒，默认3）", "Seconds per rep (default 3)"), color = TextLo) }, singleLine = true,
                         keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = KeyboardType.Decimal),
                         colors = com.eelan.musclediary.ui.fieldColors())
                     QtyType.DISTANCE -> OutlinedTextField(value = pace, onValueChange = { pace = it },
-                        label = { Text("配速（分钟/公里，默认8）", color = TextLo) }, singleLine = true,
+                        label = { Text(L("配速（分钟/公里，默认8）", "Pace (min/km, default 8)"), color = TextLo) }, singleLine = true,
                         keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = KeyboardType.Decimal),
                         colors = com.eelan.musclediary.ui.fieldColors())
                     QtyType.SECONDS -> {}
                 }
-                Text("主练部位（单选）", fontSize = 12.sp, color = TextLo)
+                Text(L("主练部位（单选）", "Primary muscle (single)"), fontSize = 12.sp, color = TextLo)
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                     Muscle.entries.forEach { m ->
                         FilterChip(
@@ -436,7 +437,7 @@ fun CustomExerciseDialog(
                         )
                     }
                 }
-                Text("兼练部位（可多选）", fontSize = 12.sp, color = TextLo)
+                Text(L("兼练部位（可多选）", "Secondary muscles (multi)"), fontSize = 12.sp, color = TextLo)
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                     Muscle.entries.forEach { m ->
                         val on = m.id in secondary
@@ -465,8 +466,8 @@ fun CustomExerciseDialog(
                         isCustom = initial?.isCustom ?: true,
                     )
                 )
-            }) { Text("保存", color = if (valid) Accent else TextLo) }
+            }) { Text(L("保存", "Save"), color = if (valid) Accent else TextLo) }
         },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("取消", color = TextLo) } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(L("取消", "Cancel"), color = TextLo) } },
     )
 }

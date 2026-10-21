@@ -51,6 +51,7 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.eelan.musclediary.ui.theme.*
+import com.eelan.musclediary.L
 import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
 
@@ -268,15 +269,15 @@ fun NumberDialog(
                         focusedIndicatorColor = Accent, unfocusedIndicatorColor = Ink3,
                     ),
                 )
-                if (!valid) Text("请输入大于 0 的数字", fontSize = 12.sp, color = Warn)
+                if (!valid) Text(L("请输入大于 0 的数字", "Enter a number greater than 0"), fontSize = 12.sp, color = Warn)
             }
         },
         confirmButton = {
             TextButton(enabled = valid, onClick = {
                 onConfirm(v!!)
-            }) { Text("确定", color = if (valid) Accent else TextLo) }
+            }) { Text(L("确定", "OK"), color = if (valid) Accent else TextLo) }
         },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("取消", color = TextLo) } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(L("取消", "Cancel"), color = TextLo) } },
     )
 }
 
@@ -362,7 +363,7 @@ fun SwipeEntryRow(
                         onEdit()
                     },
                 contentAlignment = Alignment.Center,
-            ) { Text("修改", color = Ink0, fontSize = 13.sp, fontWeight = FontWeight.Bold) }
+            ) { Text(L("修改", "Edit"), color = Ink0, fontSize = 13.sp, fontWeight = FontWeight.Bold) }
             Box(
                 Modifier
                     .width(66.dp)
@@ -370,7 +371,7 @@ fun SwipeEntryRow(
                     .background(Color(0xFFEF5350))
                     .clickable { deleteWithCrush() },
                 contentAlignment = Alignment.Center,
-            ) { Text("删除", color = Ink0, fontSize = 13.sp, fontWeight = FontWeight.Bold) }
+            ) { Text(L("删除", "Delete"), color = Ink0, fontSize = 13.sp, fontWeight = FontWeight.Bold) }
         }
         // 前景内容（自身撑开高度，背景按钮 matchParentSize 跟随）
         Row(
@@ -417,7 +418,7 @@ fun SectionTitle(text: String, modifier: Modifier = Modifier) {
 
 /** 标题行 + 右侧「全部 >」入口（进全屏记录历史页） */
 @Composable
-fun SectionTitleRow(text: String, moreText: String = "全部 >", onMore: () -> Unit) {
+fun SectionTitleRow(text: String, moreText: String = L("全部 >", "All >"), onMore: () -> Unit) {
     Row(
         Modifier.fillMaxWidth().heightIn(min = 40.dp).padding(vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -446,7 +447,7 @@ fun QuickChips(
         modifier = modifier,
         horizontalArrangement = Arrangement.spacedBy(6.dp),
     ) {
-        Text("最近：", fontSize = 12.sp, color = TextLo,
+        Text(L("最近：", "Recent: "), fontSize = 12.sp, color = TextLo,
             modifier = Modifier.align(Alignment.CenterVertically))
         chips.forEach { c ->
             // 标签舒展：点中瞬间 1 → 1.08 → 1 弹性回落，其余项随布局弹簧让位
