@@ -204,9 +204,14 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     /** 快速记录一餐：直接录入整餐热量与营养（不经过食物模板），克数记 0 表示按餐录入 */
     fun addMealEntry(mealName: String, kcal: Double, protein: Double, carb: Double, fat: Double, date: LocalDate) {
+        // kcal 是计算属性（p*4+c*4+f*9）：只填热量时三维全 0 会让 kcal 归零——
+        // 按 15/50/35 能量占比反推三维，保证热量真实落库（与 updateMealEntry 口径一致）
+        val (p, c, f) = if (protein == 0.0 && carb == 0.0 && fat == 0.0 && kcal > 0) {
+            Triple(kcal * 0.15 / 4, kcal * 0.50 / 4, kcal * 0.35 / 9)
+        } else Triple(protein, carb, fat)
         val e = FoodEntry(
             date = date.toString(), name = mealName, grams = 0.0,
-            protein = protein, carb = carb, fat = fat,
+            protein = p, carb = c, fat = f,
         )
         viewModelScope.launch(Dispatchers.IO) {
             val id = dao.insertFoodEntry(e)
@@ -214,16 +219,9 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    /** 修改快速记录的餐食热量：把目标热量与现有营养热量的差额按三维热量占比分摊；
-     *  三维全 0（只有热量没存进营养）时按 15/50/35 能量占比反推（与自定义食物填 kJ 的口径一致） */
-    fun updateMealEntry(e: FoodEntry, newKcal: Double) {
-        val curKcal = e.kcal
-        val upd = if (curKcal > 0) {
-            val k = newKcal / curKcal
-            e.copy(protein = e.protein * k, carb = e.carb * k, fat = e.fat * k)
-        } else {
-            e.copy(protein = newKcal * 0.15 / 4, carb = newKcal * 0.50 / 4, fat = newKcal * 0.35 / 9)
-        }
+    /** 修改快速记录的餐食：直接写入用户编辑后的三维营养（kcal 为计算属性，随三维更新） */
+    fun updateMealEntry(e: FoodEntry, newKcal: Double, newProtein: Double, newCarb: Double, newFat: Double) {
+        val upd = e.copy(protein = newProtein, carb = newCarb, fat = newFat)
         viewModelScope.launch(Dispatchers.IO) { dao.updateFoodEntry(upd) }
         foodEntries = foodEntries.map { if (it.id == e.id) upd else it }
     }

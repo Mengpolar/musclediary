@@ -128,10 +128,10 @@ fun DietScreen(vm: AppViewModel, onOpenRecords: () -> Unit = {}) {
 
     editingEntry?.let { e ->
         if (e.grams <= 0.0) {
-            // 快速记录的餐食：直接改热量（营养不按比例缩放，保持手输值）
+            // 快速记录的餐食：热量与三维营养均可修改
             MealEditDialog(e,
                 onDismiss = { editingEntry = null },
-                onConfirm = { kcal -> vm.updateMealEntry(e, kcal); editingEntry = null })
+                onConfirm = { kcal, p, c, f -> vm.updateMealEntry(e, kcal, p, c, f); editingEntry = null })
         } else {
             FoodEditDialog(
                 entryName = e.name,
@@ -501,33 +501,64 @@ internal fun foodDetail(f: com.eelan.musclediary.data.FoodEntry): String {
     return "${head}蛋白${fmt1(f.protein)} 碳水${fmt1(f.carb)} 脂肪${fmt1(f.fat)}"
 }
 
-/** 修改快速记录的餐食热量 */
+/** 修改快速记录的餐食：热量（参考）与三维营养均可编辑，实际热量按三维计算落库 */
 @Composable
 internal fun MealEditDialog(
     entry: com.eelan.musclediary.data.FoodEntry,
     onDismiss: () -> Unit,
-    onConfirm: (Double) -> Unit,
+    onConfirm: (Double, Double, Double, Double) -> Unit,
 ) {
     var kcal by remember { mutableStateOf(fmt0(entry.kcal)) }
-    val kd = kcal.toDoubleOrNull()
+    var p by remember { mutableStateOf(fmt1(entry.protein)) }
+    var c by remember { mutableStateOf(fmt1(entry.carb)) }
+    var f by remember { mutableStateOf(fmt1(entry.fat)) }
+    val kd = kcal.toDoubleOrNull(); val pd = p.toDoubleOrNull()
+    val cd = c.toDoubleOrNull(); val fd = f.toDoubleOrNull()
+    val valid = kd != null && pd != null && cd != null && fd != null &&
+        pd >= 0 && cd >= 0 && fd >= 0
+    // 实际落库热量 = 三维计算值；与填写的热量差得多时提示
+    val realKcal = if (valid) pd!! * 4 + cd!! * 4 + fd!! * 9 else null
     AlertDialog(
         onDismissRequest = onDismiss,
         containerColor = Ink2,
-        title = { Text("修改「${entry.name}」热量", color = TextHi, fontSize = 16.sp) },
+        title = { Text("修改「${entry.name}」", color = TextHi, fontSize = 16.sp) },
         text = {
-            OutlinedTextField(
-                value = kcal, onValueChange = { kcal = it },
-                label = { Text("热量 kcal", color = TextLo) },
-                singleLine = true,
-                keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
-                    keyboardType = KeyboardType.Decimal),
-                colors = fieldColors(),
-            )
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedTextField(
+                    value = kcal, onValueChange = { kcal = it },
+                    label = { Text("热量 kcal（参考）", color = TextLo) },
+                    singleLine = true,
+                    keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
+                        keyboardType = KeyboardType.Decimal),
+                    colors = fieldColors(),
+                )
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedTextField(value = p, onValueChange = { p = it },
+                        label = { Text("蛋白g", color = TextLo, fontSize = 12.sp) }, singleLine = true,
+                        keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
+                            keyboardType = KeyboardType.Decimal),
+                        modifier = Modifier.weight(1f), colors = fieldColors())
+                    OutlinedTextField(value = c, onValueChange = { c = it },
+                        label = { Text("碳水g", color = TextLo, fontSize = 12.sp) }, singleLine = true,
+                        keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
+                            keyboardType = KeyboardType.Decimal),
+                        modifier = Modifier.weight(1f), colors = fieldColors())
+                    OutlinedTextField(value = f, onValueChange = { f = it },
+                        label = { Text("脂肪g", color = TextLo, fontSize = 12.sp) }, singleLine = true,
+                        keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
+                            keyboardType = KeyboardType.Decimal),
+                        modifier = Modifier.weight(1f), colors = fieldColors())
+                }
+                if (realKcal != null && kotlin.math.abs(realKcal - (kd ?: 0.0)) > 0.5) {
+                    Text("实际热量按三维计算 ≈ ${fmt0(realKcal)} kcal",
+                        fontSize = 12.sp, color = Warn)
+                }
+            }
         },
         confirmButton = {
-            TextButton(enabled = kd != null && kd > 0, onClick = {
-                onConfirm(kd!!); onDismiss()
-            }) { Text("确定", color = if (kd != null && kd > 0) Accent else TextLo) }
+            TextButton(enabled = valid, onClick = {
+                onConfirm(kd!!, pd!!, cd!!, fd!!); onDismiss()
+            }) { Text("确定", color = if (valid) Accent else TextLo) }
         },
         dismissButton = { TextButton(onClick = onDismiss) { Text("取消", color = TextLo) } },
     )

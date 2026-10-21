@@ -131,7 +131,7 @@ fun RecordsScreen(vm: AppViewModel, kind: Int, onClose: () -> Unit) {
         } else {
             MealEditDialog(
                 entry = e, onDismiss = { editingFood = null },
-                onConfirm = { v -> vm.updateMealEntry(e, v); editingFood = null },
+                onConfirm = { kcal, p, c, f -> vm.updateMealEntry(e, kcal, p, c, f); editingFood = null },
             )
         }
     }

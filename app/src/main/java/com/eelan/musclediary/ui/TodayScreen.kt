@@ -56,13 +56,8 @@ fun TodayScreen(vm: AppViewModel, onGoWorkout: () -> Unit = {}, onOpenWaterRecor
         Modifier.padding(horizontal = 20.dp)
             .verticalScroll(rememberScrollState())
     ) {
-        // 日期头：英文字距星期 + 大日期 + 时期徽章
-        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
-            Box(Modifier.weight(1f)) {
-                DateHeader(vm, onOpenCalendar = { showCalendar = true })
-            }
-            PhaseBadge(if (targets.isCut) "减脂期" else "增肌期")
-        }
+        // 日期头：英文字距星期 + 大日期（右上角不再显示时期徽章）
+        DateHeader(vm, onOpenCalendar = { showCalendar = true })
         // 灯光短线
         Box(
             Modifier.padding(top = 10.dp)
@@ -281,17 +276,19 @@ fun DateHeader(vm: AppViewModel, onOpenCalendar: () -> Unit = {}) {
                 maxLines = 1,
             )
         }
+        // 「今天」快捷钮在箭头左侧：出现/消失不会引起左右箭头位移（占位等宽）
+        if (d != today) {
+            IconButton(onClick = { vm.selectDate(today) }) {
+                Icon(Icons.Default.Today, "回到今天", tint = Accent, modifier = Modifier.size(20.dp))
+            }
+        } else {
+            Spacer(Modifier.size(48.dp))
+        }
         IconButton(onClick = { vm.selectDate(d.minusDays(1)) }) {
             Icon(Icons.Default.ChevronLeft, "前一天", tint = TextLo)
         }
         IconButton(onClick = { vm.selectDate(d.plusDays(1)) }, enabled = d < today) {
             Icon(Icons.Default.ChevronRight, "后一天", tint = if (d < today) TextLo else Ink3)
-        }
-        // 历史日期才出现的「今天」快捷钮：仅图标，不撑高日期行（布局与今日保持一致）
-        if (d != today) {
-            IconButton(onClick = { vm.selectDate(today) }) {
-                Icon(Icons.Default.Today, "回到今天", tint = Accent, modifier = Modifier.size(20.dp))
-            }
         }
     }
 }
