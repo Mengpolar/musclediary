@@ -2,6 +2,8 @@
 
 English | [中文](README.md)
 
+**Project homepage (release page)**: https://mengpolar.github.io/musclediary/ — bilingual (EN/中文) with direct APK download.
+
 A **fully offline** Android app for bulking/cutting: log daily food, workouts, water and weight, auto-calculate calorie & macro targets from your body stats, and visualize today's muscle stimulation on a human body map. All data stays on your phone — nothing is uploaded (the only network access is manually checking for updates via GitHub Releases).
 
 > Open source (MIT). Your data never leaves the device — no account, no tracking.
@@ -61,7 +63,7 @@ keyPassword=...
 
 ## Download
 
-Grab the APK from [Releases](https://github.com/Mengpolar/musclediary/releases), or upgrade in-app via "Me → Check for updates".
+Grab the APK from [Releases](https://github.com/Mengpolar/musclediary/releases), or upgrade in-app via "Me → Check for updates" (optional gh-proxy.com proxy acceleration).
 
 ## License
 

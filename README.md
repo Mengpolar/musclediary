@@ -2,6 +2,8 @@
 
 [English](README_EN.md) | 中文
 
+**项目主页（发布页）**：https://mengpolar.github.io/musclediary/ —— 支持中英切换，可直接下载最新 APK。
+
 一款为增肌/减脂人群设计的**纯本地离线**安卓 App：记录每日饮食、锻炼、饮水量与体重，按身体数据自动计算热量与三大营养素目标，并用人体肌肉图直观展示当天各肌群的刺激程度。所有数据只存在手机本地，不联网上传（仅在手动检查更新时访问 GitHub Releases）。
 
 > 代码开源（MIT），数据不出设备 —— 不需要账号，不收集任何信息。
@@ -61,7 +63,7 @@ keyPassword=...
 
 ## 下载
 
-前往 [Releases](https://github.com/Mengpolar/musclediary/releases) 下载 APK，或在 App 内「我的 → 检查更新」升级。
+前往 [Releases](https://github.com/Mengpolar/musclediary/releases) 下载 APK，或在 App 内「我的 → 检查更新」升级（可选 gh-proxy.com 代理加速）。
 
 ## License
 
