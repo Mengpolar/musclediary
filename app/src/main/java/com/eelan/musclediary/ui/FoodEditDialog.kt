@@ -84,17 +84,16 @@ fun FoodGramsDialog(
                     colors = fieldColors(),
                 )
                 if (recent.isNotEmpty()) {
+                    // 标签与克数成对生成，点击按标签直查数值（量词单位任意，不做文本反解）
+                    val chipMap = recent.associate { g ->
+                        (if (hasUnit) "${fmt1(g / template!!.unitGrams)}$unitName" else "${fmt0(g)}g") to g
+                    }
                     QuickChips(
-                        chips = recent.map { g ->
-                            if (hasUnit) "${fmt1(g / template!!.unitGrams)}$unitName" else "${fmt0(g)}g"
-                        },
+                        chips = chipMap.keys.toList(),
                         onPick = { c ->
-                            // 从标签文本反解出克数：取括号里的数字，无括号取整体
-                            val g = Regex("（([0-9.]+)g）").find(c)?.groupValues?.get(1)?.toDoubleOrNull()
-                                ?: c.removeSuffix("g").toDoubleOrNull()
-                            g?.let {
-                                gramsText = fmt1(it)
-                                if (hasUnit) unitText = fmt1(it / template!!.unitGrams)
+                            chipMap[c]?.let { g ->
+                                gramsText = fmt1(g)
+                                if (hasUnit) unitText = fmt1(g / template!!.unitGrams)
                             }
                         },
                     )

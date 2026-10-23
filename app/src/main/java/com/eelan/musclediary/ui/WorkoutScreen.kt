@@ -335,21 +335,20 @@ private fun WorkoutQtyDialog(
                         colors = com.eelan.musclediary.ui.fieldColors(),
                     )
                 }
-                // 最近 3 次记录（去重）：点击直接填入
+                // 最近 3 次记录（去重）：点击直接填入；标签与数值成对生成，点击按标签直查
+                val chipMap = recent.associate { (qty0, w0) ->
+                    val base = if (unitLabel == "公里") "${fmt1(qty0)}" + L("公里", "km")
+                        else if (unitLabel == "秒") "${fmt0(qty0)}" + L("秒", "s")
+                        else "${fmt0(qty0)}" + L("个", " reps")
+                    (if (w0 > 0) "$base(x${fmt1(w0)}kg)" else base) to (qty0 to w0)
+                }
                 QuickChips(
-                    chips = recent.map { (qty0, w0) ->
-                        val base = if (unitLabel == "公里") "${fmt1(qty0)}" + L("公里", "km")
-                            else if (unitLabel == "秒") "${fmt0(qty0)}" + L("秒", "s")
-                            else "${fmt0(qty0)}" + L("个", " reps")
-                        if (w0 > 0) "$base(x${fmt1(w0)}kg)" else base
-                    },
+                    chips = chipMap.keys.toList(),
                     onPick = { c ->
-                        // 形如 "40个（×10kg）" / "40个" / "5公里"
-                        val w = Regex("×([0-9.]+)kg").find(c)?.groupValues?.get(1)?.toDoubleOrNull()
-                        val base = c.substringBefore("(").substringBefore("（")
-                        val num = Regex("^([0-9.]+)").find(base)?.groupValues?.get(1)?.toDoubleOrNull()
-                        num?.let { qty = fmt1(it) }
-                        if (w != null) weight = fmt1(w)
+                        chipMap[c]?.let { (q0, w0) ->
+                            qty = fmt1(q0)
+                            if (w0 > 0) weight = fmt1(w0)
+                        }
                     },
                 )
                 if (preview != null) {

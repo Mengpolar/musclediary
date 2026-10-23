@@ -130,12 +130,15 @@ fun PillNavBar(
         // 流动的液态色块：位于 selected 与上一位置之间，途经中间时横向拉伸
         BoxWithConstraints(Modifier.matchParentSize()) {
             val tabW = maxWidth / tabs.size
-            // 相对上一位置的偏移量（速度感）：拉伸量与移动距离成正比，两端小中间大
-            val stretch = (1f - kotlin.math.abs(animSelected - selected)).coerceIn(0f, 1f)
+            // 拉伸量与移动距离成正比：出发时拉开、接近目标回缩原宽（落定绝不超宽，避免两端被裁）
+            val stretch = kotlin.math.abs(animSelected - selected).coerceIn(0f, 1f)
             val stretchW = tabW * (1f + 0.45f * stretch)
+            val rawX = tabW * animSelected + (tabW - stretchW) / 2
+            // 钳制在胶囊内：弹簧回弹越过端点时块体贴边停留，不被裁切
+            val x = rawX.coerceIn(0.dp, (maxWidth - stretchW).coerceAtLeast(0.dp))
             Box(
                 Modifier
-                    .offset(x = tabW * animSelected + (tabW - stretchW) / 2)
+                    .offset(x = x)
                     .width(stretchW)
                     .fillMaxHeight()
                     .clip(RoundedCornerShape(99.dp))

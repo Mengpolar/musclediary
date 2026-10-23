@@ -167,11 +167,6 @@ fun TodayScreen(vm: AppViewModel, onGoWorkout: () -> Unit = {}, onOpenWaterRecor
                 }
             }
         }
-        if (date != LocalDate.now()) {
-            Spacer(Modifier.height(6.dp))
-            Text(L("当前查看 ", "Viewing ") + "${dMD(date.monthValue, date.dayOfMonth)}" +
-                    L(" 的数据", " data"), fontSize = 12.sp, color = Warn)
-        }
         Spacer(Modifier.height(12.dp))
     }
 
