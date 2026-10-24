@@ -263,6 +263,12 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         foodEntries = foodEntries.filterNot { it.id == e.id }
     }
 
+    /** 撤销删除：按原 id 重插并保持时间顺序（主页删除带 Snackbar 撤销） */
+    fun restoreFood(e: FoodEntry) {
+        viewModelScope.launch(Dispatchers.IO) { dao.insertFoodEntry(e) }
+        foodEntries = (foodEntries + e).sortedBy { it.createdAt }
+    }
+
     /** 某食物最近 3 次记录的克数（去重，新→旧），用于快捷标签与预填 */
     fun recentFoodGrams(template: FoodTemplate): List<Double> {
         val seen = linkedSetOf<Double>()
@@ -352,9 +358,15 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    fun deleteExercise(e: ExerciseEntry) {
+    fun deleteExercise(e: com.eelan.musclediary.data.ExerciseEntry) {
         viewModelScope.launch(Dispatchers.IO) { dao.deleteExerciseEntry(e) }
         exerciseEntries = exerciseEntries.filterNot { it.id == e.id }
+    }
+
+    /** 撤销删除：按原 id 重插并保持时间顺序（主页删除带 Snackbar 撤销） */
+    fun restoreExercise(e: com.eelan.musclediary.data.ExerciseEntry) {
+        viewModelScope.launch(Dispatchers.IO) { dao.insertExerciseEntry(e) }
+        exerciseEntries = (exerciseEntries + e).sortedBy { it.createdAt }
     }
 
     /** 备份：导出后回调文件路径（v3 格式：v2 基础上补锻炼时长/肌肉刺激分、饮水时间戳与语言偏好，新增列在行尾，旧版可读） */
@@ -367,19 +379,19 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         }
         sb.appendLine("# food_templates(custom)")
         foodTemplates.filter { it.isCustom }.forEach {
-            sb.appendLine("food,${csv(csvSafe(it.name))},${it.protein},${it.carb},${it.fat},${csv(it.tag)},${csv(it.unitName)},${it.unitGrams}")
+            sb.appendLine("food,${CsvCodec.escape(CsvCodec.safe(it.name))},${it.protein},${it.carb},${it.fat},${CsvCodec.escape(it.tag)},${CsvCodec.escape(it.unitName)},${it.unitGrams}")
         }
         sb.appendLine("# exercise_templates(custom)")
         exerciseTemplates.filter { it.isCustom }.forEach {
-            sb.appendLine("exercise,${csv(csvSafe(it.name))},${it.qtyType},${it.met},${it.perRepSeconds},${it.paceMinPerKm},${it.primaryMuscle},${csv(it.secondaryMuscles)}")
+            sb.appendLine("exercise,${CsvCodec.escape(CsvCodec.safe(it.name))},${it.qtyType},${it.met},${it.perRepSeconds},${it.paceMinPerKm},${it.primaryMuscle},${CsvCodec.escape(it.secondaryMuscles)}")
         }
         sb.appendLine("# food_entries")
         foodEntries.forEach {
-            sb.appendLine("fentry,${it.date},${csv(csvSafe(it.name))},${it.grams},${it.protein},${it.carb},${it.fat}")
+            sb.appendLine("fentry,${it.date},${CsvCodec.escape(CsvCodec.safe(it.name))},${it.grams},${it.protein},${it.carb},${it.fat}")
         }
         sb.appendLine("# exercise_entries")
         exerciseEntries.forEach {
-            sb.appendLine("xentry,${it.date},${csv(csvSafe(it.name))},${it.qty},${it.weightKg},${it.qtyTypeOf(exerciseTemplates)},${it.calories},${it.minutes},${csv(it.musclesJson)}")
+            sb.appendLine("xentry,${it.date},${CsvCodec.escape(CsvCodec.safe(it.name))},${it.qty},${it.weightKg},${it.qtyTypeOf(exerciseTemplates)},${it.calories},${it.minutes},${CsvCodec.escape(it.musclesJson)}")
         }
         sb.appendLine("# weight_entries")
         weightEntries.forEach {
@@ -395,39 +407,10 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         withContext(Dispatchers.Main) { onDone(f) }
     }
 
-    /** CSV 字段转义：含逗号/引号/换行时加引号 */
-    private fun csv(s: String): String =
-        if (s.contains(',') || s.contains('"') || s.contains('\n'))
-            "\"" + s.replace("\"", "\"\"") + "\""
-        else s
-
-    /** 防公式注入：名称以 ' = + - @ 开头时加前导单引号（Excel 打开 CSV 不会当公式执行），导入侧对称还原 */
-    private fun csvSafe(s: String): String =
-        if (s.isNotEmpty() && s.first() in "'=+-@") "'$s" else s
-
-    private fun csvUnSafe(s: String): String =
-        if (s.length > 1 && s[0] == '\'' && s[1] in "'=+-@") s.substring(1) else s
+    /** CSV 字段转义与公式注入防护见 [CsvCodec]（纯函数，带单元测试） */
 
     /** 拆分一行 CSV（支持带引号字段） */
-    private fun parseCsvLine(line: String): List<String> {
-        if (!line.contains('"')) return line.split(',')
-        val out = mutableListOf<String>()
-        val cur = StringBuilder()
-        var inQuote = false
-        var i = 0
-        while (i < line.length) {
-            val c = line[i]
-            when {
-                inQuote && c == '"' && i + 1 < line.length && line[i + 1] == '"' -> { cur.append('"'); i++ }
-                c == '"' -> inQuote = !inQuote
-                c == ',' && !inQuote -> { out.add(cur.toString()); cur.clear() }
-                else -> cur.append(c)
-            }
-            i++
-        }
-        out.add(cur.toString())
-        return out
-    }
+    private fun parseCsvLine(line: String): List<String> = CsvCodec.parseLine(line)
 
     private fun ExerciseEntry.qtyTypeOf(templates: List<ExerciseTemplate>): String =
         templates.firstOrNull { it.id == templateId }?.qtyType?.name
@@ -459,7 +442,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                     section == "profile" -> profileLine = line.split(',')
                     section == "food_templates(custom)" && line.startsWith("food,") -> runCatching {
                         val p = parseCsvLine(line)
-                        customsF += FoodTemplate(name = csvUnSafe(p[1].trim()), protein = num(p[2]),
+                        customsF += FoodTemplate(name = CsvCodec.unSafe(p[1].trim()), protein = num(p[2]),
                             carb = num(p[3]), fat = num(p[4]), isCustom = true,
                             tag = p.getOrElse(5) { "" }.trim(),
                             unitName = p.getOrElse(6) { "" }.trim(),
@@ -468,7 +451,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                     }.onFailure { skipped++ }
                     section == "exercise_templates(custom)" && line.startsWith("exercise,") -> runCatching {
                         val p = parseCsvLine(line)
-                        customsX += ExerciseTemplate(name = csvUnSafe(p[1].trim()), qtyType = QtyType.valueOf(p[2].trim()),
+                        customsX += ExerciseTemplate(name = CsvCodec.unSafe(p[1].trim()), qtyType = QtyType.valueOf(p[2].trim()),
                             met = num(p[3]), perRepSeconds = num(p[4]),
                             paceMinPerKm = num(p[5]), primaryMuscle = p[6].trim(),
                             secondaryMuscles = p.getOrElse(7) { "" }.trim(), isCustom = true)
@@ -478,7 +461,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                         val p = parseCsvLine(line)
                         val d = p[1].trim()
                         if (!dateOk(d)) { skipped++; return@runCatching }
-                        fEntries += FoodEntry(date = d, name = csvUnSafe(p[2].trim()), grams = num(p[3]),
+                        fEntries += FoodEntry(date = d, name = CsvCodec.unSafe(p[2].trim()), grams = num(p[3]),
                             protein = num(p[4]), carb = num(p[5]), fat = num(p[6]))
                         sawFood = true
                     }.onFailure { skipped++ }
@@ -486,7 +469,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                         val p = parseCsvLine(line)
                         val d = p[1].trim()
                         if (!dateOk(d)) { skipped++; return@runCatching }
-                        xEntries += Triple(ExerciseEntry(date = d, templateId = 0, name = csvUnSafe(p[2].trim()),
+                        xEntries += Triple(ExerciseEntry(date = d, templateId = 0, name = CsvCodec.unSafe(p[2].trim()),
                             qty = num(p[3]), weightKg = num(p[4]), calories = num(p[6]),
                             minutes = num(p.getOrElse(7) { "0" }),
                             musclesJson = p.getOrNull(8)?.takeIf { it.isNotBlank() } ?: "{}"), p[5].trim(), "")

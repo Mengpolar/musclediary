@@ -27,6 +27,7 @@ import com.eelan.musclediary.tagLabel
 import com.eelan.musclediary.data.FoodEntry
 import com.eelan.musclediary.data.FoodTemplate
 import com.eelan.musclediary.ui.theme.*
+import kotlinx.coroutines.launch
 
 /** 饮食页：当日记录列表 + 模板快速添加 + 自定义食物 */
 @Composable
@@ -45,9 +46,23 @@ fun DietScreen(vm: AppViewModel, onOpenRecords: () -> Unit = {}) {
     val carb = entries.sumOf { it.carb }
     val fat = entries.sumOf { it.fat }
 
+    // 删除撤销：主页左滑删除立即生效，Snackbar 期间可一键恢复
+    val snackbar = remember { SnackbarHostState() }
+    val scope = rememberCoroutineScope()
+    fun deleteWithUndo(f: FoodEntry) {
+        vm.deleteFood(f)
+        scope.launch {
+            if (snackbar.showSnackbar(
+                    L("已删除 ", "Deleted ") + f.name, actionLabel = L("撤销", "Undo")
+                ) == SnackbarResult.ActionPerformed
+            ) vm.restoreFood(f)
+        }
+    }
+
     Scaffold(
         containerColor = Color.Transparent,
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
+        snackbarHost = { SnackbarHost(snackbar) },
         floatingActionButton = {
             FloatingActionButton(
                 onClick = { pickOpen = true },
@@ -92,7 +107,7 @@ fun DietScreen(vm: AppViewModel, onOpenRecords: () -> Unit = {}) {
                                 foodDetail(f),
                                 "${fmt0(f.kcal)} kcal",
                                 onEdit = { editingEntry = f },
-                                onDelete = { vm.deleteFood(f) },
+                                onDelete = { deleteWithUndo(f) },
                             )
                         }
                         }

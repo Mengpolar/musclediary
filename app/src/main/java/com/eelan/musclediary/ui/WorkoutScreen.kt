@@ -31,6 +31,7 @@ import com.eelan.musclediary.data.QtyType
 import com.eelan.musclediary.domain.Calc
 import com.eelan.musclediary.domain.Muscle
 import com.eelan.musclediary.ui.theme.*
+import kotlinx.coroutines.launch
 import org.json.JSONObject
 
 /** 锻炼页：肌肉概览图 + 当日记录 + 模板快速添加 */
@@ -44,6 +45,19 @@ fun WorkoutScreen(vm: AppViewModel, onOpenWeightRecords: () -> Unit = {}, onOpen
 
     val date = vm.selectedDate
     val entries = vm.exerciseOn(date).sortedBy { it.createdAt }
+
+    // 删除撤销：主页左滑删除立即生效，Snackbar 期间可一键恢复
+    val snackbar = remember { SnackbarHostState() }
+    val scope = rememberCoroutineScope()
+    fun deleteWithUndo(e: com.eelan.musclediary.data.ExerciseEntry) {
+        vm.deleteExercise(e)
+        scope.launch {
+            if (snackbar.showSnackbar(
+                    L("已删除 ", "Deleted ") + e.name, actionLabel = L("撤销", "Undo")
+                ) == SnackbarResult.ActionPerformed
+            ) vm.restoreExercise(e)
+        }
+    }
 
     // 汇总当天各肌群刺激分
     val scores = remember(entries) {
@@ -60,6 +74,7 @@ fun WorkoutScreen(vm: AppViewModel, onOpenWeightRecords: () -> Unit = {}, onOpen
     Scaffold(
         containerColor = androidx.compose.ui.graphics.Color.Transparent,
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
+        snackbarHost = { SnackbarHost(snackbar) },
         floatingActionButton = {
             FloatingActionButton(
                 onClick = { pickOpen = true },
@@ -161,7 +176,7 @@ fun WorkoutScreen(vm: AppViewModel, onOpenWeightRecords: () -> Unit = {}, onOpen
                                 workoutDetail(e, vm.exerciseTemplates),
                                 "${fmt0(e.calories)} kcal",
                                 onEdit = { editingEntry = e },
-                                onDelete = { vm.deleteExercise(e) },
+                                onDelete = { deleteWithUndo(e) },
                             )
                         }
                     }

@@ -579,6 +579,9 @@ fun LiquidGlobe(
         animationSpec = infiniteRepeatable(tween(2400, easing = LinearEasing)),
         label = "globeWave",
     )
+    // 波面每帧重画：Path 复用（rewind 清空重填），避免每帧分配两个对象
+    val circleClip = remember { androidx.compose.ui.graphics.Path() }
+    val wavePath = remember { androidx.compose.ui.graphics.Path() }
     Box(
         modifier
             .size(sizeDp)
@@ -595,11 +598,12 @@ fun LiquidGlobe(
             // 液体：以液面 y 裁剪画圆形液体，液面为单一缓正弦波
             val surfaceY = cy + r - (2f * r) * liquid
             // 圆形裁剪：液体只画在球内
-            val circleClip = androidx.compose.ui.graphics.Path().apply { addOval(androidx.compose.ui.geometry.Rect(cx - r, cy - r, cx + r, cy + r)) }
+            circleClip.rewind()
+            circleClip.addOval(androidx.compose.ui.geometry.Rect(cx - r, cy - r, cx + r, cy + r))
             clipPath(circleClip) {
                 drawCircle(color.copy(alpha = 0.32f), radius = r, center = c)
-                val wavePath = androidx.compose.ui.graphics.Path()
                 val amp = r * 0.035f
+                wavePath.rewind()
                 wavePath.moveTo(cx - r, surfaceY)
                 var x = cx - r
                 while (x <= cx + r) {

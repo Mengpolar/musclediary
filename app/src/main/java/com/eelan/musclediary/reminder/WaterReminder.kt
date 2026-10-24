@@ -39,9 +39,10 @@ object WaterReminder {
 
     fun ensureChannel(ctx: Context) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            // 同 ID 重复 create 会更新名称/描述：随语言切换刷新（已建渠道也可更名）
             val ch = NotificationChannel(
-                CHANNEL_ID, "Water reminder", NotificationManager.IMPORTANCE_DEFAULT
-            ).apply { description = "Checks water intake by time slot and reminds when behind" }
+                CHANNEL_ID, L("喝水提醒", "Water reminder"), NotificationManager.IMPORTANCE_DEFAULT
+            ).apply { description = L("分时段检查饮水量，落后时提醒", "Checks water intake by time slot, reminds when behind") }
             ctx.getSystemService(NotificationManager::class.java)
                 .createNotificationChannel(ch)
         }

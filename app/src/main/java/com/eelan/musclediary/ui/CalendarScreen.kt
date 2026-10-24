@@ -77,6 +77,10 @@ fun CalendarSheet(vm: AppViewModel, onDismiss: () -> Unit) {
             val lead = (month.atDay(1).dayOfWeek.value + 6) % 7 // 周一开头
             val cells: List<LocalDate?> =
                 List(lead) { null } + (1..month.lengthOfMonth()).map { month.atDay(it) }
+            // 整月达标状态一次算好：原先每个日期格重组时都全量过滤饮食/锻炼记录
+            val statusByDay = remember(month, vm.foodEntries, vm.exerciseEntries, vm.profile) {
+                (1..month.lengthOfMonth()).associate { day -> month.atDay(day) to dayStatus(vm, month.atDay(day)) }
+            }
 
             cells.chunked(7).forEach { week ->
                 Row(
@@ -89,7 +93,7 @@ fun CalendarSheet(vm: AppViewModel, onDismiss: () -> Unit) {
                                 DayCell(
                                     date = d, isToday = d == today,
                                     isSelected = d == selected,
-                                    status = dayStatus(vm, d),
+                                    status = statusByDay[d],
                                     onClick = { vm.selectDate(d); onDismiss() },
                                 )
                             }

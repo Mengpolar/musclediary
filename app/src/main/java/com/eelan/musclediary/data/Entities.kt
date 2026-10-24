@@ -228,7 +228,7 @@ interface AppDao {
     entities = [Profile::class, FoodTemplate::class, FoodEntry::class,
         ExerciseTemplate::class, ExerciseEntry::class, WeightEntry::class, WaterEntry::class],
     version = 8,
-    exportSchema = false,
+    exportSchema = true,
 )
 abstract class AppDatabase : RoomDatabase() {
     abstract fun dao(): AppDao

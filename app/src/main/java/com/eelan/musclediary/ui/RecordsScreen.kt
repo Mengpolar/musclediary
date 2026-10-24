@@ -167,6 +167,10 @@ private fun RecordsBody(
     when (kind) {
         0 -> {
             // 体重：按月分组，分组头 = 条数 · 均值 · 与上月环比
+            // 一次预计算月分组与「上一条」映射（原先每月/每条都全表过滤，O(n²)）
+            val allByMonth = vm.weightEntries.groupBy { YearMonth.from(LocalDate.parse(it.date)) }
+            val asc = vm.weightEntries.sortedBy { it.date }
+            val prevByEntry = (1 until asc.size).associate { asc[it] to asc[it - 1] }
             val filtered = vm.weightEntries.sortedByDescending { it.date }
                 .filter { hit(it.date, "${fmt1(it.weightKg)}") }
             val byMonth = filtered.groupBy { YearMonth.from(LocalDate.parse(it.date)) }
@@ -174,18 +178,14 @@ private fun RecordsBody(
             StackedColumn {
                 byMonth.forEach { (month, es) ->
                     val avg = es.map { it.weightKg }.average()
-                    val prevMonthEs = vm.weightEntries.filter {
-                        YearMonth.from(LocalDate.parse(it.date)) == month.minusMonths(1)
-                    }
-                    val prevAvg = prevMonthEs.map { it.weightKg }.average()
-                    val delta = if (prevMonthEs.isNotEmpty()) avg - prevAvg else null
+                    val prevMonthEs = allByMonth[month.minusMonths(1)].orEmpty()
+                    val delta = if (prevMonthEs.isNotEmpty()) avg - prevMonthEs.map { it.weightKg }.average() else null
                     GroupHeader(
                         "${dYM(month.year, month.monthValue)} · ${es.size} " + L("条", ""),
                         L("均值 ", "avg ") + "${fmt1(avg)} kg" + delta?.let { d -> " · " + L("环比", "vs prev") + " ${if (d >= 0) "+" else "-"}${fmt1(kotlin.math.abs(d))} kg" }.orEmpty(),
                     )
                     es.forEach { e ->
-                        val prev = vm.weightEntries.filter { it.date < e.date }.maxByOrNull { it.date }
-                        val d = prev?.let { e.weightKg - it.weightKg }
+                        val d = prevByEntry[e]?.let { e.weightKg - it.weightKg }
                         key(e.id) {
                         Box(Modifier.stackApproach()) {
                             SwipeEntryRow(
