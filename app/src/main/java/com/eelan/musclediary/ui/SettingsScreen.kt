@@ -18,6 +18,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.viewModelScope
 import com.eelan.musclediary.AppViewModel
 import com.eelan.musclediary.BuildConfig
 import com.eelan.musclediary.L
@@ -276,8 +277,8 @@ fun SettingsScreen(
                 }) { Text(L("导入（覆盖现有记录）", "Import (overwrites)"), fontSize = 13.sp, color = Accent) }
             }
             Spacer(Modifier.height(6.dp))
-            Text(L("包含：档案、自定义模板、全部饮食与锻炼记录。内置模板不在备份内。",
-                "Includes: profile, custom templates, all food & exercise records. Built-in templates excluded."),
+            Text(L("包含：档案、自定义模板、全部饮食/锻炼/体重/饮水记录。内置模板不在备份内。",
+                "Includes: profile, custom templates, all food / exercise / weight / water records. Built-in templates excluded."),
                 fontSize = 12.sp, color = TextLo)
         }
 
@@ -343,7 +344,7 @@ fun SettingsScreen(
                 )
                 Text(
                     L("下载中", "Downloading") + " $progress% · " +
-                            "${String.format("%.1f", (updateInfo?.sizeBytes ?: 0) * progress / 100.0 / 1048576.0)}" +
+                            "${String.format(java.util.Locale.US, "%.1f", (updateInfo?.sizeBytes ?: 0) * progress / 100.0 / 1048576.0)}" +
                             " / ${Updater.formatSize(updateInfo?.sizeBytes ?: 0)}",
                     fontSize = 12.sp, color = TextLo,
                 )
@@ -379,10 +380,11 @@ fun SettingsScreen(
             confirmButton = {
                 TextButton(onClick = {
                     downloading = true; progress = 0
-                    // 下载是长任务：用 ViewModel 作用域，切页不中断
-                    vm.appScope.launch {
+                    // 下载是长任务：用 ViewModel 作用域，切页不中断；安装走应用级 context，防页面销毁后 Activity 失效
+                    val appCtx = ctx.applicationContext
+                    vm.viewModelScope.launch {
                         runCatching {
-                            Updater.downloadApk(ctx, info.apkUrl, { progress = it }, updateSource)
+                            Updater.downloadApk(appCtx, info.apkUrl, { progress = it }, updateSource)
                         }.onSuccess { apk ->
                             // 校验下载包与 Release 资产摘要一致，防止下载损坏或被篡改
                             if (!Updater.verifySha256(apk, info.sha256)) {
@@ -394,7 +396,7 @@ fun SettingsScreen(
                             }
                             downloading = false
                             updateInfo = null
-                            Updater.install(ctx, apk)
+                            Updater.install(appCtx, apk)
                         }.onFailure {
                             downloading = false
                             updateState = L("下载失败：", "Download failed: ") + (it.message ?: "")

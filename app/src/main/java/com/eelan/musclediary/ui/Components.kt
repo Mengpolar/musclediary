@@ -237,7 +237,8 @@ fun EmptyState(
     }
 }
 
-fun fmt1(v: Double): String = if (v >= 100) Math.round(v).toInt().toString() else String.format("%.1f", v)
+// Locale.US：点号小数。默认 Locale 在逗号小数语区（de/fr/ru 等）产出 "0,7"，回填输入框后 toDoubleOrNull 解析失败
+fun fmt1(v: Double): String = if (v >= 100) Math.round(v).toInt().toString() else String.format(java.util.Locale.US, "%.1f", v)
 fun fmt0(v: Double): String = Math.round(v).toInt().toString()
 
 /** 数字输入对话框 */
@@ -451,15 +452,21 @@ fun QuickChips(
             modifier = Modifier.align(Alignment.CenterVertically))
         chips.forEach { c ->
             // 标签舒展：点中瞬间 1 → 1.08 → 1 弹性回落，其余项随布局弹簧让位
-            var pressed by remember(c) { mutableStateOf(false) }
+            var pulse by remember(c) { mutableStateOf(false) }
             val chipScale by animateFloatAsState(
-                targetValue = if (pressed) 0.92f else 1f,
+                targetValue = if (pulse) 1.08f else 1f,
                 animationSpec = spring(
                     dampingRatio = Spring.DampingRatioMediumBouncy,
                     stiffness = Spring.StiffnessMedium,
                 ),
                 label = "chipScale",
             )
+            LaunchedEffect(pulse) {
+                if (pulse) {
+                    kotlinx.coroutines.delay(200)
+                    pulse = false
+                }
+            }
             Box(
                 modifier = Modifier
                     .graphicsLayer {
@@ -469,7 +476,7 @@ fun QuickChips(
                     .clip(RoundedCornerShape(14.dp))
                     .background(Accent.copy(alpha = 0.15f))
                     .clickable {
-                        pressed = true
+                        pulse = true
                         onPick(c)
                     }
                     .padding(horizontal = 12.dp, vertical = 8.dp),

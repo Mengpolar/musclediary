@@ -2,9 +2,6 @@ package com.eelan.musclediary.ui
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
@@ -13,9 +10,6 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.layout.onGloballyPositioned
-import androidx.compose.ui.layout.positionInWindow
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -104,7 +98,7 @@ fun RecordsScreen(vm: AppViewModel, kind: Int, onClose: () -> Unit) {
                 }) { Text(L("删除", "Delete"), color = Color(0xFFEF5350)) }
             },
             dismissButton = {
-                TextButton(onClick = { pendingDelete = null }) { Text("取消", color = TextLo) }
+                TextButton(onClick = { pendingDelete = null }) { Text(L("取消", "Cancel"), color = TextLo) }
             },
         )
     }
@@ -135,13 +129,13 @@ fun RecordsScreen(vm: AppViewModel, kind: Int, onClose: () -> Unit) {
         } else {
             MealEditDialog(
                 entry = e, onDismiss = { editingFood = null },
-                onConfirm = { kcal, p, c, f -> vm.updateMealEntry(e, kcal, p, c, f); editingFood = null },
+                onConfirm = { p, c, f -> vm.updateMealEntry(e, p, c, f); editingFood = null },
             )
         }
     }
     editingExercise?.let { e ->
         NumberDialog(
-            title = "修改「${e.name}」",
+            title = L("修改「", "Edit [") + "${e.name}" + L("」", "]"),
             label = qtyLabel(e, vm.exerciseTemplates),
             initial = fmt1(e.qty),
             onDismiss = { editingExercise = null },

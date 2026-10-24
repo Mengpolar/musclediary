@@ -166,7 +166,13 @@ fun intensityColor(level: Int): Color = when (level) {
     else -> IdleColor
 }
 
-val intensityLabels = listOf(L("未锻炼", "Idle"), L("轻度", "Light"), L("中度", "Moderate"), L("高强度", "Intense"))
+/** 档位名：调用时取词，跟随语言切换刷新（不能用顶层 val——类加载时求值一次就冻结了） */
+fun intensityLabel(level: Int): String = when (level) {
+    1 -> L("轻度", "Light")
+    2 -> L("中度", "Moderate")
+    3 -> L("高强度", "Intense")
+    else -> L("未锻炼", "Idle")
+}
 
 @Composable
 fun MuscleMap(
@@ -205,7 +211,7 @@ fun MuscleMap(
             val score = scores[picked!!.id] ?: 0.0
             val level = intensityOf(score)
             Text(
-                "${picked!!.label} · ${intensityLabels[level]} · " + L("刺激分 ", "score ") + "${fmt1(score)}",
+                "${Muscle.labelOf(picked!!.id)} · ${intensityLabel(level)} · " + L("刺激分 ", "score ") + "${fmt1(score)}",
                 fontSize = 13.sp, color = if (level == 0) TextHi else intensityColor(level),
                 modifier = Modifier.align(Alignment.CenterHorizontally)
                     .clip(RoundedCornerShape(8.dp))

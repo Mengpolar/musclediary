@@ -261,7 +261,7 @@ fun DateHeader(vm: AppViewModel, onOpenCalendar: () -> Unit = {}) {
         Column(
             Modifier
                 .weight(1f)
-                .clickable(enabled = onOpenCalendar != {}) { onOpenCalendar() }
+                .clickable { onOpenCalendar() }
         ) {
             Text(
                 (listOf("MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN")[d.dayOfWeek.value - 1]) +

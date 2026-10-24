@@ -136,7 +136,7 @@ fun ManageTemplatesScreen(vm: AppViewModel, kind: Int, onClose: () -> Unit) {
                 }) { Text(L("删除", "Delete"), color = MaterialTheme.colorScheme.error) }
             },
             dismissButton = {
-                TextButton(onClick = { confirmDelete = null }) { Text("取消", color = TextLo) }
+                TextButton(onClick = { confirmDelete = null }) { Text(L("取消", "Cancel"), color = TextLo) }
             },
         )
     }

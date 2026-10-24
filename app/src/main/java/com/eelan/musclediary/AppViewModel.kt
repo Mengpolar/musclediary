@@ -18,9 +18,6 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     private val dao = AppDatabase.get(app).dao()
 
-    /** 应用更新下载等长任务：不随页面销毁中断，ViewModel 存活期内有效 */
-    val appScope = kotlinx.coroutines.CoroutineScope(viewModelScope.coroutineContext + Dispatchers.Main.immediate)
-
     var selectedDate by mutableStateOf(LocalDate.now())
         private set
 
@@ -50,8 +47,11 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             profile = dao.getProfile() ?: Profile().also { dao.upsertProfile(it) }
             // 同步语言偏好到全局（切换语言后所有 L() 取词自动刷新）
             Lang.set(profile.lang)
-            // 老版本升级：盈余数值对齐新模式区间（增肌 200~300 / 减脂 −300~−500）
-            if (profile.surplusKcal > 300) profile = profile.copy(surplusKcal = 250.0)
+            // 老版本升级：盈余数值对齐新模式区间（增肌 200~300 / 减脂 −300~−500），并落库避免每次启动重算
+            if (profile.surplusKcal > 300) {
+                profile = profile.copy(surplusKcal = 250.0)
+                dao.upsertProfile(profile)
+            }
             // 内置食物数据源升级：重建内置模板（自定义模板与历史记录不受影响）
             if (profile.seedVersion < FoodSeed.version) {
                 dao.clearBuiltinFoodTemplates()
@@ -223,7 +223,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     /** 修改快速记录的餐食：直接写入用户编辑后的三维营养（kcal 为计算属性，随三维更新） */
-    fun updateMealEntry(e: FoodEntry, newKcal: Double, newProtein: Double, newCarb: Double, newFat: Double) {
+    fun updateMealEntry(e: FoodEntry, newProtein: Double, newCarb: Double, newFat: Double) {
         val upd = e.copy(protein = newProtein, carb = newCarb, fat = newFat)
         viewModelScope.launch(Dispatchers.IO) { dao.updateFoodEntry(upd) }
         foodEntries = foodEntries.map { if (it.id == e.id) upd else it }
@@ -263,12 +263,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         foodEntries = foodEntries.filterNot { it.id == e.id }
     }
 
-    /** 某食物最近一次记录的克数（用于预填输入框） */
-    fun lastFoodGrams(template: FoodTemplate): Double? =
-        foodEntries.filter { it.name == template.name }
-            .maxByOrNull { it.createdAt }?.grams
-
-    /** 某食物最近 3 次记录的克数（去重，新→旧），用于快捷标签 */
+    /** 某食物最近 3 次记录的克数（去重，新→旧），用于快捷标签与预填 */
     fun recentFoodGrams(template: FoodTemplate): List<Double> {
         val seen = linkedSetOf<Double>()
         foodEntries.filter { it.name == template.name }
@@ -277,12 +272,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         return seen.take(3).toList()
     }
 
-    /** 某动作最近一次记录的数量与重量（用于预填输入框） */
-    fun lastExerciseQty(template: ExerciseTemplate): Pair<Double, Double>? =
-        exerciseEntries.filter { it.templateId == template.id || it.name == template.name }
-            .maxByOrNull { it.createdAt }?.let { it.qty to it.weightKg }
-
-    /** 某动作最近 3 次记录的「数量+附加重量」（去重，新→旧），用于快捷标签 */
+    /** 某动作最近 3 次记录的「数量+附加重量」（去重，新→旧），用于快捷标签与预填 */
     fun recentExerciseQty(template: ExerciseTemplate): List<Pair<Double, Double>> {
         val seen = linkedSetOf<Pair<Double, Double>>()
         exerciseEntries.filter { it.templateId == template.id || it.name == template.name }
@@ -367,29 +357,29 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         exerciseEntries = exerciseEntries.filterNot { it.id == e.id }
     }
 
-    /** 备份：导出后回调文件路径（v2 格式：含体重/饮水记录与自定义模板的标签/量词单位，旧版可读的部分向后兼容） */
+    /** 备份：导出后回调文件路径（v3 格式：v2 基础上补锻炼时长/肌肉刺激分、饮水时间戳与语言偏好，新增列在行尾，旧版可读） */
     fun exportCsv(onDone: (java.io.File) -> Unit) = viewModelScope.launch(Dispatchers.IO) {
         val sb = StringBuilder()
         sb.appendLine("# profile")
-        sb.appendLine("male,age,heightCm,weightKg,surplus,mode,setupDone,waterReminder,exerciseGoalKcal")
+        sb.appendLine("male,age,heightCm,weightKg,surplus,mode,setupDone,waterReminder,exerciseGoalKcal,lang")
         with(profile) {
-            sb.appendLine("$male,$age,$heightCm,$weightKg,$surplusKcal,$mode,$setupDone,$waterReminder,$exerciseGoalKcal")
+            sb.appendLine("$male,$age,$heightCm,$weightKg,$surplusKcal,$mode,$setupDone,$waterReminder,$exerciseGoalKcal,$lang")
         }
         sb.appendLine("# food_templates(custom)")
         foodTemplates.filter { it.isCustom }.forEach {
-            sb.appendLine("food,${csv(it.name)},${it.protein},${it.carb},${it.fat},${csv(it.tag)},${csv(it.unitName)},${it.unitGrams}")
+            sb.appendLine("food,${csv(csvSafe(it.name))},${it.protein},${it.carb},${it.fat},${csv(it.tag)},${csv(it.unitName)},${it.unitGrams}")
         }
         sb.appendLine("# exercise_templates(custom)")
         exerciseTemplates.filter { it.isCustom }.forEach {
-            sb.appendLine("exercise,${csv(it.name)},${it.qtyType},${it.met},${it.perRepSeconds},${it.paceMinPerKm},${it.primaryMuscle},${csv(it.secondaryMuscles)}")
+            sb.appendLine("exercise,${csv(csvSafe(it.name))},${it.qtyType},${it.met},${it.perRepSeconds},${it.paceMinPerKm},${it.primaryMuscle},${csv(it.secondaryMuscles)}")
         }
         sb.appendLine("# food_entries")
         foodEntries.forEach {
-            sb.appendLine("fentry,${it.date},${csv(it.name)},${it.grams},${it.protein},${it.carb},${it.fat}")
+            sb.appendLine("fentry,${it.date},${csv(csvSafe(it.name))},${it.grams},${it.protein},${it.carb},${it.fat}")
         }
         sb.appendLine("# exercise_entries")
         exerciseEntries.forEach {
-            sb.appendLine("xentry,${it.date},${csv(it.name)},${it.qty},${it.weightKg},${it.qtyTypeOf(exerciseTemplates)},${it.calories}")
+            sb.appendLine("xentry,${it.date},${csv(csvSafe(it.name))},${it.qty},${it.weightKg},${it.qtyTypeOf(exerciseTemplates)},${it.calories},${it.minutes},${csv(it.musclesJson)}")
         }
         sb.appendLine("# weight_entries")
         weightEntries.forEach {
@@ -397,7 +387,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         }
         sb.appendLine("# water_entries")
         waterEntries.forEach {
-            sb.appendLine("waentry,${it.date},${it.ml}")
+            sb.appendLine("waentry,${it.date},${it.ml},${it.createdAt}")
         }
         val dir = java.io.File(getApplication<Application>().filesDir, "backup").apply { mkdirs() }
         val f = java.io.File(dir, "musclediary_backup_${LocalDate.now()}.csv")
@@ -410,6 +400,13 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         if (s.contains(',') || s.contains('"') || s.contains('\n'))
             "\"" + s.replace("\"", "\"\"") + "\""
         else s
+
+    /** 防公式注入：名称以 ' = + - @ 开头时加前导单引号（Excel 打开 CSV 不会当公式执行），导入侧对称还原 */
+    private fun csvSafe(s: String): String =
+        if (s.isNotEmpty() && s.first() in "'=+-@") "'$s" else s
+
+    private fun csvUnSafe(s: String): String =
+        if (s.length > 1 && s[0] == '\'' && s[1] in "'=+-@") s.substring(1) else s
 
     /** 拆分一行 CSV（支持带引号字段） */
     private fun parseCsvLine(line: String): List<String> {
@@ -448,7 +445,12 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             val waEntries = mutableListOf<WaterEntry>()
             var section = ""
             var skipped = 0
+            // 备份里实际解析出有效数据的 section 才按「覆盖」语义清空重灌，防止缺 section 的旧备份抹掉现有记录
+            var sawFood = false; var sawExercise = false
+            var sawCustomF = false; var sawCustomX = false
             fun num(s: String?, def: Double = 0.0) = s?.trim()?.toDoubleOrNull() ?: def
+            // 日期必须是合法 yyyy-MM-dd：坏日期入库会让记录页 LocalDate.parse 崩溃
+            fun dateOk(s: String?): Boolean = s?.trim()?.let { runCatching { LocalDate.parse(it) }.isSuccess } == true
             text.lineSequence().forEach { raw ->
                 val line = raw.trim()
                 when {
@@ -457,37 +459,51 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                     section == "profile" -> profileLine = line.split(',')
                     section == "food_templates(custom)" && line.startsWith("food,") -> runCatching {
                         val p = parseCsvLine(line)
-                        customsF += FoodTemplate(name = p[1].trim(), protein = num(p[2]),
+                        customsF += FoodTemplate(name = csvUnSafe(p[1].trim()), protein = num(p[2]),
                             carb = num(p[3]), fat = num(p[4]), isCustom = true,
                             tag = p.getOrElse(5) { "" }.trim(),
                             unitName = p.getOrElse(6) { "" }.trim(),
                             unitGrams = num(p.getOrElse(7) { "0" }))
+                        sawCustomF = true
                     }.onFailure { skipped++ }
                     section == "exercise_templates(custom)" && line.startsWith("exercise,") -> runCatching {
                         val p = parseCsvLine(line)
-                        customsX += ExerciseTemplate(name = p[1].trim(), qtyType = QtyType.valueOf(p[2].trim()),
+                        customsX += ExerciseTemplate(name = csvUnSafe(p[1].trim()), qtyType = QtyType.valueOf(p[2].trim()),
                             met = num(p[3]), perRepSeconds = num(p[4]),
                             paceMinPerKm = num(p[5]), primaryMuscle = p[6].trim(),
                             secondaryMuscles = p.getOrElse(7) { "" }.trim(), isCustom = true)
+                        sawCustomX = true
                     }.onFailure { skipped++ }
                     section == "food_entries" && line.startsWith("fentry,") -> runCatching {
                         val p = parseCsvLine(line)
-                        fEntries += FoodEntry(date = p[1].trim(), name = p[2].trim(), grams = num(p[3]),
+                        val d = p[1].trim()
+                        if (!dateOk(d)) { skipped++; return@runCatching }
+                        fEntries += FoodEntry(date = d, name = csvUnSafe(p[2].trim()), grams = num(p[3]),
                             protein = num(p[4]), carb = num(p[5]), fat = num(p[6]))
+                        sawFood = true
                     }.onFailure { skipped++ }
                     section == "exercise_entries" && line.startsWith("xentry,") -> runCatching {
                         val p = parseCsvLine(line)
-                        xEntries += Triple(ExerciseEntry(date = p[1].trim(), templateId = 0, name = p[2].trim(),
+                        val d = p[1].trim()
+                        if (!dateOk(d)) { skipped++; return@runCatching }
+                        xEntries += Triple(ExerciseEntry(date = d, templateId = 0, name = csvUnSafe(p[2].trim()),
                             qty = num(p[3]), weightKg = num(p[4]), calories = num(p[6]),
-                            minutes = 0.0, musclesJson = "{}"), p[5].trim(), "")
+                            minutes = num(p.getOrElse(7) { "0" }),
+                            musclesJson = p.getOrNull(8)?.takeIf { it.isNotBlank() } ?: "{}"), p[5].trim(), "")
+                        sawExercise = true
                     }.onFailure { skipped++ }
                     section == "weight_entries" && line.startsWith("wentry,") -> runCatching {
                         val p = line.split(',')
-                        wEntries += WeightEntry(date = p[1].trim(), weightKg = num(p[2]))
+                        val d = p[1].trim()
+                        if (!dateOk(d)) { skipped++; return@runCatching }
+                        wEntries += WeightEntry(date = d, weightKg = num(p[2]))
                     }.onFailure { skipped++ }
                     section == "water_entries" && line.startsWith("waentry,") -> runCatching {
                         val p = line.split(',')
-                        waEntries += WaterEntry(date = p[1].trim(), ml = num(p[2]))
+                        val d = p[1].trim()
+                        if (!dateOk(d)) { skipped++; return@runCatching }
+                        waEntries += WaterEntry(date = d, ml = num(p[2]),
+                            createdAt = p.getOrNull(3)?.trim()?.toLongOrNull() ?: System.currentTimeMillis())
                     }.onFailure { skipped++ }
                 }
             }
@@ -512,20 +528,20 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                             setupDone = it.getOrNull(6)?.trim()?.toIntOrNull() ?: cur.setupDone,
                             waterReminder = it.getOrNull(7)?.trim()?.toIntOrNull()?.coerceIn(0, 1) ?: cur.waterReminder,
                             exerciseGoalKcal = num(it.getOrNull(8), cur.exerciseGoalKcal),
+                            lang = it.getOrNull(9)?.trim()?.toIntOrNull()?.coerceIn(0, 1) ?: cur.lang,
                         ))
                     }
                 }
-                // 体重按日期唯一（REPLACE 同日取后值）；饮水/饮食/锻炼按「覆盖」语义清空重灌
+                // 体重按日期唯一（REPLACE 同日取后值）；其余 section 仅在备份中存在有效数据时按「覆盖」清空重灌
                 if (wEntries.isNotEmpty()) dao.insertWeightEntries(wEntries)
                 if (waEntries.isNotEmpty()) {
                     dao.clearWaterEntries()
                     dao.insertWaterEntries(waEntries)
                 }
-                dao.clearFoodEntries(); dao.clearExerciseEntries()
-                dao.insertFoodEntries(fEntries)
-                dao.insertExerciseEntries(xEntries.map { it.first })
-                dao.clearCustomFoodTemplates(); dao.insertFoodTemplates(customsF)
-                dao.clearCustomExerciseTemplates(); dao.insertExerciseTemplates(customsX)
+                if (sawFood) { dao.clearFoodEntries(); dao.insertFoodEntries(fEntries) }
+                if (sawExercise) { dao.clearExerciseEntries(); dao.insertExerciseEntries(xEntries.map { it.first }) }
+                if (sawCustomF) { dao.clearCustomFoodTemplates(); dao.insertFoodTemplates(customsF) }
+                if (sawCustomX) { dao.clearCustomExerciseTemplates(); dao.insertExerciseTemplates(customsX) }
                 foodEntries = dao.allFoodEntries()
                 exerciseEntries = dao.allExerciseEntries()
                 weightEntries = dao.allWeightEntries()
@@ -535,6 +551,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 exerciseTemplates = dao.exerciseTemplates().sortedWith(
                     compareByDescending<ExerciseTemplate> { it.lastUsedAt }.thenBy { it.name })
                 profile = dao.getProfile() ?: profile
+                Lang.set(profile.lang)
             } else summary = "文件中没有可导入的数据"
             withContext(Dispatchers.Main) { onDone(summary) }
         } catch (e: Exception) {

@@ -143,7 +143,7 @@ fun WorkoutScreen(vm: AppViewModel, onOpenWeightRecords: () -> Unit = {}, onOpen
                     onAction = { pickOpen = true },
                 )
             } else {
-                // 卡片滚到视口顶部钉住、被后面卡片叠盖（外层整页滚动提供位移）
+                // 记录列表：整页滚动模型（与饮食页的内滚列表不同），卡片不钉顶
                 Column(
                     verticalArrangement = Arrangement.spacedBy(6.dp),
                     modifier = Modifier.animateContentSize(
@@ -153,17 +153,16 @@ fun WorkoutScreen(vm: AppViewModel, onOpenWeightRecords: () -> Unit = {}, onOpen
                         ),
                     ),
                 ) {
+                    // 删除带粉碎动画；新增/删除条目时整列尺寸弹性过渡（整页滚动，卡片不钉顶）
                     entries.forEach { e ->
                         key(e.id) {
-                            Box(Modifier.stackApproach()) {
-                                SwipeEntryRow(
-                                    e.name,
-                                    workoutDetail(e, vm.exerciseTemplates),
-                                    "${fmt0(e.calories)} kcal",
-                                    onEdit = { editingEntry = e },
-                                    onDelete = { vm.deleteExercise(e) },
-                                )
-                            }
+                            SwipeEntryRow(
+                                e.name,
+                                workoutDetail(e, vm.exerciseTemplates),
+                                "${fmt0(e.calories)} kcal",
+                                onEdit = { editingEntry = e },
+                                onDelete = { vm.deleteExercise(e) },
+                            )
                         }
                     }
                 }
@@ -304,7 +303,6 @@ private fun WorkoutQtyDialog(
     onDismiss: () -> Unit,
     onConfirm: (Double, Double) -> Unit,
 ) {
-    val unitLabel = Calc.unitLabel(template)
     var qty by remember { mutableStateOf(lastQty?.let { fmt1(it) } ?: "") }
     var weight by remember {
         mutableStateOf(lastWeight?.takeIf { it > 0 }?.let { fmt1(it) }
@@ -321,7 +319,12 @@ private fun WorkoutQtyDialog(
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 OutlinedTextField(
                     value = qty, onValueChange = { qty = it },
-                    label = { Text(if (unitLabel == "个") L("做了多少个？", "How many reps?") else if (unitLabel == "公里") L("多少公里？", "How many km?") else L("坚持了多少秒？", "How many seconds?"), color = TextLo) },
+                    // 按 qtyType 分支取问题文案：unitLabel 已本地化，拿它比较在英文模式下会全部失配
+                    label = { Text(when (template.qtyType) {
+                        QtyType.REPS -> L("做了多少个？", "How many reps?")
+                        QtyType.DISTANCE -> L("多少公里？", "How many km?")
+                        QtyType.SECONDS -> L("坚持了多少秒？", "How many seconds?")
+                    }, color = TextLo) },
                     singleLine = true,
                     keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = KeyboardType.Decimal),
                     colors = com.eelan.musclediary.ui.fieldColors(),
@@ -337,9 +340,11 @@ private fun WorkoutQtyDialog(
                 }
                 // 最近 3 次记录（去重）：点击直接填入；标签与数值成对生成，点击按标签直查
                 val chipMap = recent.associate { (qty0, w0) ->
-                    val base = if (unitLabel == "公里") "${fmt1(qty0)}" + L("公里", "km")
-                        else if (unitLabel == "秒") "${fmt0(qty0)}" + L("秒", "s")
-                        else "${fmt0(qty0)}" + L("个", " reps")
+                    val base = when (template.qtyType) {
+                        QtyType.DISTANCE -> "${fmt1(qty0)}" + L("公里", "km")
+                        QtyType.SECONDS -> "${fmt0(qty0)}" + L("秒", "s")
+                        else -> "${fmt0(qty0)}" + L("个", " reps")
+                    }
                     (if (w0 > 0) "$base(x${fmt1(w0)}kg)" else base) to (qty0 to w0)
                 }
                 QuickChips(
@@ -429,7 +434,7 @@ fun CustomExerciseDialog(
                     Muscle.entries.forEach { m ->
                         FilterChip(
                             selected = primary == m.id, onClick = { primary = m.id },
-                            label = { Text(m.label, fontSize = 12.sp) },
+                            label = { Text(Muscle.labelOf(m.id), fontSize = 12.sp) },
                             colors = FilterChipDefaults.filterChipColors(
                                 selectedContainerColor = Accent.copy(alpha = 0.35f),
                             ),
@@ -444,7 +449,7 @@ fun CustomExerciseDialog(
                             selected = on, onClick = {
                                 secondary = if (on) secondary - m.id else secondary + m.id
                             },
-                            label = { Text(m.label, fontSize = 12.sp) },
+                            label = { Text(Muscle.labelOf(m.id), fontSize = 12.sp) },
                             colors = FilterChipDefaults.filterChipColors(
                                 selectedContainerColor = Accent.copy(alpha = 0.35f),
                             ),

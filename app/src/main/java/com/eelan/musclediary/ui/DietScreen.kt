@@ -7,7 +7,6 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
@@ -131,10 +130,10 @@ fun DietScreen(vm: AppViewModel, onOpenRecords: () -> Unit = {}) {
 
     editingEntry?.let { e ->
         if (e.grams <= 0.0) {
-            // 快速记录的餐食：热量与三维营养均可修改
+            // 快速记录的餐食：热量由三维营养自动计算，只编辑三维
             MealEditDialog(e,
                 onDismiss = { editingEntry = null },
-                onConfirm = { kcal, p, c, f -> vm.updateMealEntry(e, kcal, p, c, f); editingEntry = null })
+                onConfirm = { p, c, f -> vm.updateMealEntry(e, p, c, f); editingEntry = null })
         } else {
             FoodEditDialog(
                 entryName = e.name,
@@ -353,7 +352,7 @@ fun CustomFoodDialog(
                                 if (tg in cur) cur.remove(tg) else cur.add(tg)
                                 tag = cur.joinToString(",")
                             },
-                            label = { Text(tg, fontSize = 12.sp) },
+                            label = { Text(tagLabel(tg), fontSize = 12.sp) },
                             colors = FilterChipDefaults.filterChipColors(
                                 selectedContainerColor = Accent.copy(alpha = 0.35f),
                                 selectedLabelColor = Accent,
@@ -370,7 +369,7 @@ fun CustomFoodDialog(
                                 if (tg in cur) cur.remove(tg) else cur.add(tg)
                                 tag = cur.joinToString(",")
                             },
-                            label = { Text(tg, fontSize = 12.sp) },
+                            label = { Text(tagLabel(tg), fontSize = 12.sp) },
                             colors = FilterChipDefaults.filterChipColors(
                                 selectedContainerColor = Accent.copy(alpha = 0.35f),
                                 selectedLabelColor = Accent,
@@ -508,22 +507,21 @@ internal fun foodDetail(f: com.eelan.musclediary.data.FoodEntry): String {
     return head + L("蛋白", "P") + "${fmt1(f.protein)} " + L("碳水", "C") + "${fmt1(f.carb)} " + L("脂肪", "F") + "${fmt1(f.fat)}"
 }
 
-/** 修改快速记录的餐食：热量（参考）与三维营养均可编辑，实际热量按三维计算落库 */
+/** 修改快速记录的餐食：热量是三维计算属性，只编辑三维，热量实时展示 */
 @Composable
 internal fun MealEditDialog(
     entry: com.eelan.musclediary.data.FoodEntry,
     onDismiss: () -> Unit,
-    onConfirm: (Double, Double, Double, Double) -> Unit,
+    onConfirm: (Double, Double, Double) -> Unit,
 ) {
-    var kcal by remember { mutableStateOf(fmt0(entry.kcal)) }
     var p by remember { mutableStateOf(fmt1(entry.protein)) }
     var c by remember { mutableStateOf(fmt1(entry.carb)) }
     var f by remember { mutableStateOf(fmt1(entry.fat)) }
-    val kd = kcal.toDoubleOrNull(); val pd = p.toDoubleOrNull()
-    val cd = c.toDoubleOrNull(); val fd = f.toDoubleOrNull()
-    val valid = kd != null && pd != null && cd != null && fd != null &&
+    val pd = p.toDoubleOrNull()
+    val cd = c.toDoubleOrNull()
+    val fd = f.toDoubleOrNull()
+    val valid = pd != null && cd != null && fd != null &&
         pd >= 0 && cd >= 0 && fd >= 0
-    // 实际落库热量 = 三维计算值；与填写的热量差得多时提示
     val realKcal = if (valid) pd!! * 4 + cd!! * 4 + fd!! * 9 else null
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -531,14 +529,10 @@ internal fun MealEditDialog(
         title = { Text(L("修改「", "Edit [") + "${entry.name}" + L("」", "]"), color = TextHi, fontSize = 16.sp) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedTextField(
-                    value = kcal, onValueChange = { kcal = it },
-                    label = { Text(L("热量 kcal（参考）", "Calories kcal (reference)"), color = TextLo) },
-                    singleLine = true,
-                    keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
-                        keyboardType = KeyboardType.Decimal),
-                    colors = fieldColors(),
-                )
+                if (realKcal != null) {
+                    Text(L("热量（按三维自动计算）≈ ", "Calories (derived from macros) ≈ ") + "${fmt0(realKcal)} kcal",
+                        fontSize = 13.sp, color = Accent)
+                }
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     OutlinedTextField(value = p, onValueChange = { p = it },
                         label = { Text(L("蛋白g", "P g"), color = TextLo, fontSize = 12.sp) }, singleLine = true,
@@ -556,15 +550,11 @@ internal fun MealEditDialog(
                             keyboardType = KeyboardType.Decimal),
                         modifier = Modifier.weight(1f), colors = fieldColors())
                 }
-                if (realKcal != null && kotlin.math.abs(realKcal - (kd ?: 0.0)) > 0.5) {
-                    Text(L("实际热量按三维计算 ≈ ", "Actual calories from macros ≈ ") + "${fmt0(realKcal)} kcal",
-                        fontSize = 12.sp, color = Warn)
-                }
             }
         },
         confirmButton = {
             TextButton(enabled = valid, onClick = {
-                onConfirm(kd!!, pd!!, cd!!, fd!!); onDismiss()
+                onConfirm(pd!!, cd!!, fd!!); onDismiss()
             }) { Text(L("确定", "OK"), color = if (valid) Accent else TextLo) }
         },
         dismissButton = { TextButton(onClick = onDismiss) { Text(L("取消", "Cancel"), color = TextLo) } },

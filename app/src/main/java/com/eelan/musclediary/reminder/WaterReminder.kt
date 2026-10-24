@@ -65,7 +65,7 @@ object WaterReminder {
         )
         val text = "$slotLabel " + L("应喝约 ", "target ~") + "${shouldMl}ml, " + L("目前 ", "drank ") + "${actualMl}ml, " + L("喝杯水吧", "time for a glass of water")
         val n = NotificationCompat.Builder(ctx, CHANNEL_ID)
-            .setSmallIcon(R.drawable.ic_launcher)
+            .setSmallIcon(R.drawable.ic_notification)
             .setContentTitle(L("该喝水了", "Time to hydrate"))
             .setContentText(text)
             .setStyle(NotificationCompat.BigTextStyle().bigText(text))
@@ -80,6 +80,8 @@ object WaterReminder {
         val db = AppDatabase.get(ctx)
         val profile = db.dao().getProfile() ?: return
         if (profile.waterReminder == 0) return
+        // 闹钟拉起进程时 ViewModel 尚未初始化，Lang 还是默认中文：按档案同步，通知文案才跟随语言设置
+        Lang.set(profile.lang)
         val now = java.util.Calendar.getInstance()
         val hour = now.get(java.util.Calendar.HOUR_OF_DAY)
         val slot = SLOTS.lastOrNull { hour >= it.endHour } ?: return // 时段未结束不打扰

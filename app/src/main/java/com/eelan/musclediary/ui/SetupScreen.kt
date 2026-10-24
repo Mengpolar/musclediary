@@ -13,12 +13,14 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.eelan.musclediary.AppViewModel
+import com.eelan.musclediary.Lang
 import com.eelan.musclediary.L
 import com.eelan.musclediary.ui.theme.*
 
-/** 首次启动引导：填写性别/年龄/身高/体重，避免用默认值算错目标 */
+/** 首次启动引导：选语言 + 填写性别/年龄/身高/体重，避免用默认值算错目标 */
 @Composable
 fun SetupScreen(vm: AppViewModel) {
+    var lang by remember { mutableStateOf(vm.profile.lang) }
     var male by remember { mutableStateOf(vm.profile.male) }
     var age by remember { mutableStateOf(vm.profile.age.toString()) }
     var height by remember { mutableStateOf(fmt1(vm.profile.heightCm)) }
@@ -42,6 +44,23 @@ fun SetupScreen(vm: AppViewModel) {
         Spacer(Modifier.height(8.dp))
         Text(L("先填一下身体数据，热量和营养目标才能算得准", "Enter your body stats so calorie & macro targets are accurate"), fontSize = 13.sp, color = TextLo)
         Spacer(Modifier.height(32.dp))
+
+        // 语言先行选择：点击立即切换本页文案，保存时随档案落库
+        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+            Text(L("语言", "Language"), fontSize = 14.sp, color = TextHi, modifier = Modifier.weight(1f))
+            FilterChip(
+                selected = lang == 0, onClick = { lang = 0; Lang.set(0) },
+                label = { Text("中文") },
+                colors = FilterChipDefaults.filterChipColors(selectedContainerColor = Accent.copy(alpha = 0.35f)),
+            )
+            Spacer(Modifier.width(8.dp))
+            FilterChip(
+                selected = lang == 1, onClick = { lang = 1; Lang.set(1) },
+                label = { Text("English") },
+                colors = FilterChipDefaults.filterChipColors(selectedContainerColor = Accent.copy(alpha = 0.35f)),
+            )
+        }
+        Spacer(Modifier.height(16.dp))
 
         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
             Text(L("性别", "Sex"), fontSize = 14.sp, color = TextHi, modifier = Modifier.weight(1f))
@@ -67,7 +86,7 @@ fun SetupScreen(vm: AppViewModel) {
             onClick = {
                 vm.updateProfile(
                     vm.profile.copy(
-                        male = male, age = ageD!!, heightCm = hD!!, weightKg = wD!!, setupDone = 1,
+                        male = male, age = ageD!!, heightCm = hD!!, weightKg = wD!!, lang = lang, setupDone = 1,
                     )
                 )
             },

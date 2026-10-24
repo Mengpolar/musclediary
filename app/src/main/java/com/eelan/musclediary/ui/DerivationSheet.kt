@@ -122,4 +122,4 @@ private fun FormulaRow(title: String, formula: String, result: String) {
     }
 }
 
-private fun fmt2(v: Double): String = String.format("%.2f", v)
+private fun fmt2(v: Double): String = String.format(java.util.Locale.US, "%.2f", v)

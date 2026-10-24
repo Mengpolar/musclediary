@@ -44,8 +44,8 @@ object Updater {
     }
 
     fun formatSize(bytes: Long): String = when {
-        bytes >= 1 shl 20 -> String.format("%.1f MB", bytes / 1048576.0)
-        bytes >= 1 shl 10 -> String.format("%.0f KB", bytes / 1024.0)
+        bytes >= 1 shl 20 -> String.format(java.util.Locale.US, "%.1f MB", bytes / 1048576.0)
+        bytes >= 1 shl 10 -> String.format(java.util.Locale.US, "%.0f KB", bytes / 1024.0)
         else -> "$bytes B"
     }
 
@@ -59,20 +59,27 @@ object Updater {
             conn.instanceFollowRedirects = true
             conn.connect()
             val total = conn.contentLengthLong
-            conn.inputStream.use { input ->
-                out.outputStream().use { output ->
-                    val buf = ByteArray(64 * 1024)
-                    var read = 0L
-                    while (true) {
-                        val n = input.read(buf)
-                        if (n < 0) break
-                        output.write(buf, 0, n)
-                        read += n
-                        if (total > 0) onProgress((read * 100 / total).toInt())
+            try {
+                // 4xx/5xx 时正文是 HTML 错误页，不当 APK 落盘（无 digest 的旧 Release 会把坏包送进安装器）
+                if (conn.responseCode !in 200..299) throw IllegalStateException("HTTP ${conn.responseCode}")
+                conn.inputStream.use { input ->
+                    out.outputStream().use { output ->
+                        val buf = ByteArray(64 * 1024)
+                        var read = 0L
+                        while (true) {
+                            val n = input.read(buf)
+                            if (n < 0) break
+                            output.write(buf, 0, n)
+                            read += n
+                            if (total > 0) onProgress((read * 100 / total).toInt())
+                        }
                     }
                 }
+                out
+            } catch (e: Exception) {
+                out.delete()
+                throw e
             }
-            out
         }
 
     fun install(ctx: Context, apk: File) {
