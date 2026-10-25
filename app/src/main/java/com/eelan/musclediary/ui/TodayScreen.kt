@@ -60,13 +60,6 @@ fun TodayScreen(vm: AppViewModel, onGoWorkout: () -> Unit = {}, onOpenWaterRecor
     ) {
         // 日期头：英文字距星期 + 大日期（右上角不再显示时期徽章）
         DateHeader(vm, onOpenCalendar = { showCalendar = true })
-        // 灯光短线
-        Box(
-            Modifier.padding(top = 10.dp)
-                .width(44.dp).height(2.dp)
-                .clip(RoundedCornerShape(2.dp))
-                .background(Accent),
-        )
         Spacer(Modifier.height(14.dp))
 
         // 灯牌主区：大摄入数字 + 右侧小环
@@ -291,4 +284,11 @@ fun DateHeader(vm: AppViewModel, onOpenCalendar: () -> Unit = {}) {
             Icon(Icons.Default.ChevronRight, L("后一天", "Next day"), tint = if (d < today) TextLo else Ink3)
         }
     }
+    // 灯光短线：今日/饮食/锻炼三个主页面日期下统一装饰
+    Box(
+        Modifier.padding(top = 10.dp)
+            .width(44.dp).height(2.dp)
+            .clip(RoundedCornerShape(2.dp))
+            .background(Accent),
+    )
 }

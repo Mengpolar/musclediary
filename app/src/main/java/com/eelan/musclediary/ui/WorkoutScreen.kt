@@ -229,6 +229,7 @@ fun WorkoutScreen(vm: AppViewModel, onOpenWeightRecords: () -> Unit = {}, onOpen
 
     if (customOpen) {
         CustomExerciseDialog(
+            builtinExists = { n -> vm.exerciseTemplates.any { !it.isCustom && (it.name == n || it.nameEn == n) } },
             onDismiss = { customOpen = false },
             onConfirm = { t ->
                 vm.addCustomExercise(t) { saved -> pendingTemplate = saved }
@@ -398,6 +399,7 @@ private fun WorkoutQtyDialog(
 @Composable
 fun CustomExerciseDialog(
     initial: ExerciseTemplate? = null,
+    builtinExists: (String) -> Boolean = { false },
     onDismiss: () -> Unit,
     onConfirm: (ExerciseTemplate) -> Unit,
 ) {
@@ -426,6 +428,12 @@ fun CustomExerciseDialog(
                 OutlinedTextField(value = name, onValueChange = { name = it },
                     label = { Text(L("名称", "Name"), color = TextLo) }, singleLine = true,
                     colors = com.eelan.musclediary.ui.fieldColors())
+                // 与内置模板重名：仅提示不阻止保存（编辑自身名称时不提示）
+                val dup = name.trim().let { n ->
+                    n.isNotEmpty() && n != initial?.name && n != initial?.nameEn && builtinExists(n)
+                }
+                if (dup) Text(L("已存在同名内置模板，仍可保存", "A built-in template with this name exists (still saveable)"),
+                    fontSize = 12.sp, color = Warn)
                 Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     FilterChip(selected = type == QtyType.REPS, onClick = { type = QtyType.REPS },
                         label = { Text(L("按次", "Reps"), fontSize = 12.sp) })

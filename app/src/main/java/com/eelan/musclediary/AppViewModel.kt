@@ -339,6 +339,27 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    /** 清空某类型的全部模板（内置+自定义）；历史记录不受影响 */
+    fun clearAllTemplates(kind: Int) {
+        viewModelScope.launch(Dispatchers.IO) {
+            if (kind == 0) {
+                dao.clearBuiltinFoodTemplates()
+                dao.clearCustomFoodTemplates()
+            } else {
+                dao.clearBuiltinExerciseTemplates()
+                dao.clearCustomExerciseTemplates()
+            }
+            val fList = dao.foodTemplates().sortedWith(
+                compareByDescending<FoodTemplate> { it.lastUsedAt }.thenBy { it.name })
+            val xList = dao.exerciseTemplates().sortedWith(
+                compareByDescending<ExerciseTemplate> { it.lastUsedAt }.thenBy { it.name })
+            withContext(Dispatchers.Main) {
+                foodTemplates = fList
+                exerciseTemplates = xList
+            }
+        }
+    }
+
     fun addExercise(t: ExerciseTemplate, qty: Double, extraWeight: Double, date: LocalDate) {
         val (kcal, minutes) = Calc.exerciseCalories(t, qty, profile.weightKg)
         val scores = Calc.muscleScores(t, qty, extraWeight)

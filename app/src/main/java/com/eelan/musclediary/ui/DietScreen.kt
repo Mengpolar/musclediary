@@ -162,6 +162,7 @@ fun DietScreen(vm: AppViewModel, onOpenRecords: () -> Unit = {}) {
 
     if (customOpen) {
         CustomFoodDialog(
+            builtinExists = { n -> vm.foodTemplates.any { !it.isCustom && (it.name == n || it.nameEn == n) } },
             onDismiss = { customOpen = false },
             onConfirm = { name, p, c, f, tag, unitName, unitGrams ->
                 vm.addCustomFood(name, p, c, f, tag, unitName, unitGrams) { saved ->
@@ -298,6 +299,7 @@ fun fieldColors() = TextFieldDefaults.colors(
 @Composable
 fun CustomFoodDialog(
     initial: FoodTemplate? = null,
+    builtinExists: (String) -> Boolean = { false },
     onDismiss: () -> Unit,
     onConfirm: (String, Double, Double, Double, String, String, Double) -> Unit,
 ) {
@@ -324,6 +326,12 @@ fun CustomFoodDialog(
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 OutlinedTextField(value = name, onValueChange = { name = it },
                     label = { Text(L("名称", "Name"), color = TextLo) }, singleLine = true, colors = fieldColors())
+                // 与内置模板重名：仅提示不阻止保存（编辑自身名称时不提示）
+                val dup = name.trim().let { n ->
+                    n.isNotEmpty() && n != initial?.name && n != initial?.nameEn && builtinExists(n)
+                }
+                if (dup) Text(L("已存在同名内置模板，仍可保存", "A built-in template with this name exists (still saveable)"),
+                    fontSize = 12.sp, color = Warn)
                 // 能量直填：包装标签单位是千焦（kJ），填后按 15/50/35 能量占比反推三维营养
                 OutlinedTextField(
                     value = kJ, onValueChange = { v ->

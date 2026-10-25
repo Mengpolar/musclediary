@@ -39,9 +39,13 @@ fun ManageTemplatesScreen(vm: AppViewModel, kind: Int, onClose: () -> Unit) {
     var addFood by remember { mutableStateOf(false) }
     var addExercise by remember { mutableStateOf(false) }
     var confirmDelete by remember { mutableStateOf<Any?>(null) }
+    var confirmClear by remember { mutableStateOf(false) }
+    // 筛选：null 全部 / false 内置 / true 自定义
+    var customFilter by remember { mutableStateOf<Boolean?>(null) }
 
     val all: List<Any> = if (kind == 0) vm.foodTemplates else vm.exerciseTemplates
     val filtered = all.filter { nameOf(it).contains(search, ignoreCase = true) }
+        .filter { customFilter == null || isCustom(it) == customFilter }
         .sortedBy { nameOf(it).let { n -> if (isCustom(it)) "～$n" else n } }
 
     Column(Modifier.fillMaxSize().padding(horizontal = 16.dp)) {
@@ -52,15 +56,13 @@ fun ManageTemplatesScreen(vm: AppViewModel, kind: Int, onClose: () -> Unit) {
                 fontSize = 16.sp, fontWeight = FontWeight.Bold, color = TextHi,
                 modifier = Modifier.weight(1f),
             )
+            TextButton(onClick = { confirmClear = true }) {
+                Text(L("清空", "Clear"), color = MaterialTheme.colorScheme.error, fontSize = 13.sp)
+            }
             TextButton(onClick = {
                 vm.restoreBuiltins { }
             }) { Text(L("补回内置", "Restore built-ins"), color = Accent, fontSize = 13.sp) }
         }
-        Spacer(Modifier.height(4.dp))
-        Text(
-            L("共 ", "Total ") + "${filtered.size}" + L(" 个 · 左滑可编辑或删除模板，历史记录不受影响", " · swipe left to edit or delete; history unaffected"),
-            fontSize = 12.sp, color = TextLo,
-        )
         Spacer(Modifier.height(8.dp))
 
         OutlinedTextField(
@@ -70,6 +72,15 @@ fun ManageTemplatesScreen(vm: AppViewModel, kind: Int, onClose: () -> Unit) {
             colors = fieldColors(),
             modifier = Modifier.fillMaxWidth(),
         )
+        Spacer(Modifier.height(8.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            FilterChip(selected = customFilter == null, onClick = { customFilter = null },
+                label = { Text(L("全部", "All"), fontSize = 12.sp) })
+            FilterChip(selected = customFilter == false, onClick = { customFilter = false },
+                label = { Text(L("内置", "Built-in"), fontSize = 12.sp) })
+            FilterChip(selected = customFilter == true, onClick = { customFilter = true },
+                label = { Text(L("自定义", "Custom"), fontSize = 12.sp) })
+        }
         Spacer(Modifier.height(8.dp))
 
         TextButton(onClick = { if (kind == 0) addFood = true else addExercise = true }) {
@@ -98,6 +109,7 @@ fun ManageTemplatesScreen(vm: AppViewModel, kind: Int, onClose: () -> Unit) {
     if (editFood != null || addFood) {
         CustomFoodDialog(
             initial = editFood,
+            builtinExists = { n -> vm.foodTemplates.any { !it.isCustom && (it.name == n || it.nameEn == n) } },
             onDismiss = { editFood = null; addFood = false },
             onConfirm = { name, p, c, f, tag, unitName, unitGrams ->
                 if (editFood != null) {
@@ -113,6 +125,7 @@ fun ManageTemplatesScreen(vm: AppViewModel, kind: Int, onClose: () -> Unit) {
     if (editExercise != null || addExercise) {
         CustomExerciseDialog(
             initial = editExercise,
+            builtinExists = { n -> vm.exerciseTemplates.any { !it.isCustom && (it.name == n || it.nameEn == n) } },
             onDismiss = { editExercise = null; addExercise = false },
             onConfirm = { t ->
                 if (editExercise != null) vm.saveExerciseTemplate(t)
@@ -138,6 +151,25 @@ fun ManageTemplatesScreen(vm: AppViewModel, kind: Int, onClose: () -> Unit) {
             dismissButton = {
                 TextButton(onClick = { confirmDelete = null }) { Text(L("取消", "Cancel"), color = TextLo) }
             },
+        )
+    }
+
+    // —— 清空确认 ——
+    if (confirmClear) {
+        AlertDialog(
+            onDismissRequest = { confirmClear = false },
+            containerColor = Ink2,
+            title = { Text(L("清空全部", "Clear all ") + (if (kind == 0) L("食物模板", "food templates") else L("锻炼模板", "exercise templates")) + L("？", "?"), color = TextHi, fontSize = 16.sp) },
+            text = { Text(L("将删除该类型的全部内置与自定义模板，历史记录不受影响；内置模板可随时补回，自定义模板删除后无法恢复。",
+                "This deletes ALL built-in and custom templates of this type. History is unaffected; built-ins can be restored anytime, custom templates cannot."),
+                fontSize = 13.sp, color = TextLo) },
+            confirmButton = {
+                TextButton(onClick = {
+                    vm.clearAllTemplates(kind)
+                    confirmClear = false
+                }) { Text(L("清空", "Clear"), color = MaterialTheme.colorScheme.error) }
+            },
+            dismissButton = { TextButton(onClick = { confirmClear = false }) { Text(L("取消", "Cancel"), color = TextLo) } },
         )
     }
 }
@@ -169,7 +201,7 @@ private fun ActionChip(label: String, color: Color, onClick: () -> Unit) {
 private fun FoodManageRow(t: FoodTemplate, onEdit: () -> Unit, onDelete: () -> Unit) {
     val unitInfo = if (t.unitName.isNotBlank() && t.unitGrams > 0) " · 1${foodUnitLabel(t.unitName)}=${fmt0(t.unitGrams)}g" else ""
     SwipeEntryRow(
-        title = t.dispName + if (t.isCustom) L(" · 自定义", " · custom") else "",
+        title = t.dispName + if (t.isCustom) L(" · 自定义", " · custom") else L(" · 内置", " · built-in"),
         detail = L("蛋白", "P") + "${fmt1(t.protein)} " + L("碳水", "C") + "${fmt1(t.carb)} " + L("脂肪", "F") + "${fmt1(t.fat)}$unitInfo",
         trailing = "${fmt0(t.kcal)} kcal",
         onEdit = onEdit,
@@ -180,7 +212,7 @@ private fun FoodManageRow(t: FoodTemplate, onEdit: () -> Unit, onDelete: () -> U
 @Composable
 private fun ExerciseManageRow(t: ExerciseTemplate, onEdit: () -> Unit, onDelete: () -> Unit) {
     SwipeEntryRow(
-        title = t.dispName + if (t.isCustom) L(" · 自定义", " · custom") else "",
+        title = t.dispName + if (t.isCustom) L(" · 自定义", " · custom") else L(" · 内置", " · built-in"),
         detail = "${Calc.unitLabel(t)} · MET ${fmt1(t.met)} · " + L("主练", "primary: ") + "${Muscle.labelOf(t.primaryMuscle)}",
         trailing = "MET ${fmt1(t.met)}",
         onEdit = onEdit,
