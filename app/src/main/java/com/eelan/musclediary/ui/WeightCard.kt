@@ -1,19 +1,33 @@
 package com.eelan.musclediary.ui
 
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.RoundRect
 import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.drawText
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.eelan.musclediary.AppViewModel
@@ -70,7 +84,10 @@ fun WeightCard(vm: AppViewModel, onOpenRecords: () -> Unit = {}) {
     }
 }
 
-/** BMI 条：偏瘦 <18.5 / 正常 18.5~24 / 超重 24~28 / 肥胖 ≥28（中国标准），展示当前位置 */
+/**
+ * BMI 条：偏瘦 <18.5 / 正常 18.5~24 / 超重 24~28 / 肥胖 ≥28（中国标准）。
+ * 分区渐变胶囊条（向右渐浓）+ 分界刻度线 + 白滑块指针；数值/颜色/指针位均带过渡动画。
+ */
 @Composable
 fun BmiBar(bmi: Double, weightKg: Double, heightCm: Double) {
     val zone = Calc.bmiZone(bmi)
@@ -78,53 +95,76 @@ fun BmiBar(bmi: Double, weightKg: Double, heightCm: Double) {
     val zoneColors = listOf(Protein, Good, Warn, Color(0xFFEF5350))
     val bmiMin = 14.0
     val bmiMax = 36.0
-    val pos = ((bmi - bmiMin) / (bmiMax - bmiMin)).coerceIn(0.0, 1.0)
+    // 体重/身高修改后数字、颜色与指针平滑过渡
+    val animBmi by animateFloatAsState(bmi.toFloat(), tween(450), label = "bmi")
+    val zoneColor by animateColorAsState(zoneColors[zone], tween(450), label = "bmiColor")
+    val measurer = rememberTextMeasurer()
 
     Column {
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-            Text(
-                "BMI ${fmt1(bmi)}",
-                fontSize = 16.sp, fontWeight = FontWeight.Bold, color = zoneColors[zone],
-            )
+            Text("BMI", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = TextLo, letterSpacing = 2.sp)
             Spacer(Modifier.width(8.dp))
             Text(
-                "「${zoneNames[zone]}」",
-                fontSize = 13.sp, color = zoneColors[zone],
+                fmt1(animBmi.toDouble()),
+                fontSize = 28.sp, fontWeight = FontWeight.ExtraBold, color = zoneColor,
+                style = TextStyle(fontFeatureSettings = "tnum"),
+            )
+            Spacer(Modifier.width(10.dp))
+            // 区间徽章：描边胶囊，同色系弱底
+            Text(
+                zoneNames[zone], fontSize = 11.sp, fontWeight = FontWeight.Bold, color = zoneColor,
+                modifier = Modifier
+                    .clip(RoundedCornerShape(99.dp))
+                    .background(zoneColor.copy(alpha = 0.10f))
+                    .border(1.dp, zoneColor.copy(alpha = 0.45f), RoundedCornerShape(99.dp))
+                    .padding(horizontal = 10.dp, vertical = 4.dp),
             )
             Spacer(Modifier.weight(1f))
-            Text(L("体重 ", "Wt ") + "${fmt1(weightKg)}kg · " + L("身高 ", "Ht ") + "${fmt1(heightCm)}cm",
-                fontSize = 12.sp, color = TextLo)
-        }
-        Spacer(Modifier.height(6.dp))
-        Canvas(Modifier.fillMaxWidth().height(14.dp)) {
-            val w = size.width
-            val h = size.height
-            val r = androidx.compose.ui.geometry.CornerRadius(h / 2, h / 2)
-            // 四段区间底色
-            fun zoneX(b: Double) = ((b - bmiMin) / (bmiMax - bmiMin) * w).toFloat()
-            val segs = listOf(
-                14.0 to 18.5, 18.5 to 24.0, 24.0 to 28.0, 28.0 to 36.0)
-            segs.forEachIndexed { i, (a, b) ->
-                drawRoundRect(
-                    zoneColors[i].copy(alpha = 0.30f),
-                    topLeft = Offset(zoneX(a), 0f),
-                    size = Size(zoneX(b) - zoneX(a), h),
-                    cornerRadius = r,
-                )
+            Column(horizontalAlignment = Alignment.End) {
+                Text(L("体重 ", "Wt ") + "${fmt1(weightKg)} kg", fontSize = 11.sp, color = TextLo)
+                Text(L("身高 ", "Ht ") + "${fmt1(heightCm)} cm", fontSize = 11.sp, color = TextLo)
             }
-            // 当前 BMI 指针
-            val x = (pos * w).toFloat()
-            drawLine(Color.White, Offset(x, -3f), Offset(x, h + 3f), strokeWidth = 3f)
-            drawCircle(Color.White, 4f, Offset(x, h / 2))
         }
-        Spacer(Modifier.height(2.dp))
-        Row(Modifier.fillMaxWidth()) {
-            Text("18.5", fontSize = 12.sp, color = TextLo)
-            Spacer(Modifier.weight(1f))
-            Text("24", fontSize = 12.sp, color = TextLo)
-            Spacer(Modifier.weight(0.76f))
-            Text("28", fontSize = 12.sp, color = TextLo)
-            Spacer(Modifier.weight(1.14f))
+        Spacer(Modifier.height(10.dp))
+        Canvas(Modifier.fillMaxWidth().height(34.dp)) {
+            val w = size.width
+            val barH = 16.dp.toPx()
+            val r = CornerRadius(barH / 2, barH / 2)
+            fun zoneX(b: Double) = ((b - bmiMin) / (bmiMax - bmiMin) * w).toFloat()
+
+            // 胶囊底 + 四区渐变（多色标一次成画：区内向右渐浓，分界处硬切换）
+            val capsule = Path().apply { addRoundRect(RoundRect(0f, 0f, w, barH, r)) }
+            drawPath(capsule, Ink2)
+            val stops = arrayOf(
+                0f to zoneColors[0].copy(alpha = 0.30f),
+                zoneX(18.5) / w to zoneColors[0].copy(alpha = 0.78f),
+                zoneX(18.5) / w to zoneColors[1].copy(alpha = 0.30f),
+                zoneX(24.0) / w to zoneColors[1].copy(alpha = 0.78f),
+                zoneX(24.0) / w to zoneColors[2].copy(alpha = 0.30f),
+                zoneX(28.0) / w to zoneColors[2].copy(alpha = 0.78f),
+                zoneX(28.0) / w to zoneColors[3].copy(alpha = 0.30f),
+                1f to zoneColors[3].copy(alpha = 0.78f),
+            )
+            drawPath(capsule, Brush.horizontalGradient(*stops))
+            // 分界刻度线（卡片底色细线，兼作分段隔断）
+            listOf(18.5, 24.0, 28.0).forEach { b ->
+                drawLine(Ink1, Offset(zoneX(b), 0f), Offset(zoneX(b), barH), 2f)
+            }
+
+            // 指针：zone 色指向线 + 白滑块 + 光环
+            val pos = ((animBmi - bmiMin) / (bmiMax - bmiMin)).coerceIn(0.0, 1.0)
+            val x = (pos * w).toFloat()
+            drawLine(zoneColor.copy(alpha = 0.65f), Offset(x, barH), Offset(x, barH + 5f), 2f)
+            drawCircle(zoneColor.copy(alpha = 0.30f), 9.dp.toPx(), Offset(x, barH / 2))
+            drawCircle(Color.White, 4.dp.toPx(), Offset(x, barH / 2))
+
+            // 分界数字：宽度实测后中心对齐各自分界线
+            val bounds = listOf(18.5, 24.0, 28.0)
+            listOf("18.5", "24", "28").forEachIndexed { i, label ->
+                val t = measurer.measure(
+                    AnnotatedString(label), TextStyle(fontSize = 9.sp, color = TextLo))
+                drawText(t, topLeft = Offset(zoneX(bounds[i]) - t.size.width / 2f, barH + 4f))
+            }
         }
     }
 }

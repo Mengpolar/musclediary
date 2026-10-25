@@ -1,6 +1,11 @@
 package com.eelan.musclediary.ui
 
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
@@ -182,41 +187,62 @@ fun MuscleMap(
     onPick: (Muscle?) -> Unit,
 ) {
     var picked by remember { mutableStateOf<Muscle?>(null) }
+    // 选中描边呼吸：以 lambda 传入，draw 阶段按需读取（未选中时不订阅、零重绘）
+    val pulseTransition = rememberInfiniteTransition(label = "pick")
+    val pulse by pulseTransition.animateFloat(
+        initialValue = 0.5f, targetValue = 1f,
+        animationSpec = infiniteRepeatable(tween(700, easing = LinearEasing), RepeatMode.Reverse),
+        label = "pickPulse",
+    )
     Column(modifier.fillMaxWidth()) {
         Row(
             Modifier.fillMaxWidth().height(260.dp),
             horizontalArrangement = Arrangement.SpaceEvenly,
         ) {
-            MuscleView(Side.FRONT, scores, intensityOf, picked,
+            MuscleView(Side.FRONT, scores, intensityOf, picked, { pulse },
                 Modifier.weight(1f).fillMaxHeight()) { picked = it; onPick(it) }
-            MuscleView(Side.BACK, scores, intensityOf, picked,
+            MuscleView(Side.BACK, scores, intensityOf, picked, { pulse },
                 Modifier.weight(1f).fillMaxHeight()) { picked = it; onPick(it) }
         }
-        Spacer(Modifier.height(6.dp))
-        // 色带图例：绿→橙→红 对应 轻/中/高
+        Spacer(Modifier.height(8.dp))
+        // 色带图例铭牌：绿→橙→红 对应 轻/中/高
         Row(
-            Modifier.fillMaxWidth().padding(horizontal = 12.dp),
-            horizontalArrangement = Arrangement.Center,
+            Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Box(Modifier.size(8.dp).background(intensityColor(1), CircleShape))
-            Text(L("轻度", "Light"), fontSize = 11.sp, color = TextLo, modifier = Modifier.padding(start = 3.dp, end = 10.dp))
-            Box(Modifier.size(8.dp).background(intensityColor(2), CircleShape))
-            Text(L("中度", "Moderate"), fontSize = 11.sp, color = TextLo, modifier = Modifier.padding(start = 3.dp, end = 10.dp))
-            Box(Modifier.size(8.dp).background(intensityColor(3), CircleShape))
-            Text(L("高强度", "Intense"), fontSize = 11.sp, color = TextLo, modifier = Modifier.padding(start = 3.dp))
+            listOf(1, 2, 3).forEach { lv ->
+                Row(
+                    Modifier
+                        .clip(RoundedCornerShape(99.dp))
+                        .background(Ink2)
+                        .padding(horizontal = 9.dp, vertical = 3.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Box(Modifier.size(6.dp).background(intensityColor(lv), CircleShape))
+                    Text(intensityLabel(lv), fontSize = 10.sp, color = TextLo,
+                        modifier = Modifier.padding(start = 4.dp))
+                }
+            }
         }
-        Spacer(Modifier.height(4.dp))
+        Spacer(Modifier.height(6.dp))
         if (picked != null) {
             val score = scores[picked!!.id] ?: 0.0
             val level = intensityOf(score)
-            Text(
-                "${Muscle.labelOf(picked!!.id)} · ${intensityLabel(level)} · " + L("刺激分 ", "score ") + "${fmt1(score)}",
-                fontSize = 13.sp, color = if (level == 0) TextHi else intensityColor(level),
-                modifier = Modifier.align(Alignment.CenterHorizontally)
-                    .clip(RoundedCornerShape(8.dp))
-                    .background(Ink2).padding(horizontal = 12.dp, vertical = 6.dp),
-            )
+            Row(
+                Modifier
+                    .align(Alignment.CenterHorizontally)
+                    .clip(RoundedCornerShape(99.dp))
+                    .background(Ink2)
+                    .padding(horizontal = 12.dp, vertical = 5.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Box(Modifier.size(6.dp).background(intensityColor(level), CircleShape))
+                Text(
+                    " ${Muscle.labelOf(picked!!.id)} · ${intensityLabel(level)} · " + L("刺激分 ", "score ") + "${fmt1(score)}",
+                    fontSize = 13.sp, color = if (level == 0) TextHi else intensityColor(level),
+                )
+            }
         } else {
             Text(
                 L("点击肌肉部位查看当天刺激情况", "Tap a muscle to see today's stimulus"),
@@ -233,16 +259,24 @@ private fun MuscleView(
     scores: Map<String, Double>,
     intensityOf: (Double) -> Int,
     picked: Muscle?,
+    pulse: () -> Float,
     modifier: Modifier,
     onTap: (Muscle?) -> Unit,
 ) {
     val shapes = if (side == Side.FRONT) frontShapes else backShapes
     Column(modifier, horizontalAlignment = Alignment.CenterHorizontally) {
-        Text(if (side == Side.FRONT) L("正面", "Front") else L("背面", "Back"), fontSize = 12.sp, color = TextLo)
+        Text(
+            if (side == Side.FRONT) L("正面", "Front") else L("背面", "Back"),
+            fontSize = 10.sp, color = TextLo, letterSpacing = 1.sp,
+            modifier = Modifier
+                .clip(RoundedCornerShape(99.dp))
+                .background(Ink2)
+                .padding(horizontal = 10.dp, vertical = 2.dp),
+        )
         Canvas(
             Modifier
                 .fillMaxSize()
-                .padding(top = 4.dp)
+                .padding(top = 6.dp)
                 .pointerInput(side, shapes) {
                     detectTapGestures { pos ->
                         val unit = min(size.width / 120f, size.height / 240f)
@@ -264,8 +298,15 @@ private fun MuscleView(
 
             bodyParts.forEach { s -> drawShape(T(s), Ink2) }
             shapes.forEach { (m, s) ->
-                val level = intensityOf(scores[m.id] ?: 0.0)
-                drawShape(T(s), levelColor(level, scores[m.id] ?: 0.0, intensityOf))
+                val sc = scores[m.id] ?: 0.0
+                val sh = T(s)
+                val c = levelColor(intensityOf(sc), sc, intensityOf)
+                if (sc > 0.0) {
+                    // 强度光晕：同色低透明宽描边垫在实体下，刺激分越高越亮
+                    drawShape(sh, c.copy(alpha = ((0.10 + sc / 60.0).coerceAtMost(0.35)).toFloat()),
+                        outline = true, strokeWidth = unit * 1.8f)
+                }
+                drawShape(sh, c)
             }
             // 轮廓
             bodyParts.forEach { s -> drawShape(T(s), OutlineColor, outline = true) }
@@ -276,10 +317,11 @@ private fun MuscleView(
                 drawLine(OutlineColor, Offset(ox + 51f * u, oy + 63f * u), Offset(ox + 69f * u, oy + 63f * u), 1.2f)
                 drawLine(OutlineColor, Offset(ox + 51f * u, oy + 71f * u), Offset(ox + 69f * u, oy + 71f * u), 1.2f)
             }
-            // 选中肌群高亮描边（把同肌群所有形状一起描）
+            // 选中肌群高亮描边呼吸（把同肌群所有形状一起描；仅在选中时读取动画值）
             if (picked != null) {
+                val a = 0.5f + 0.5f * pulse()
                 shapes.forEach { (m, s) ->
-                    if (m == picked) drawShape(T(s), Color.White, outline = true, strokeWidth = 4f)
+                    if (m == picked) drawShape(T(s), Color.White.copy(alpha = a), outline = true, strokeWidth = 3.5f)
                 }
             }
         }

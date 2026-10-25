@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -92,14 +93,26 @@ fun WorkoutScreen(vm: AppViewModel, onOpenWeightRecords: () -> Unit = {}, onOpen
             DateHeader(vm, onOpenCalendar = { showCalendar = true })
             Spacer(Modifier.height(8.dp))
             CardBox {
-                Text(L("肌肉概览", "Muscle map"), fontSize = 14.sp, fontWeight = FontWeight.Bold, color = TextHi)
+                // 标题行右侧当日小结：训练部位数 + 总刺激分（无训练显示休息日）
+                val hitAreas = scores.count { it.value > 0 }
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                    Text(L("肌肉概览", "Muscle map"), fontSize = 14.sp, fontWeight = FontWeight.Bold,
+                        color = TextHi, modifier = Modifier.weight(1f))
+                    if (hitAreas > 0) {
+                        Box(Modifier.size(6.dp).background(Good, CircleShape))
+                        Text(
+                            "  $hitAreas" + L(" 部位 · 刺激 ", " areas · stim ") + fmt0(scores.values.sum()),
+                            fontSize = 12.sp, color = TextLo,
+                        )
+                    } else {
+                        Text(L("今日休息", "Rest day"), fontSize = 12.sp, color = TextLo)
+                    }
+                }
                 Spacer(Modifier.height(4.dp))
                 MuscleMap(scores, { Calc.intensity(it) }, onPick = { })
             }
             Spacer(Modifier.height(12.dp))
             CardBox {
-                Text("BMI", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = TextHi)
-                Spacer(Modifier.height(4.dp))
                 BmiBar(Calc.bmi(vm.profile.weightKg, vm.profile.heightCm),
                     vm.profile.weightKg, vm.profile.heightCm)
             }
