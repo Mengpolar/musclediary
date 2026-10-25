@@ -38,7 +38,7 @@ fun FoodGramsDialog(
     onConfirm: (Double) -> Unit,
 ) {
     val hasUnit = template != null && template.unitName.isNotBlank() && template.unitGrams > 0
-    val unitName = template?.unitName?.ifBlank { L("份", "serving") } ?: L("份", "serving")
+    val unitName = foodUnitLabel(template?.unitName?.ifBlank { "份" } ?: "份")
 
     var gramsText by remember { mutableStateOf(fmt1(initialGrams)) }
     var unitText by remember {

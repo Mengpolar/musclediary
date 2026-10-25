@@ -143,8 +143,8 @@ fun ManageTemplatesScreen(vm: AppViewModel, kind: Int, onClose: () -> Unit) {
 }
 
 private fun nameOf(t: Any): String = when (t) {
-    is FoodTemplate -> t.name
-    is ExerciseTemplate -> t.name
+    is FoodTemplate -> t.dispName
+    is ExerciseTemplate -> t.dispName
     else -> ""
 }
 
@@ -167,9 +167,9 @@ private fun ActionChip(label: String, color: Color, onClick: () -> Unit) {
 
 @Composable
 private fun FoodManageRow(t: FoodTemplate, onEdit: () -> Unit, onDelete: () -> Unit) {
-    val unitInfo = if (t.unitName.isNotBlank() && t.unitGrams > 0) " · 1${t.unitName}=${fmt0(t.unitGrams)}g" else ""
+    val unitInfo = if (t.unitName.isNotBlank() && t.unitGrams > 0) " · 1${foodUnitLabel(t.unitName)}=${fmt0(t.unitGrams)}g" else ""
     SwipeEntryRow(
-        title = t.name + if (t.isCustom) L(" · 自定义", " · custom") else "",
+        title = t.dispName + if (t.isCustom) L(" · 自定义", " · custom") else "",
         detail = L("蛋白", "P") + "${fmt1(t.protein)} " + L("碳水", "C") + "${fmt1(t.carb)} " + L("脂肪", "F") + "${fmt1(t.fat)}$unitInfo",
         trailing = "${fmt0(t.kcal)} kcal",
         onEdit = onEdit,
@@ -180,7 +180,7 @@ private fun FoodManageRow(t: FoodTemplate, onEdit: () -> Unit, onDelete: () -> U
 @Composable
 private fun ExerciseManageRow(t: ExerciseTemplate, onEdit: () -> Unit, onDelete: () -> Unit) {
     SwipeEntryRow(
-        title = t.name + if (t.isCustom) L(" · 自定义", " · custom") else "",
+        title = t.dispName + if (t.isCustom) L(" · 自定义", " · custom") else "",
         detail = "${Calc.unitLabel(t)} · MET ${fmt1(t.met)} · " + L("主练", "primary: ") + "${Muscle.labelOf(t.primaryMuscle)}",
         trailing = "MET ${fmt1(t.met)}",
         onEdit = onEdit,

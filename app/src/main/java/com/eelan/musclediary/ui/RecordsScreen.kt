@@ -122,7 +122,7 @@ fun RecordsScreen(vm: AppViewModel, kind: Int, onClose: () -> Unit) {
             FoodEditDialog(
                 entryName = e.name,
                 currentGrams = e.grams,
-                template = vm.foodTemplates.firstOrNull { it.name == e.name },
+                template = vm.foodTemplates.firstOrNull { it.dispName == e.name || it.name == e.name },
                 onDismiss = { editingFood = null },
                 onConfirm = { v -> vm.updateFoodEntry(e, v); editingFood = null },
             )
@@ -146,9 +146,10 @@ fun RecordsScreen(vm: AppViewModel, kind: Int, onClose: () -> Unit) {
 
 /** 锻炼修改弹框的数量单位标签：按模板类型显示 个/公里/秒，模板已删按名称兜底 */
 private fun qtyLabel(e: ExerciseEntry, templates: List<ExerciseTemplate>): String {
-    val unit = templates.firstOrNull { it.id == e.templateId }
+    val unit = (templates.firstOrNull { it.id == e.templateId }
+        ?: templates.firstOrNull { it.name == e.name || it.dispName == e.name })
         ?.let { Calc.unitLabel(it) }
-        ?: if (e.name.contains("跑") || e.name.contains("步") || e.name.contains("骑")) L("公里", "km") else L("数量", "qty")
+        ?: if (isDistanceName(e.name)) L("公里", "km") else L("数量", "qty")
     return if (unit == L("数量", "qty")) L("数量", "qty") else L("数量（", "Qty (") + "$unit)"
 }
 

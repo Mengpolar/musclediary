@@ -133,7 +133,7 @@ fun DietScreen(vm: AppViewModel, onOpenRecords: () -> Unit = {}) {
 
     pendingTemplate?.let { t ->
         FoodGramsDialog(
-            title = t.name,
+            title = t.dispName,
             template = t,
             initialGrams = vm.recentFoodGrams(t).firstOrNull() ?: 100.0,
             recent = vm.recentFoodGrams(t),
@@ -153,7 +153,7 @@ fun DietScreen(vm: AppViewModel, onOpenRecords: () -> Unit = {}) {
             FoodEditDialog(
                 entryName = e.name,
                 currentGrams = e.grams,
-                template = vm.foodTemplates.firstOrNull { it.name == e.name },
+                template = vm.foodTemplates.firstOrNull { it.dispName == e.name || it.name == e.name },
                 onDismiss = { editingEntry = null },
                 onConfirm = { grams -> vm.updateFoodEntry(e, grams); editingEntry = null },
             )
@@ -233,7 +233,7 @@ fun TemplatePickerDialog(
                 }
                 Spacer(Modifier.height(4.dp))
                 val filtered = templates.filter {
-                    it.name.contains(search, ignoreCase = true) &&
+                    (it.name.contains(search, ignoreCase = true) || it.nameEn.contains(search, ignoreCase = true)) &&
                             (tagFilter == null || it.tag.contains(tagFilter!!))
                 }
                 LazyColumn(modifier = Modifier.height(300.dp)) {
@@ -247,7 +247,7 @@ fun TemplatePickerDialog(
                         ) {
                             Column(Modifier.weight(1f)) {
                                 Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Text(t.name, color = TextHi, fontSize = 14.sp)
+                                    Text(t.dispName, color = TextHi, fontSize = 14.sp)
                                     if (t.tag.isNotBlank()) {
                                         Spacer(Modifier.width(6.dp))
                                         t.tag.split(',').filter { it.isNotBlank() }.forEach { tg ->
@@ -301,7 +301,7 @@ fun CustomFoodDialog(
     onDismiss: () -> Unit,
     onConfirm: (String, Double, Double, Double, String, String, Double) -> Unit,
 ) {
-    var name by remember { mutableStateOf(initial?.name ?: "") }
+    var name by remember { mutableStateOf(initial?.dispName ?: "") }
     var p by remember { mutableStateOf(initial?.let { fmt1(it.protein) } ?: "") }
     var c by remember { mutableStateOf(initial?.let { fmt1(it.carb) } ?: "") }
     var f by remember { mutableStateOf(initial?.let { fmt1(it.fat) } ?: "") }
@@ -318,7 +318,7 @@ fun CustomFoodDialog(
         containerColor = Ink2,
         title = { Text(
             if (initial == null) L("自定义食物（每100g）", "Custom food (per 100g)")
-            else L("修改「", "Edit \"") + initial.name + L("」（每100g）", "\" (per 100g)"),
+            else L("修改「", "Edit \"") + initial.dispName + L("」（每100g）", "\" (per 100g)"),
             color = TextHi, fontSize = 16.sp) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {

@@ -12,6 +12,7 @@ data class Profile(
     val weightKg: Double = 65.0,
     val surplusKcal: Double = 250.0,
     val seedVersion: Int = 1,
+    val exerciseSeedVersion: Int = 1,
     val mode: Int = 0, // 0 增肌期 / 1 减脂期
     val exerciseGoalKcal: Double = 300.0,
     val setupDone: Int = 0, // 0 未完成首次引导
@@ -43,6 +44,7 @@ data class WaterEntry(
 data class FoodTemplate(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
     val name: String,
+    val nameEn: String = "", // 英文名（内置模板数据源），空 = 无英文名，英文界面回退中文名
     val protein: Double,
     val carb: Double,
     val fat: Double,
@@ -53,6 +55,7 @@ data class FoodTemplate(
     val unitGrams: Double = 0.0, // 1 个单位等于多少 g（牛奶等液体为 ml）
 ) {
     val kcal: Double get() = protein * 4 + carb * 4 + fat * 9
+    val dispName: String get() = if (com.eelan.musclediary.Lang.isEn && nameEn.isNotEmpty()) nameEn else name
 }
 
 /** 营养数值为当日进食总量 */
@@ -76,6 +79,7 @@ enum class QtyType { REPS, DISTANCE, SECONDS }
 data class ExerciseTemplate(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
     val name: String,
+    val nameEn: String = "", // 英文名（内置模板数据源），空 = 无英文名，英文界面回退中文名
     val qtyType: QtyType,
     val met: Double,
     val perRepSeconds: Double = 0.0,  // REPS 类型：单次耗时（秒）
@@ -85,7 +89,9 @@ data class ExerciseTemplate(
     val isCustom: Boolean = false,
     val lastUsedAt: Long = 0,
     val voiceKey: String = "",        // 旧训练模式遗留字段，已废弃
-)
+) {
+    val dispName: String get() = if (com.eelan.musclediary.Lang.isEn && nameEn.isNotEmpty()) nameEn else name
+}
 
 @Entity(tableName = "exercise_entries")
 data class ExerciseEntry(
@@ -202,6 +208,9 @@ interface AppDao {
     @Query("DELETE FROM food_templates WHERE isCustom = 0")
     suspend fun clearBuiltinFoodTemplates()
 
+    @Query("DELETE FROM exercise_templates WHERE isCustom = 0")
+    suspend fun clearBuiltinExerciseTemplates()
+
     @Query("SELECT * FROM water_entries ORDER BY date, createdAt")
     suspend fun allWaterEntries(): List<WaterEntry>
 
@@ -227,7 +236,7 @@ interface AppDao {
 @Database(
     entities = [Profile::class, FoodTemplate::class, FoodEntry::class,
         ExerciseTemplate::class, ExerciseEntry::class, WeightEntry::class, WaterEntry::class],
-    version = 8,
+    version = 9,
     exportSchema = true,
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -315,12 +324,22 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        val MIGRATION_8_9 = object : androidx.room.migration.Migration(8, 9) {
+            override fun migrate(db: androidx.sqlite.db.SupportSQLiteDatabase) {
+                // 模板英文名（内置模板随数据源升级重播种补全，自定义模板默认空回退中文名）
+                db.execSQL("ALTER TABLE `food_templates` ADD COLUMN `nameEn` TEXT NOT NULL DEFAULT ''")
+                db.execSQL("ALTER TABLE `exercise_templates` ADD COLUMN `nameEn` TEXT NOT NULL DEFAULT ''")
+                // 锻炼数据源版本：与食物 seedVersion 同机制，老用户可收到动作模板修正
+                db.execSQL("ALTER TABLE `profile` ADD COLUMN `exerciseSeedVersion` INTEGER NOT NULL DEFAULT 1")
+            }
+        }
+
         fun get(ctx: Context): AppDatabase =
             inst ?: synchronized(this) {
                 inst ?: Room.databaseBuilder(
                     ctx.applicationContext, AppDatabase::class.java, "musclediary.db"
                 ).addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6,
-                    MIGRATION_6_7, MIGRATION_7_8)
+                    MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9)
                     .build().also { inst = it }
             }
     }

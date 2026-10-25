@@ -59,6 +59,13 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 profile = profile.copy(seedVersion = FoodSeed.version)
                 dao.upsertProfile(profile)
             }
+            // 内置锻炼数据源升级：同食物机制重建内置动作模板（自定义动作与历史记录不受影响）
+            if (profile.exerciseSeedVersion < ExerciseSeed.version) {
+                dao.clearBuiltinExerciseTemplates()
+                dao.insertExerciseTemplates(ExerciseSeed.items)
+                profile = profile.copy(exerciseSeedVersion = ExerciseSeed.version)
+                dao.upsertProfile(profile)
+            }
             // 旧内置模板没有标签：按名称补上
             val tagByName = FoodSeed.items.associate { it.name to it.tag }
             dao.foodTemplates().filter { !it.isCustom && it.tag.isEmpty() }
@@ -195,7 +202,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     fun addFood(t: FoodTemplate, grams: Double, date: LocalDate) {
         val k = grams / 100.0
         val e = FoodEntry(
-            date = date.toString(), name = t.name, grams = grams,
+            date = date.toString(), name = t.dispName, grams = grams,
             protein = t.protein * k, carb = t.carb * k, fat = t.fat * k,
         )
         bumpFoodUsage(t)
@@ -337,7 +344,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         val scores = Calc.muscleScores(t, qty, extraWeight)
         val json = org.json.JSONObject().apply { scores.forEach { (k, v) -> put(k, v) } }.toString()
         val e = ExerciseEntry(
-            date = date.toString(), templateId = t.id, name = t.name,
+            date = date.toString(), templateId = t.id, name = t.dispName,
             qty = qty, weightKg = extraWeight, calories = kcal, minutes = minutes, musclesJson = json,
         )
         bumpExerciseUsage(t)

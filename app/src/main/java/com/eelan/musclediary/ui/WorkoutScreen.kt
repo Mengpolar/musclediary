@@ -214,9 +214,10 @@ fun WorkoutScreen(vm: AppViewModel, onOpenWeightRecords: () -> Unit = {}, onOpen
     }
 
     editingEntry?.let { e ->
-        val unit = vm.exerciseTemplates.firstOrNull { it.id == e.templateId }
+        val unit = (vm.exerciseTemplates.firstOrNull { it.id == e.templateId }
+            ?: vm.exerciseTemplates.firstOrNull { it.name == e.name || it.dispName == e.name })
             ?.let { Calc.unitLabel(it) }
-            ?: if (e.name.contains("跑") || e.name.contains("步") || e.name.contains("骑")) L("公里", "km") else L("数量", "qty")
+            ?: if (isDistanceName(e.name)) L("公里", "km") else L("数量", "qty")
         NumberDialog(
             title = L("修改「", "Edit 「") + "${e.name}" + L("」", "」"),
             label = if (unit == L("数量", "qty")) L("数量", "qty") else L("数量（", "Qty (") + "$unit)",
@@ -237,12 +238,17 @@ fun WorkoutScreen(vm: AppViewModel, onOpenWeightRecords: () -> Unit = {}, onOpen
     }
 }
 
+/** 哑铃类动作判定（中英文名都认）：决定是否展示附加重量输入 */
+private fun isDumbbell(t: ExerciseTemplate): Boolean =
+    t.name.contains("哑铃") || t.nameEn.contains("Dumbbell")
+
 /** 锻炼行 detail：单位按模板类型区分（个/公里/秒） */
 private fun workoutDetail(e: com.eelan.musclediary.data.ExerciseEntry, templates: List<ExerciseTemplate>): String {
-    // 模板可能已被删，找不到时按名称兜底
-    val unit = templates.firstOrNull { it.id == e.templateId }
+    // 模板可能已被删（或重播种后 id 变化），先按 id 再按名称回查
+    val unit = (templates.firstOrNull { it.id == e.templateId }
+        ?: templates.firstOrNull { it.name == e.name || it.dispName == e.name })
         ?.let { Calc.unitLabel(it) }
-        ?: if (e.name.contains("跑") || e.name.contains("步") || e.name.contains("骑")) L("公里", "km") else L("个", " reps")
+        ?: if (isDistanceName(e.name)) L("公里", "km") else L("个", " reps")
     val qty = when {
         e.weightKg > 0 -> "${fmt1(e.qty)}" + L("个", " reps") + "x${fmt1(e.weightKg)}kg"
         else -> "${fmt1(e.qty)}$unit"
@@ -275,7 +281,7 @@ private fun ExercisePickerDialog(
                     singleLine = true, colors = com.eelan.musclediary.ui.fieldColors(),
                 )
                 Spacer(Modifier.height(8.dp))
-                val filtered = templates.filter { it.name.contains(search, ignoreCase = true) }
+                val filtered = templates.filter { it.name.contains(search, ignoreCase = true) || it.nameEn.contains(search, ignoreCase = true) }
                 LazyColumn(modifier = Modifier.height(300.dp)) {
                     items(filtered, key = { it.id }) { t ->
                         Row(
@@ -284,7 +290,7 @@ private fun ExercisePickerDialog(
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
                             Column(Modifier.weight(1f)) {
-                                Text(t.name, color = TextHi, fontSize = 14.sp)
+                                Text(t.dispName, color = TextHi, fontSize = 14.sp)
                                 Text(
                                     L("主练", "Primary: ") + "${Muscle.labelOf(t.primaryMuscle)} · ${
                                         when (t.qtyType) {
@@ -321,7 +327,7 @@ private fun WorkoutQtyDialog(
     var qty by remember { mutableStateOf(lastQty?.let { fmt1(it) } ?: "") }
     var weight by remember {
         mutableStateOf(lastWeight?.takeIf { it > 0 }?.let { fmt1(it) }
-            ?: if (template.name.contains("哑铃")) "10" else "")
+            ?: if (isDumbbell(template)) "10" else "")
     }
     val q = qty.toDoubleOrNull()
     val valid = q != null && q > 0
@@ -329,7 +335,7 @@ private fun WorkoutQtyDialog(
     AlertDialog(
         onDismissRequest = onDismiss,
         containerColor = Ink2,
-        title = { Text(template.name, color = TextHi, fontSize = 16.sp) },
+        title = { Text(template.dispName, color = TextHi, fontSize = 16.sp) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 OutlinedTextField(
@@ -344,7 +350,7 @@ private fun WorkoutQtyDialog(
                     keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = KeyboardType.Decimal),
                     colors = com.eelan.musclediary.ui.fieldColors(),
                 )
-                if (template.name.contains("哑铃")) {
+                if (isDumbbell(template)) {
                     OutlinedTextField(
                         value = weight, onValueChange = { weight = it },
                         label = { Text(L("哑铃单只重量 kg（可选）", "Dumbbell weight kg (optional)"), color = TextLo) },
@@ -395,7 +401,7 @@ fun CustomExerciseDialog(
     onDismiss: () -> Unit,
     onConfirm: (ExerciseTemplate) -> Unit,
 ) {
-    var name by remember { mutableStateOf(initial?.name ?: "") }
+    var name by remember { mutableStateOf(initial?.dispName ?: "") }
     var type by remember { mutableStateOf(initial?.qtyType ?: QtyType.REPS) }
     var met by remember { mutableStateOf(initial?.let { fmt1(it.met) } ?: "") }
     var perRep by remember { mutableStateOf(initial?.takeIf { it.perRepSeconds > 0 }?.let { fmt1(it.perRepSeconds) } ?: "3") }
@@ -411,7 +417,7 @@ fun CustomExerciseDialog(
     AlertDialog(
         onDismissRequest = onDismiss,
         containerColor = Ink2,
-        title = { Text(if (initial == null) L("自定义动作", "Custom exercise") else L("修改「", "Edit [") + "${initial.name}" + L("」", "]"), color = TextHi, fontSize = 16.sp) },
+        title = { Text(if (initial == null) L("自定义动作", "Custom exercise") else L("修改「", "Edit [") + "${initial.dispName}" + L("」", "]"), color = TextHi, fontSize = 16.sp) },
         text = {
             Column(
                 verticalArrangement = Arrangement.spacedBy(8.dp),

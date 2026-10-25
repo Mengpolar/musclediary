@@ -241,6 +241,20 @@ fun EmptyState(
 fun fmt1(v: Double): String = if (v >= 100) Math.round(v).toInt().toString() else String.format(java.util.Locale.US, "%.1f", v)
 fun fmt0(v: Double): String = Math.round(v).toInt().toString()
 
+/** 食物量词单位英文显示：内置单位为中文数据，英文界面按映射翻译；自定义/未知单位原样返回 */
+private val FOOD_UNIT_EN = mapOf(
+    "个" to "pc", "颗" to "pc", "碗" to "bowl", "杯" to "cup", "罐" to "can", "盒" to "carton",
+    "瓶" to "bottle", "根" to "stick", "片" to "slice", "块" to "piece", "瓣" to "segment",
+    "串" to "skewer", "份" to "serving", "条" to "roll",
+)
+fun foodUnitLabel(u: String): String =
+    if (com.eelan.musclediary.Lang.isEn) FOOD_UNIT_EN[u] ?: u else u
+
+/** 历史条目找不到模板时的公里类兜底判定（中英文条目名都认） */
+fun isDistanceName(n: String): Boolean =
+    n.contains("跑") || n.contains("步") || n.contains("骑") ||
+            n.contains("Run") || n.contains("Walk") || n.contains("Cycl")
+
 /** 数字输入对话框 */
 @Composable
 fun NumberDialog(
