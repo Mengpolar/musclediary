@@ -31,7 +31,7 @@ A **fully offline** Android app for bulking/cutting: log daily food, workouts, w
 - **Water reminders**: checks intake by time slot (11/15/19/22), local notification when behind; auto-disables if notification permission is denied
 - **Backup**: CSV export / import (local files, you control migration)
 - **In-app updates**: checks GitHub Releases for the latest version, shows package size before download and progress during, verifies SHA-256 before install; **dual update sources** — direct GitHub, or proxy acceleration via [gh-proxy.com](https://gh-proxy.com) for slow direct connections
-- **App language**: 中文 / English in-app switch (Me → Language), no system language change needed
+- **App language**: 中文 / English in-app switch (Me → Language), no system language change needed; built-in food & exercise template names and units are fully bilingual
 - **UI**: dark theme, tabular-numeric figures, swipe-left to edit/delete cards, four tabs (Today / Diet / Workout / Me)
 
 ## Tech Stack
