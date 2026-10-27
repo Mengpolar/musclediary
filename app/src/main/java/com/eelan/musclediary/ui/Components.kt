@@ -309,15 +309,16 @@ fun SwipeEntryRow(
     val density = LocalDensity.current
     val maxSwipePx = with(density) { 132.dp.toPx() }
     val offset = remember { Animatable(0f) }
-    // 粉碎删除：0=正常，1=粉碎完成。卡片竖切 6 条碎块，从右往左依次脱落（下坠+旋转+淡出）
-    val crush = remember { Animatable(0f) }
+    // 灰飞烟灭：0=正常，1=粒子飘散完成。卡片栅格化为小粒子，向上飘出并逐渐淡化
+    val dust = remember { Animatable(0f) }
     var flying by remember { mutableStateOf(false) }
-    val CRUSH_PIECES = 6
+    // 粒子属性在首次绘制粒子帧时按卡片尺寸生成（伪随机但确定，避免重组闪烁）
+    var particles by remember { mutableStateOf<List<Particle>>(emptyList()) }
 
     fun deleteWithCrush() {
         flying = true
         scope.launch {
-            crush.animateTo(1f, tween(560, easing = FastOutSlowInEasing))
+            dust.animateTo(1f, tween(850, easing = LinearEasing))
             onDelete()
         }
     }
@@ -330,35 +331,53 @@ fun SwipeEntryRow(
                 if (!flying) {
                     drawContent()
                 } else {
-                    // 碎块 j 的脱落进度：右边的块先动（j 从右往左 0..N-1）
-                    val p = crush.value
-                    fun pieceProgress(j: Int): Float {
-                        val start = j * (0.55f / CRUSH_PIECES)      // 右块 0 先开始
-                        return ((p - start) / 0.45f).coerceIn(0f, 1f)
-                    }
-                    val pieceW = size.width / CRUSH_PIECES
-                    // 每个碎块独立绘制：裁出竖条 → 下坠 + 旋转 + 缩小；最左条最后动
-                    for (j in 0 until CRUSH_PIECES) {
-                        val jp = pieceProgress(j)
-                        val left = size.width - (j + 1) * pieceW
-                        if (jp >= 1f) continue
-                        clipRect(left = left, top = 0f, right = left + pieceW, bottom = size.height) {
-                            withTransform({
-                                rotate(
-                                    degrees = 14f * jp * (if (j % 2 == 0) 1f else -0.6f),
-                                    pivot = Offset(left + pieceW / 2f, size.height),
+                    val p = dust.value
+                    if (particles.isEmpty()) {
+                        // 生成粒子：每 14px 网格 1 颗 + 抖动，携带各自的速度/大小/寿命
+                        val list = mutableListOf<Particle>()
+                        val step = 14f
+                        var seed = 12345
+                        fun rnd(): Float { seed = seed * 1103515245 + 12345; return ((seed shr 16) and 0x7fff) / 32768f }
+                        var gy = 0f
+                        while (gy < size.height) {
+                            var gx = 0f
+                            while (gx < size.width) {
+                                list += Particle(
+                                    x = gx + rnd() * step, y = gy + rnd() * step,
+                                    vx = (rnd() - 0.5f) * 22f,
+                                    vy = -(28f + rnd() * 52f),          // 向上飘
+                                    r = 1.2f + rnd() * 1.8f,
+                                    delay = rnd() * 0.25f,              // 起飘时间错开
                                 )
-                                translate(left = 6f * jp, top = size.height * 1.15f * jp * jp)
-                                scale(scaleX = 1f - 0.15f * jp, scaleY = 1f - 0.15f * jp, pivot = Offset(left + pieceW / 2f, size.height / 2f))
-                            }) {
-                                this@drawWithContent.drawContent()
+                                gx += step
                             }
-                            // 末段叠底色模拟淡出（drawContent 无法直接调 alpha）
-                            if (jp > 0.6f) {
-                                drawRect(Ink0, topLeft = Offset(left, 0f), size = Size(pieceW, size.height),
-                                    alpha = ((jp - 0.6f) / 0.4f).coerceIn(0f, 1f))
-                            }
+                            gy += step
                         }
+                        particles = list
+                    }
+                    // 卡片本体快速碎化淡出（前 25% 进度）
+                    val bodyAlpha = (1f - p / 0.25f).coerceIn(0f, 1f)
+                    if (bodyAlpha > 0f) {
+                        clipRect(left = 0f, top = 0f, right = size.width, bottom = size.height) {
+                            this@drawWithContent.drawContent()
+                        }
+                        // 本体淡出用叠底色模拟（drawContent 无法直接调 alpha）
+                        drawRect(Ink0, topLeft = Offset.Zero, size = size, alpha = 1f - bodyAlpha)
+                    }
+                    // 粒子：错峰起飘，向上加速飘出 + 缩小 + 淡去
+                    particles.forEach { pt ->
+                        val t = ((p - pt.delay) / 0.75f).coerceIn(0f, 1f)
+                        if (t <= 0f) return@forEach
+                        val eased = t * t                                   // 越飘越快
+                        val x = pt.x + pt.vx * eased * 3.2f
+                        val y = pt.y + pt.vy * eased * 4.2f                 // 上飘行程
+                        val alpha = (1f - t).coerceIn(0f, 1f) * 0.9f
+                        if (alpha <= 0.01f) return@forEach
+                        drawCircle(
+                            TextHi.copy(alpha = alpha),
+                            radius = pt.r * (1f - 0.55f * t),
+                            center = Offset(x, y),
+                        )
                     }
                 }
             },
@@ -421,6 +440,14 @@ fun SwipeEntryRow(
         }
     }
 }
+
+/** 删除粒子：卡片栅格化生成的一颗尘埃（模型即屏幕坐标，速度向上） */
+private data class Particle(
+    val x: Float, val y: Float,     // 初始位置
+    val vx: Float, val vy: Float,   // 速度（px/进度单位）
+    val r: Float,                   // 半径
+    val delay: Float,               // 起飘延迟（0~0.25）
+)
 
 /** 页面标题 */
 @Composable
