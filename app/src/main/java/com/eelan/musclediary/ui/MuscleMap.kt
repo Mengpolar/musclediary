@@ -3,7 +3,6 @@ package com.eelan.musclediary.ui
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
-import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
@@ -21,7 +20,6 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.unit.dp
@@ -29,21 +27,20 @@ import androidx.compose.ui.unit.sp
 import com.eelan.musclediary.L
 import com.eelan.musclediary.domain.Muscle
 import com.eelan.musclediary.domain.Side
+import com.eelan.musclediary.ui.theme.Ink1
 import com.eelan.musclediary.ui.theme.Ink2
-import com.eelan.musclediary.ui.theme.Ink3
 import com.eelan.musclediary.ui.theme.TextHi
 import com.eelan.musclediary.ui.theme.TextLo
 import kotlin.math.min
 
 /**
- * 人体肌肉概览图（素材见 MuscleArt.kt）：正面 + 背面。
+ * 人体肌肉概览图（GymMane 手绘矢量数据，见 MuscleArtSvg.kt）：正面 + 背面。
  * 灰色 = 未锻炼；刺激分越高颜色越暖（灰→绿→橙→红），训练部位叠加同色强度光晕。
- * 命中判定用与绘制同源的离散多边形（所见即所点），选中肌群呼吸描边。
+ * 命中判定直接用 path 本身（所见即所点），选中肌群呼吸描边。
  */
 
-// 未锻炼：从 Ink3 提亮一档，与底图（Ink2）拉开层次
+// 未锻炼：从描边色提亮一档，与底图（Ink2）拉开层次
 private val IdleColor = Color(0xFF4A505B)
-private val OutlineColor = Color(0xFF5A616C)
 
 fun intensityColor(level: Int): Color = when (level) {
     1 -> Color(0xFF66BB6A) // 轻度：绿
@@ -144,8 +141,14 @@ private fun MuscleView(
     modifier: Modifier,
     onTap: (Muscle?) -> Unit,
 ) {
-    val muscles = if (side == Side.FRONT) artFront else artBack
-    val deco = if (side == Side.FRONT) artFrontDeco else emptyList()
+    // 该侧肌群的 (Muscle, path) 对；数据按此顺序绘制，命中从后往前找（小块优先）
+    val musclePaths: List<Pair<Muscle, SvgShape>> = remember(side) {
+        val m = if (side == Side.FRONT) BodySvg.frontMusclePaths else BodySvg.backMusclePaths
+        m.flatMap { (id, ds) -> ds.map { d -> (Muscle.byId.getValue(id)) to SvgShape.of(d) } }
+    }
+    val baseShapes: List<SvgShape> = remember(side) {
+        (if (side == Side.FRONT) BodySvg.frontBase else BodySvg.backBase).map { SvgShape.of(it) }
+    }
     Column(modifier, horizontalAlignment = Alignment.CenterHorizontally) {
         Text(
             if (side == Side.FRONT) L("正面", "Front") else L("背面", "Back"),
@@ -161,60 +164,40 @@ private fun MuscleView(
                 .padding(top = 6.dp)
                 .pointerInput(side) {
                     detectTapGestures { pos ->
-                        val unit = min(size.width / 120f, size.height / 240f)
-                        val ox = (size.width - 120f * unit) / 2f
-                        val oy = (size.height - 240f * unit) / 2f
-                        val mx = (pos.x - ox) / unit
-                        val my = (pos.y - oy) / unit
-                        val p = Offset(mx, my)
-                        // 命中判定与绘制同源（从最后绘制的往前找，小块肌群优先）
-                        val hit = muscles.lastOrNull { it.contains(p) }?.muscle
+                        val v = svgView(size.width.toFloat(), size.height.toFloat(), side)
+                        val p = Offset(pos.x - 0f, pos.y - 0f)
+                        // 屏幕点 → 判定：所有绘制 path 用同变换，直接把点逆变换回模型坐标
+                        val mx = (p.x - v.ox) / v.unit
+                        val my = (p.y - v.oy) / v.unit
+                        val model = Offset(mx, my)
+                        // 从最后绘制的往前找（肌群在底图之上）
+                        val hit = musclePaths.lastOrNull { it.second.contains(model) }?.first
                         onTap(hit)
                     }
                 }
         ) {
-            val unit = min(size.width / 120f, size.height / 240f)
-            val ox = (size.width - 120f * unit) / 2f
-            val oy = (size.height - 240f * unit) / 2f
+            val v = svgView(size.width, size.height, side)
 
-            // 底图（躯干四肢），单色填充 + 描边
-            artBody.forEach { s ->
-                s.draw(this, unit, ox, oy, color = Ink2)
-                s.draw(this, unit, ox, oy, color = OutlineColor, outline = true, strokeWidth = 1.5f)
-            }
+            // 底图轮廓
+            baseShapes.forEach { drawSvg(it, v, Ink2) }
 
-            // 肌群：左侧用纵向渐变（上亮下暗）制造顶灯体积感；镜像侧用反向渐变
-            // 逐侧绘制：left 形状用 (top→bottom) 渐变，right 镜像形状单独绘制同样渐变
-            fun muscleBrush(): Brush = Brush.verticalGradient(
-                listOf(Color.White.copy(alpha = 0.16f), Color.Transparent),
-            )
-            muscles.forEach { s ->
-                val sc = scores[s.muscle!!.id] ?: 0.0
+            // 肌群填充 + 强度光晕 + 体积高光
+            musclePaths.forEach { (m, s) ->
+                val sc = scores[m.id] ?: 0.0
                 val c = levelColor(intensityOf(sc), sc)
-                // 光晕（有训练时）：同色低透明粗描边垫在实体下
                 if (sc > 0.0) {
                     val halo = c.copy(alpha = ((0.10 + sc / 60.0).coerceAtMost(0.35)).toFloat())
-                    s.draw(this, unit, ox, oy, color = halo, outline = true, strokeWidth = unit * 1.8f)
+                    drawSvgOutline(s, v, halo, v.unit * 2.2f)
                 }
-                s.draw(this, unit, ox, oy, color = c)
-                // 体积高光：同形状再叠一层顶部渐白
-                s.draw(this, unit, ox, oy, brush = muscleBrush())
-            }
-            deco.forEach { s ->
-                s.draw(this, unit, ox, oy, color = OutlineColor, outline = true, strokeWidth = 1.2f)
+                drawSvg(s, v, c)
+                drawSvg(s, v, Color.White.copy(alpha = 0.07f)) // 顶部体积提亮（叠加半透明白）
             }
 
-            // 轮廓（最后描一圈，压住肌群与底图的接缝）
-            artBody.forEach { s ->
-                s.draw(this, unit, ox, oy, color = OutlineColor, outline = true, strokeWidth = 1.5f)
-            }
-
-            // 选中肌群高亮描边呼吸（把同肌群所有形状一起描；仅在选中时读取动画值）
+            // 选中肌群呼吸描边
             if (picked != null) {
                 val a = 0.5f + 0.5f * pulse()
-                muscles.forEach { s ->
-                    if (s.muscle == picked) s.draw(this, unit, ox, oy,
-                        color = Color.White.copy(alpha = a), outline = true, strokeWidth = 3.5f)
+                musclePaths.forEach { (m, s) ->
+                    if (m == picked) drawSvgOutline(s, v, Color.White.copy(alpha = a), 2.5f)
                 }
             }
         }

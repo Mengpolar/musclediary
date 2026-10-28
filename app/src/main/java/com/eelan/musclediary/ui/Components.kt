@@ -326,7 +326,7 @@ fun SwipeEntryRow(
     Box(
         Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(10.dp))
+            // 不裁剪：粒子要飘出卡片边界（圆角裁剪下移到前景内容层）
             .drawWithContent {
                 if (!flying) {
                     drawContent()
@@ -344,9 +344,9 @@ fun SwipeEntryRow(
                             while (gx < size.width) {
                                 list += Particle(
                                     x = gx + rnd() * step, y = gy + rnd() * step,
-                                    vx = (rnd() - 0.5f) * 22f,
-                                    vy = -(28f + rnd() * 52f),          // 向上飘
-                                    r = 1.2f + rnd() * 1.8f,
+                                    vx = (rnd() - 0.5f) * 34f,
+                                    vy = -(34f + rnd() * 66f),          // 向上飘
+                                    r = 1.2f + rnd() * 1.9f,
                                     delay = rnd() * 0.25f,              // 起飘时间错开
                                 )
                                 gx += step
@@ -364,13 +364,13 @@ fun SwipeEntryRow(
                         // 本体淡出用叠底色模拟（drawContent 无法直接调 alpha）
                         drawRect(Ink0, topLeft = Offset.Zero, size = size, alpha = 1f - bodyAlpha)
                     }
-                    // 粒子：错峰起飘，向上加速飘出 + 缩小 + 淡去
+                    // 粒子：错峰起飘，向上加速、横向散开、飘出卡片边界，缩小淡去
                     particles.forEach { pt ->
                         val t = ((p - pt.delay) / 0.75f).coerceIn(0f, 1f)
                         if (t <= 0f) return@forEach
                         val eased = t * t                                   // 越飘越快
-                        val x = pt.x + pt.vx * eased * 3.2f
-                        val y = pt.y + pt.vy * eased * 4.2f                 // 上飘行程
+                        val x = pt.x + pt.vx * eased * 4.6f                  // 横向扩散（突破左右边界）
+                        val y = pt.y + pt.vy * eased * 5.2f                 // 上飘（突破上边界）
                         val alpha = (1f - t).coerceIn(0f, 1f) * 0.9f
                         if (alpha <= 0.01f) return@forEach
                         drawCircle(
@@ -407,11 +407,12 @@ fun SwipeEntryRow(
                 contentAlignment = Alignment.Center,
             ) { Text(L("删除", "Delete"), color = Ink0, fontSize = 13.sp, fontWeight = FontWeight.Bold) }
         }
-        // 前景内容（自身撑开高度，背景按钮 matchParentSize 跟随）
+        // 前景内容（自身撑开高度，背景按钮 matchParentSize 跟随；圆角裁剪在此层）
         Row(
             Modifier
                 .fillMaxWidth()
                 .offset { IntOffset(offset.value.roundToInt(), 0) }
+                .clip(RoundedCornerShape(10.dp))
                 .background(Ink2)
                 .pointerInput(Unit) {
                     detectHorizontalDragGestures(
