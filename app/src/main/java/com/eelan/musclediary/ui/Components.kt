@@ -382,11 +382,11 @@ fun SwipeEntryRow(
                 }
             },
     ) {
-        // 背景操作按钮（右侧）：与前景同圆角——未滑动时前景圆角缺口不会露出按钮直角色块
+        // 背景操作按钮（右侧）：右缘与卡片整体轮廓同圆角；左缘直角（与滑开的卡片无缝相接）
         Row(
             Modifier
                 .matchParentSize()
-                .clip(RoundedCornerShape(10.dp)),
+                .clip(RoundedCornerShape(topStart = 0.dp, topEnd = 10.dp, bottomEnd = 10.dp, bottomStart = 0.dp)),
             horizontalArrangement = Arrangement.End,
         ) {
             Box(
@@ -409,12 +409,21 @@ fun SwipeEntryRow(
                 contentAlignment = Alignment.Center,
             ) { Text(L("删除", "Delete"), color = Ink0, fontSize = 13.sp, fontWeight = FontWeight.Bold) }
         }
-        // 前景内容（自身撑开高度，背景按钮 matchParentSize 跟随；圆角裁剪在此层）
+        // 前景内容（自身撑开高度，背景按钮 matchParentSize 跟随）。
+        // 圆角动态化：静止时四角圆（全局一致）；左滑打开时右缘圆角随进度收为直角，
+        // 与按钮区交界无缝（graphicsLayer 延迟读取 offset，拖动帧内直接更新 layer 不重组）
         Row(
             Modifier
                 .fillMaxWidth()
                 .offset { IntOffset(offset.value.roundToInt(), 0) }
-                .clip(RoundedCornerShape(10.dp))
+                .graphicsLayer {
+                    val progress = (-offset.value / maxSwipePx).coerceIn(0f, 1f)
+                    shape = RoundedCornerShape(
+                        topStart = 10.dp, bottomStart = 10.dp,
+                        topEnd = 10.dp * (1f - progress), bottomEnd = 10.dp * (1f - progress),
+                    )
+                    clip = true
+                }
                 .background(Ink2)
                 .pointerInput(Unit) {
                     detectHorizontalDragGestures(
