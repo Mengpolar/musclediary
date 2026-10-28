@@ -382,9 +382,11 @@ fun SwipeEntryRow(
                 }
             },
     ) {
-        // 背景操作按钮（右侧）
+        // 背景操作按钮（右侧）：与前景同圆角——未滑动时前景圆角缺口不会露出按钮直角色块
         Row(
-            Modifier.matchParentSize(),
+            Modifier
+                .matchParentSize()
+                .clip(RoundedCornerShape(10.dp)),
             horizontalArrangement = Arrangement.End,
         ) {
             Box(

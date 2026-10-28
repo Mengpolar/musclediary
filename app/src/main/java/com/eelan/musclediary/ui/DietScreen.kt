@@ -46,14 +46,15 @@ fun DietScreen(vm: AppViewModel, onOpenRecords: () -> Unit = {}) {
     val carb = entries.sumOf { it.carb }
     val fat = entries.sumOf { it.fat }
 
-    // 删除撤销：主页左滑删除立即生效，Snackbar 期间可一键恢复
+    // 删除撤销：主页左滑删除立即生效，Snackbar 短时显示（4s）可一键恢复，尽快还出底部操作区
     val snackbar = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
     fun deleteWithUndo(f: FoodEntry) {
         vm.deleteFood(f)
         scope.launch {
             if (snackbar.showSnackbar(
-                    L("已删除 ", "Deleted ") + f.name, actionLabel = L("撤销", "Undo")
+                    L("已删除 ", "Deleted ") + f.name, actionLabel = L("撤销", "Undo"),
+                    duration = SnackbarDuration.Short,
                 ) == SnackbarResult.ActionPerformed
             ) vm.restoreFood(f)
         }
