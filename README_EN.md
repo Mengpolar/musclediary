@@ -24,7 +24,7 @@ A **fully offline** Android app for bulking/cutting: log daily food, workouts, w
   - Activity factor: 1.2 + today's exercise burn ÷ BMR (capped at 1.6) — train more, target rises that day
   - Macro targets (per kg bodyweight): bulk protein 2g / carbs 5g / fat 1g; cut 1.5g / 2g / 0.8g
   - Surplus/deficit is split across macros by calorie ratio; the bar shows dual tick marks (base target vs scaled target), green when met, red when over
-- **Muscle map**: front + back body views, 13 muscle groups colored by today's stimulation (gray = untrained → green = light → orange = moderate → red = intense)
+- **Muscle map**: front + back hand-drawn vector body figures (anatomy-style muscle shapes), 13 muscle groups colored by today's stimulation (gray = untrained → green = light → orange = moderate → red = intense), intensity glow on trained areas, tap a muscle for details; body artwork from [GymMane](https://github.com/InlitX/GymMane) (GPL-3.0)
 - **Today overview**: calorie ring + three macro bars + water ring + exercise burn ring, green when goals met
 
 ### Extras
@@ -32,7 +32,7 @@ A **fully offline** Android app for bulking/cutting: log daily food, workouts, w
 - **Backup**: CSV export / import (local files, you control migration)
 - **In-app updates**: checks GitHub Releases for the latest version, shows package size before download and progress during, verifies SHA-256 before install; **dual update sources** — direct GitHub, or proxy acceleration via [gh-proxy.com](https://gh-proxy.com) for slow direct connections
 - **App language**: 中文 / English in-app switch (Me → Language), no system language change needed; built-in food & exercise template names and units are fully bilingual
-- **UI**: dark theme, tabular-numeric figures, swipe-left to edit/delete cards, four tabs (Today / Diet / Workout / Me)
+- **UI**: dark theme, tabular-numeric figures, swipe-left to edit/delete cards (delete bursts the card into rising dust particles with an undo snackbar), four tabs (Today / Diet / Workout / Me)
 
 ## Tech Stack
 
