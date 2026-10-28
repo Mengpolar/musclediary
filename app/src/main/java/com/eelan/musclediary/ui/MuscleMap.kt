@@ -141,6 +141,7 @@ private fun MuscleView(
     modifier: Modifier,
     onTap: (Muscle?) -> Unit,
 ) {
+    val isBack = side == Side.BACK
     // 该侧肌群的 (Muscle, path) 对；数据按此顺序绘制，命中从后往前找（小块优先）
     val musclePaths: List<Pair<Muscle, SvgShape>> = remember(side) {
         val m = if (side == Side.FRONT) BodySvg.frontMusclePaths else BodySvg.backMusclePaths
@@ -161,6 +162,7 @@ private fun MuscleView(
         Canvas(
             Modifier
                 .fillMaxSize()
+                .clip(RoundedCornerShape(8.dp))
                 .padding(top = 6.dp)
                 .pointerInput(side) {
                     detectTapGestures { pos ->
@@ -179,7 +181,7 @@ private fun MuscleView(
             val v = svgView(size.width, size.height, side)
 
             // 底图轮廓
-            baseShapes.forEach { drawSvg(it, v, Ink2) }
+            baseShapes.forEach { drawSvg(it, v, Ink2, isBack) }
 
             // 肌群填充 + 强度光晕 + 体积高光
             musclePaths.forEach { (m, s) ->
@@ -187,17 +189,17 @@ private fun MuscleView(
                 val c = levelColor(intensityOf(sc), sc)
                 if (sc > 0.0) {
                     val halo = c.copy(alpha = ((0.10 + sc / 60.0).coerceAtMost(0.35)).toFloat())
-                    drawSvgOutline(s, v, halo, v.unit * 2.2f)
+                    drawSvgOutline(s, v, halo, v.unit * 2.2f, isBack)
                 }
-                drawSvg(s, v, c)
-                drawSvg(s, v, Color.White.copy(alpha = 0.07f)) // 顶部体积提亮（叠加半透明白）
+                drawSvg(s, v, c, isBack)
+                drawSvg(s, v, Color.White.copy(alpha = 0.07f), isBack) // 顶部体积提亮（叠加半透明白）
             }
 
             // 选中肌群呼吸描边
             if (picked != null) {
                 val a = 0.5f + 0.5f * pulse()
                 musclePaths.forEach { (m, s) ->
-                    if (m == picked) drawSvgOutline(s, v, Color.White.copy(alpha = a), 2.5f)
+                    if (m == picked) drawSvgOutline(s, v, Color.White.copy(alpha = a), 2.5f, isBack)
                 }
             }
         }
