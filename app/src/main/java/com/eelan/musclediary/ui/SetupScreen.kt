@@ -76,7 +76,7 @@ fun SetupScreen(vm: AppViewModel) {
         }
         Spacer(Modifier.height(16.dp))
 
-        SetupField(L("年龄（岁）", "Age (years)"), age) { age = it }
+        SetupField(L("年龄（岁）", "Age (years)"), age, KeyboardType.Number) { age = it }
         SetupField(L("身高（cm）", "Height (cm)"), height) { height = it }
         SetupField(L("体重（kg）", "Weight (kg)"), weight) { weight = it }
 
@@ -99,12 +99,17 @@ fun SetupScreen(vm: AppViewModel) {
 }
 
 @Composable
-private fun SetupField(label: String, value: String, onChange: (String) -> Unit) {
+private fun SetupField(
+    label: String,
+    value: String,
+    keyboard: KeyboardType = KeyboardType.Decimal,
+    onChange: (String) -> Unit,
+) {
     OutlinedTextField(
         value = value, onValueChange = onChange,
         label = { Text(label, color = TextLo) },
         singleLine = true,
-        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+        keyboardOptions = KeyboardOptions(keyboardType = keyboard),
         colors = fieldColors(),
         modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp),
     )

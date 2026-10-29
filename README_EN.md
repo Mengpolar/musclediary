@@ -28,8 +28,9 @@ A **fully offline** Android app for bulking/cutting: log daily food, workouts, w
 - **Today overview**: calorie ring + three macro bars + water ring + exercise burn ring, green when goals met
 
 ### Extras
+- **Template management**: built-in and custom templates in one place (search, built-in/custom filter, clear all, restore built-ins); manually edited built-in templates survive data-source upgrades instead of being overwritten
 - **Water reminders**: checks intake by time slot (11/15/19/22), local notification when behind; auto-disables if notification permission is denied
-- **Backup**: CSV export / import (local files, you control migration)
+- **Backup**: CSV export / import (local files, you control migration); import asks for confirmation before overwriting existing records
 - **In-app updates**: checks GitHub Releases for the latest version, shows package size before download and progress during, verifies SHA-256 before install; **dual update sources** — direct GitHub, or proxy acceleration via [gh-proxy.com](https://gh-proxy.com) for slow direct connections
 - **App language**: 中文 / English in-app switch (Me → Language), no system language change needed; built-in food & exercise template names and units are fully bilingual
 - **UI**: dark theme, tabular-numeric figures, swipe-left to edit/delete cards (delete bursts the card into rising dust particles with an undo snackbar), four tabs (Today / Diet / Workout / Me)

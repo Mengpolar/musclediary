@@ -29,6 +29,7 @@ import com.eelan.musclediary.AppViewModel
 import com.eelan.musclediary.L
 import com.eelan.musclediary.data.ExerciseTemplate
 import com.eelan.musclediary.data.QtyType
+import com.eelan.musclediary.data.matchesEntryName
 import com.eelan.musclediary.domain.Calc
 import com.eelan.musclediary.domain.Muscle
 import com.eelan.musclediary.ui.theme.*
@@ -228,13 +229,17 @@ fun WorkoutScreen(vm: AppViewModel, onOpenWeightRecords: () -> Unit = {}, onOpen
     }
 
     editingEntry?.let { e ->
-        val unit = (vm.exerciseTemplates.firstOrNull { it.id == e.templateId }
-            ?: vm.exerciseTemplates.firstOrNull { it.name == e.name || it.dispName == e.name })
-            ?.let { Calc.unitLabel(it) }
-            ?: if (isDistanceName(e.name)) L("公里", "km") else L("数量", "qty")
+        // 单位按模板类型取；模板已删时按历史名称兜底（不拿本地化字符串做类型判断）
+        val template = vm.exerciseTemplates.firstOrNull { it.id == e.templateId }
+            ?: vm.exerciseTemplates.firstOrNull { it.matchesEntryName(e.name) }
+        val label = when {
+            template != null -> L("数量（", "Qty (") + Calc.unitLabel(template) + ")"
+            isDistanceName(e.name) -> L("数量（", "Qty (") + L("公里", "km") + ")"
+            else -> L("数量", "qty")
+        }
         NumberDialog(
             title = L("修改「", "Edit 「") + "${e.name}" + L("」", "」"),
-            label = if (unit == L("数量", "qty")) L("数量", "qty") else L("数量（", "Qty (") + "$unit)",
+            label = label,
             initial = fmt1(e.qty),
             onDismiss = { editingEntry = null },
             onConfirm = { qty -> vm.updateExerciseEntry(e, qty); editingEntry = null },
@@ -261,7 +266,7 @@ private fun isDumbbell(t: ExerciseTemplate): Boolean =
 private fun workoutDetail(e: com.eelan.musclediary.data.ExerciseEntry, templates: List<ExerciseTemplate>): String {
     // 模板可能已被删（或重播种后 id 变化），先按 id 再按名称回查
     val unit = (templates.firstOrNull { it.id == e.templateId }
-        ?: templates.firstOrNull { it.name == e.name || it.dispName == e.name })
+        ?: templates.firstOrNull { it.matchesEntryName(e.name) })
         ?.let { Calc.unitLabel(it) }
         ?: if (isDistanceName(e.name)) L("公里", "km") else L("个", " reps")
     val qty = when {

@@ -44,6 +44,8 @@ fun SettingsScreen(
     var updateInfo by remember { mutableStateOf<Updater.UpdateInfo?>(null) }
     var downloading by remember { mutableStateOf(false) }
     var progress by remember { mutableStateOf(0) }
+    // 下载启动后对话框即关闭，进度文案的大小改由这里提供（updateInfo 已置空）
+    var downloadSize by remember { mutableStateOf(0L) }
     // 更新源：跟随最近一次检查所用源下载，默认官方
     var updateSource by remember { mutableStateOf(Updater.SRC_OFFICIAL) }
 
@@ -52,10 +54,19 @@ fun SettingsScreen(
     ) { uri ->
         if (uri != null) {
             vm.exportCsv { f ->
-                ctx.contentResolver.openOutputStream(uri)?.use { out ->
-                    f.inputStream().use { it.copyTo(out) }
-                }
-                Toast.makeText(ctx, L("已导出到所选位置", "Exported to selected location"), Toast.LENGTH_SHORT).show()
+                // 中转文件复制到用户所选位置后即删，不在 filesDir 留备份垃圾
+                val ok = runCatching {
+                    ctx.contentResolver.openOutputStream(uri)?.use { out ->
+                        f.inputStream().use { it.copyTo(out) }
+                    } ?: error("no output stream")
+                }.isSuccess
+                f.delete()
+                Toast.makeText(
+                    ctx,
+                    if (ok) L("已导出到所选位置", "Exported to selected location")
+                    else L("导出失败，请重试", "Export failed, please retry"),
+                    Toast.LENGTH_SHORT,
+                ).show()
             }
         }
     }
@@ -72,6 +83,8 @@ fun SettingsScreen(
                 "Notification permission denied; reminders stay off"), Toast.LENGTH_LONG).show()
         }
     }
+    // 选好文件先暂存内容，弹确认后再真正覆盖导入
+    var pendingImport by remember { mutableStateOf<String?>(null) }
     val importLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.OpenDocument()
     ) { uri ->
@@ -79,7 +92,7 @@ fun SettingsScreen(
             runCatching {
                 ctx.contentResolver.openInputStream(uri)?.bufferedReader()?.use { it.readText() }
             }.getOrNull()?.let { text ->
-                vm.importCsv(text) { msg -> Toast.makeText(ctx, msg, Toast.LENGTH_LONG).show() }
+                pendingImport = text
             } ?: Toast.makeText(ctx, L("无法读取文件", "Cannot read file"), Toast.LENGTH_SHORT).show()
         }
     }
@@ -344,8 +357,8 @@ fun SettingsScreen(
                 )
                 Text(
                     L("下载中", "Downloading") + " $progress% · " +
-                            "${String.format(java.util.Locale.US, "%.1f", (updateInfo?.sizeBytes ?: 0) * progress / 100.0 / 1048576.0)}" +
-                            " / ${Updater.formatSize(updateInfo?.sizeBytes ?: 0)}",
+                            "${String.format(java.util.Locale.US, "%.1f", downloadSize * progress / 100.0 / 1048576.0)}" +
+                            " / ${Updater.formatSize(downloadSize)}",
                     fontSize = 12.sp, color = TextLo,
                 )
             }
@@ -364,7 +377,8 @@ fun SettingsScreen(
 
     updateInfo?.let { info ->
         AlertDialog(
-            onDismissRequest = { },
+            // 点遮罩/返回键等同「以后再说」：不打断下载状态机
+            onDismissRequest = { updateInfo = null },
             containerColor = Ink2,
             title = { Text(L("发现新版本 v", "New version v") + info.version, color = TextHi) },
             text = {
@@ -378,8 +392,13 @@ fun SettingsScreen(
                 }
             },
             confirmButton = {
-                TextButton(onClick = {
-                    downloading = true; progress = 0
+                // 点击后立即关对话框（进度条在设置卡片里），并禁用按钮防止双击并发下载同一个文件
+                TextButton(enabled = !downloading, onClick = {
+                    downloading = true
+                    progress = 0
+                    downloadSize = info.sizeBytes
+                    updateState = null
+                    updateInfo = null
                     // 下载是长任务：用 ViewModel 作用域，切页不中断；安装走应用级 context，防页面销毁后 Activity 失效
                     val appCtx = ctx.applicationContext
                     vm.viewModelScope.launch {
@@ -406,6 +425,31 @@ fun SettingsScreen(
             },
             dismissButton = {
                 TextButton(onClick = { updateInfo = null }) { Text(L("以后再说", "Later"), color = TextLo) }
+            },
+        )
+    }
+
+    // 导入覆盖不可撤销：文件选好后先确认再写入
+    pendingImport?.let { text ->
+        AlertDialog(
+            onDismissRequest = { pendingImport = null },
+            containerColor = Ink2,
+            title = { Text(L("导入备份？", "Import backup?"), color = TextHi, fontSize = 16.sp) },
+            text = {
+                Text(
+                    L("导入会用备份中的数据覆盖现有饮食、锻炼、饮水记录与自定义模板（体重按日期合并），此操作不可撤销。",
+                        "Importing overwrites current food, exercise and water records and custom templates (weight merges by date). This cannot be undone."),
+                    fontSize = 13.sp, color = TextLo,
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    pendingImport = null
+                    vm.importCsv(text) { msg -> Toast.makeText(ctx, msg, Toast.LENGTH_LONG).show() }
+                }) { Text(L("继续导入", "Import"), color = Warn) }
+            },
+            dismissButton = {
+                TextButton(onClick = { pendingImport = null }) { Text(L("取消", "Cancel"), color = TextLo) }
             },
         )
     }

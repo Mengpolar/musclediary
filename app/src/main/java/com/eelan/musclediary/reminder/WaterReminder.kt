@@ -16,6 +16,10 @@ import com.eelan.musclediary.R
 import com.eelan.musclediary.data.AppDatabase
 import com.eelan.musclediary.L
 import com.eelan.musclediary.Lang
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
 
 /**
  * 饮水分时段提醒（可扩展更多提醒类型）：
@@ -109,8 +113,16 @@ object WaterReminder {
     class Receiver : BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent) {
             if (intent.action != ACTION_CHECK && intent.action != Intent.ACTION_BOOT_COMPLETED) return
-            kotlinx.coroutines.runBlocking { runCatching { checkNow(context) } }
-            scheduleNext(context)
+            // goAsync：checkNow 含 Room 查询，不能在广播主线程 runBlocking（超时 ANR 且提醒丢失）
+            val pending = goAsync()
+            CoroutineScope(SupervisorJob() + Dispatchers.IO).launch {
+                try {
+                    runCatching { checkNow(context) }
+                    runCatching { scheduleNext(context) }
+                } finally {
+                    pending.finish()
+                }
+            }
         }
     }
 

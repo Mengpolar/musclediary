@@ -9,6 +9,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Inbox
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -33,6 +34,7 @@ import com.eelan.musclediary.ui.theme.*
  */
 @Composable
 fun ManageTemplatesScreen(vm: AppViewModel, kind: Int, onClose: () -> Unit) {
+    val ctx = androidx.compose.ui.platform.LocalContext.current
     var search by remember { mutableStateOf("") }
     var editFood by remember { mutableStateOf<FoodTemplate?>(null) }
     var editExercise by remember { mutableStateOf<ExerciseTemplate?>(null) }
@@ -42,6 +44,15 @@ fun ManageTemplatesScreen(vm: AppViewModel, kind: Int, onClose: () -> Unit) {
     var confirmClear by remember { mutableStateOf(false) }
     // 筛选：null 全部 / false 内置 / true 自定义
     var customFilter by remember { mutableStateOf<Boolean?>(null) }
+
+    fun restoreBuiltins() {
+        vm.restoreBuiltins {
+            android.widget.Toast.makeText(
+                ctx, L("已补回被删除的内置模板", "Deleted built-ins restored"),
+                android.widget.Toast.LENGTH_SHORT
+            ).show()
+        }
+    }
 
     val all: List<Any> = if (kind == 0) vm.foodTemplates else vm.exerciseTemplates
     val filtered = all.filter { nameOf(it).contains(search, ignoreCase = true) }
@@ -59,9 +70,9 @@ fun ManageTemplatesScreen(vm: AppViewModel, kind: Int, onClose: () -> Unit) {
             TextButton(onClick = { confirmClear = true }) {
                 Text(L("清空", "Clear"), color = MaterialTheme.colorScheme.error, fontSize = 13.sp)
             }
-            TextButton(onClick = {
-                vm.restoreBuiltins { }
-            }) { Text(L("补回内置", "Restore built-ins"), color = Accent, fontSize = 13.sp) }
+            TextButton(onClick = { restoreBuiltins() }) {
+                Text(L("补回内置", "Restore built-ins"), color = Accent, fontSize = 13.sp)
+            }
         }
         Spacer(Modifier.height(8.dp))
 
@@ -101,6 +112,15 @@ fun ManageTemplatesScreen(vm: AppViewModel, kind: Int, onClose: () -> Unit) {
                         onDelete = { confirmDelete = t })
                 }
                 }
+            }
+            if (filtered.isEmpty()) {
+                EmptyState(
+                    icon = Icons.Default.Inbox,
+                    text = if (search.isNotBlank()) L("没有匹配的模板", "No matching templates")
+                           else L("还没有模板，点上方「新增」创建", "No templates yet — tap New above"),
+                    actionText = if (all.isEmpty()) L("补回内置模板", "Restore built-ins") else null,
+                    onAction = if (all.isEmpty()) ({ restoreBuiltins() }) else null,
+                )
             }
         }
     }
@@ -213,8 +233,8 @@ private fun FoodManageRow(t: FoodTemplate, onEdit: () -> Unit, onDelete: () -> U
 private fun ExerciseManageRow(t: ExerciseTemplate, onEdit: () -> Unit, onDelete: () -> Unit) {
     SwipeEntryRow(
         title = t.dispName + if (t.isCustom) L(" · 自定义", " · custom") else L(" · 内置", " · built-in"),
-        detail = "${Calc.unitLabel(t)} · MET ${fmt1(t.met)} · " + L("主练", "primary: ") + "${Muscle.labelOf(t.primaryMuscle)}",
-        trailing = "MET ${fmt1(t.met)}",
+        detail = "${Calc.unitLabel(t)} · MET ${fmt1(t.met)}",
+        trailing = Muscle.labelOf(t.primaryMuscle),
         onEdit = onEdit,
         onDelete = onDelete,
     )

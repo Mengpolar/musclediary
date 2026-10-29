@@ -16,8 +16,10 @@ import com.eelan.musclediary.domain.Muscle
 
 /** 一条解析好的 path：绘制用缓存 Path，命中用离散多边形（贝塞尔 8 段线性化 + 射线法） */
 class SvgShape(val d: String) {
-    val path: Path = parse(d)
-    private val poly: List<Offset> = flatten(d)
+    /** 命令流只解析一次，绘制 / 命中 / 屏幕变换共用 */
+    internal val cmds: List<Pair<Char, FloatArray>> = tokens(d)
+    val path: Path = buildPath(cmds)
+    private val poly: List<Offset> = flatten(cmds)
 
     fun contains(p: Offset): Boolean {
         var inside = false
@@ -32,10 +34,10 @@ class SvgShape(val d: String) {
         return inside
     }
 
-    private fun flatten(d: String): List<Offset> {
+    private fun flatten(cmds: List<Pair<Char, FloatArray>>): List<Offset> {
         val pts = mutableListOf<Offset>()
         var cx = 0f; var cy = 0f
-        tokens(d).forEach { (cmd, nums) ->
+        cmds.forEach { (cmd, nums) ->
             when (cmd) {
                 'M' -> { cx = nums[0]; cy = nums[1]; pts.add(Offset(cx, cy)) }
                 'C' -> {
@@ -76,9 +78,9 @@ private fun tokens(d: String): List<Pair<Char, FloatArray>> {
     return out
 }
 
-private fun parse(d: String): Path {
+private fun buildPath(cmds: List<Pair<Char, FloatArray>>): Path {
     val p = Path()
-    tokens(d).forEach { (cmd, nums) ->
+    cmds.forEach { (cmd, nums) ->
         when (cmd) {
             'M' -> p.moveTo(nums[0], nums[1])
             'C' -> {
@@ -141,25 +143,42 @@ fun DrawScope.drawSvgOutline(shape: SvgShape, v: SvgView, color: Color, width: F
 }
 
 /**
- * 缓存变换后的 path：正/背面各一槽。
+ * 屏幕坐标变换缓存：正/背面各一份，按视口（unit/ox/oy 三者）整体失效。
+ * 同一次绘制 pass 内 view 固定，缓存一次填充后，选中肌群呼吸重绘等后续帧
+ * 直接复用已变换 path，不再逐帧重走命令流。
  * 变换不依赖 Matrix（scale/translate 组合顺序在不同版本语义有差异），
  * 直接重走 path 命令流逐点计算屏幕坐标：px = ox + x·unit，所见即所得。
  */
-private val tfCache = arrayOfNulls<Path>(2)
-private val tfCacheShape = arrayOfNulls<SvgShape>(2)
-private var tfCacheView = arrayOfNulls<Pair<Float, Float>>(2)
+private class TransformCache {
+    private var unit = Float.NaN
+    private var ox = Float.NaN
+    private var oy = Float.NaN
+    private val paths = HashMap<SvgShape, Path>()
+
+    fun matches(v: SvgView) = unit == v.unit && ox == v.ox && oy == v.oy
+
+    fun reset(v: SvgView) {
+        unit = v.unit; ox = v.ox; oy = v.oy
+        paths.clear()
+    }
+
+    operator fun get(shape: SvgShape): Path? = paths[shape]
+    fun put(shape: SvgShape, path: Path) { paths[shape] = path }
+}
+
+private val frontTransform = TransformCache()
+private val backTransform = TransformCache()
 
 private fun SvgShape.transformed(v: SvgView, isBack: Boolean): Path {
-    val slot = if (isBack) 1 else 0
-    val key = v.unit to v.ox
-    if (tfCacheShape[slot] === this && tfCacheView[slot] == key) return tfCache[slot]!!
+    val cache = if (isBack) backTransform else frontTransform
+    if (!cache.matches(v)) cache.reset(v)
+    cache[this]?.let { return it }
     val out = Path()
-    var i = 0
-    tokens(d).forEach { (cmd, nums) ->
+    cmds.forEach { (cmd, nums) ->
         when (cmd) {
             'M' -> out.moveTo(v.px(nums[0]), v.py(nums[1]))
             'C' -> {
-                i = 0
+                var i = 0
                 while (i + 5 < nums.size) {
                     out.cubicTo(
                         v.px(nums[i]), v.py(nums[i + 1]),
@@ -172,8 +191,6 @@ private fun SvgShape.transformed(v: SvgView, isBack: Boolean): Path {
             'Z' -> out.close()
         }
     }
-    tfCache[slot] = out
-    tfCacheShape[slot] = this
-    tfCacheView[slot] = key
+    cache.put(this, out)
     return out
 }

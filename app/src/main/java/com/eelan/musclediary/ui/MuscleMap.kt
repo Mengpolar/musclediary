@@ -65,13 +65,21 @@ fun MuscleMap(
     onPick: (Muscle?) -> Unit,
 ) {
     var picked by remember { mutableStateOf<Muscle?>(null) }
-    // 选中描边呼吸：以 lambda 传入，draw 阶段按需读取（未选中时不订阅、零重绘）
-    val pulseTransition = rememberInfiniteTransition(label = "pick")
-    val pulse by pulseTransition.animateFloat(
-        initialValue = 0.5f, targetValue = 1f,
-        animationSpec = infiniteRepeatable(tween(700, easing = LinearEasing), RepeatMode.Reverse),
-        label = "pickPulse",
-    )
+    // 选中描边呼吸：仅在选中某个肌群时才创建无限动画（未选中零开销），
+    // 以 lambda 传入让 draw 阶段按需读取数值，避免每帧重组
+    val pulse: () -> Float = if (picked != null) {
+        val pulseTransition = rememberInfiniteTransition(label = "pick")
+        val animated by pulseTransition.animateFloat(
+            initialValue = 0.5f, targetValue = 1f,
+            animationSpec = infiniteRepeatable(tween(700, easing = LinearEasing), RepeatMode.Reverse),
+            label = "pickPulse",
+        )
+        val f: () -> Float = { animated }
+        f
+    } else {
+        val f: () -> Float = { 0.5f }
+        f
+    }
     Column(modifier.fillMaxWidth()) {
         Row(
             Modifier.fillMaxWidth().height(260.dp),
@@ -79,9 +87,9 @@ fun MuscleMap(
             // 窄屏（或系统显示放大）上人形边距只剩 1-2dp，会视觉贴死
             horizontalArrangement = Arrangement.spacedBy(16.dp),
         ) {
-            MuscleView(Side.FRONT, scores, intensityOf, picked, { pulse },
+            MuscleView(Side.FRONT, scores, intensityOf, picked, pulse,
                 Modifier.weight(1f).fillMaxHeight()) { picked = it; onPick(it) }
-            MuscleView(Side.BACK, scores, intensityOf, picked, { pulse },
+            MuscleView(Side.BACK, scores, intensityOf, picked, pulse,
                 Modifier.weight(1f).fillMaxHeight()) { picked = it; onPick(it) }
         }
         Spacer(Modifier.height(8.dp))

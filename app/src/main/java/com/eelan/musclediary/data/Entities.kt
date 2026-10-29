@@ -53,6 +53,7 @@ data class FoodTemplate(
     val tag: String = "", // 标签：高质量蛋白 / 优质碳水 / 健康脂肪 / 果蔬纤维 等，空为无标签
     val unitName: String = "", // 量词单位名：如「个」「盒」「碗」，空 = 按克
     val unitGrams: Double = 0.0, // 1 个单位等于多少 g（牛奶等液体为 ml）
+    val userEdited: Boolean = false, // 用户手动改过（仅对内置模板有意义）：数据源升级重播种时保留，不覆盖
 ) {
     val kcal: Double get() = protein * 4 + carb * 4 + fat * 9
     val dispName: String get() = if (com.eelan.musclediary.Lang.isEn && nameEn.isNotEmpty()) nameEn else name
@@ -89,9 +90,17 @@ data class ExerciseTemplate(
     val isCustom: Boolean = false,
     val lastUsedAt: Long = 0,
     val voiceKey: String = "",        // 旧训练模式遗留字段，已废弃
+    val userEdited: Boolean = false,  // 用户手动改过（仅对内置模板有意义）：数据源升级重播种时保留，不覆盖
 ) {
     val dispName: String get() = if (com.eelan.musclediary.Lang.isEn && nameEn.isNotEmpty()) nameEn else name
 }
+
+/** 历史条目名是录入时语言的快照：回查模板时中英文名都要认（语言切换后仍能匹配） */
+fun FoodTemplate.matchesEntryName(n: String): Boolean =
+    n == name || (nameEn.isNotEmpty() && n == nameEn)
+
+fun ExerciseTemplate.matchesEntryName(n: String): Boolean =
+    n == name || (nameEn.isNotEmpty() && n == nameEn)
 
 @Entity(tableName = "exercise_entries")
 data class ExerciseEntry(
@@ -236,7 +245,7 @@ interface AppDao {
 @Database(
     entities = [Profile::class, FoodTemplate::class, FoodEntry::class,
         ExerciseTemplate::class, ExerciseEntry::class, WeightEntry::class, WaterEntry::class],
-    version = 9,
+    version = 10,
     exportSchema = true,
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -334,12 +343,20 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        val MIGRATION_9_10 = object : androidx.room.migration.Migration(9, 10) {
+            override fun migrate(db: androidx.sqlite.db.SupportSQLiteDatabase) {
+                // 标记用户手动编辑过的内置模板：数据源升级重播种时保留这些行不被官方数据覆盖
+                db.execSQL("ALTER TABLE `food_templates` ADD COLUMN `userEdited` INTEGER NOT NULL DEFAULT 0")
+                db.execSQL("ALTER TABLE `exercise_templates` ADD COLUMN `userEdited` INTEGER NOT NULL DEFAULT 0")
+            }
+        }
+
         fun get(ctx: Context): AppDatabase =
             inst ?: synchronized(this) {
                 inst ?: Room.databaseBuilder(
                     ctx.applicationContext, AppDatabase::class.java, "musclediary.db"
                 ).addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6,
-                    MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9)
+                    MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10)
                     .build().also { inst = it }
             }
     }

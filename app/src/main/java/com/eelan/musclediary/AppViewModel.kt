@@ -52,17 +52,30 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 profile = profile.copy(surplusKcal = 250.0)
                 dao.upsertProfile(profile)
             }
-            // 内置食物数据源升级：重建内置模板（自定义模板与历史记录不受影响）
+            // 内置食物数据源升级：重建内置模板（保留使用排序与用户手改过的条目）
             if (profile.seedVersion < FoodSeed.version) {
+                val builtin = dao.foodTemplates().filter { !it.isCustom }
+                val usage = builtin.associate { it.name to it.lastUsedAt }
+                val edited = builtin.filter { it.userEdited }
+                val editedNames = edited.map { it.name }.toSet()
                 dao.clearBuiltinFoodTemplates()
-                dao.insertFoodTemplates(FoodSeed.items)
+                // 先按原 id 插回用户改过的行，再插官方数据（同名跳过）；避免种子 id 抢占导致主键冲突
+                if (edited.isNotEmpty()) dao.insertFoodTemplates(edited)
+                dao.insertFoodTemplates(FoodSeed.items.filter { it.name !in editedNames }
+                    .map { it.copy(lastUsedAt = usage[it.name] ?: 0) })
                 profile = profile.copy(seedVersion = FoodSeed.version)
                 dao.upsertProfile(profile)
             }
-            // 内置锻炼数据源升级：同食物机制重建内置动作模板（自定义动作与历史记录不受影响）
+            // 内置锻炼数据源升级：同食物机制重建内置动作模板
             if (profile.exerciseSeedVersion < ExerciseSeed.version) {
+                val builtin = dao.exerciseTemplates().filter { !it.isCustom }
+                val usage = builtin.associate { it.name to it.lastUsedAt }
+                val edited = builtin.filter { it.userEdited }
+                val editedNames = edited.map { it.name }.toSet()
                 dao.clearBuiltinExerciseTemplates()
-                dao.insertExerciseTemplates(ExerciseSeed.items)
+                if (edited.isNotEmpty()) dao.insertExerciseTemplates(edited)
+                dao.insertExerciseTemplates(ExerciseSeed.items.filter { it.name !in editedNames }
+                    .map { it.copy(lastUsedAt = usage[it.name] ?: 0) })
                 profile = profile.copy(exerciseSeedVersion = ExerciseSeed.version)
                 dao.upsertProfile(profile)
             }
@@ -103,8 +116,29 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     fun selectDate(d: LocalDate) { selectedDate = d }
 
-    fun foodOn(date: LocalDate) = foodEntries.filter { it.date == date.toString() }
-    fun exerciseOn(date: LocalDate) = exerciseEntries.filter { it.date == date.toString() }
+    /**
+     * 按日期分组的索引：只在源列表引用变化（新增/删除/导入）时重建一次，
+     * 避免每次重组都全表过滤（日积月累几千条记录后开销可观）。
+     */
+    private class DayIndex<T>(private val dayOf: (T) -> String) {
+        private var src: List<T>? = null
+        private var map: Map<String, List<T>> = emptyMap()
+
+        fun get(src: List<T>, day: String): List<T> {
+            if (this.src !== src) {
+                this.src = src
+                map = src.groupBy(dayOf)
+            }
+            return map[day].orEmpty()
+        }
+    }
+
+    private val foodIndex = DayIndex<FoodEntry> { it.date }
+    private val exerciseIndex = DayIndex<ExerciseEntry> { it.date }
+    private val waterIndex = DayIndex<WaterEntry> { it.date }
+
+    fun foodOn(date: LocalDate) = foodIndex.get(foodEntries, date.toString())
+    fun exerciseOn(date: LocalDate) = exerciseIndex.get(exerciseEntries, date.toString())
     fun exerciseKcalOn(date: LocalDate) = exerciseOn(date).sumOf { it.calories }
 
     fun updateProfile(p: Profile) {
@@ -127,7 +161,18 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun deleteWeight(e: WeightEntry) {
-        viewModelScope.launch(Dispatchers.IO) { dao.deleteWeightEntry(e) }
+        viewModelScope.launch(Dispatchers.IO) {
+            dao.deleteWeightEntry(e)
+            // 删的是今日记录时，档案体重回退到最近一条历史记录（目标计算依赖 profile.weightKg）
+            if (e.date == LocalDate.now().toString()) {
+                val latest = dao.allWeightEntries().lastOrNull()?.weightKg
+                if (latest != null && latest != profile.weightKg) {
+                    val upd = profile.copy(weightKg = latest)
+                    dao.upsertProfile(upd)
+                    withContext(Dispatchers.Main) { profile = upd; Lang.set(upd.lang) }
+                }
+            }
+        }
         weightEntries = weightEntries.filterNot { it.id == e.id }
     }
 
@@ -142,11 +187,11 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun waterOn(date: LocalDate): Double =
-        waterEntries.filter { it.date == date.toString() }.sumOf { it.ml }
+        waterIndex.get(waterEntries, date.toString()).sumOf { it.ml }
 
     /** 某日期的饮水记录明细（按时间正序） */
     fun waterListOn(date: LocalDate): List<WaterEntry> =
-        waterEntries.filter { it.date == date.toString() }.sortedBy { it.createdAt }
+        waterIndex.get(waterEntries, date.toString()).sortedBy { it.createdAt }
 
     /** 记录一次饮水 */
     fun addWater(ml: Double, date: LocalDate) {
@@ -279,7 +324,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     /** 某食物最近 3 次记录的克数（去重，新→旧），用于快捷标签与预填 */
     fun recentFoodGrams(template: FoodTemplate): List<Double> {
         val seen = linkedSetOf<Double>()
-        foodEntries.filter { it.name == template.name }
+        foodEntries.filter { template.matchesEntryName(it.name) }
             .sortedByDescending { it.createdAt }
             .forEach { e -> seen.add(e.grams) }
         return seen.take(3).toList()
@@ -288,7 +333,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     /** 某动作最近 3 次记录的「数量+附加重量」（去重，新→旧），用于快捷标签与预填 */
     fun recentExerciseQty(template: ExerciseTemplate): List<Pair<Double, Double>> {
         val seen = linkedSetOf<Pair<Double, Double>>()
-        exerciseEntries.filter { it.templateId == template.id || it.name == template.name }
+        exerciseEntries.filter { it.templateId == template.id || template.matchesEntryName(it.name) }
             .sortedByDescending { it.createdAt }
             .forEach { e -> seen.add(e.qty to e.weightKg) }
         return seen.take(3).toList()
@@ -303,8 +348,10 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun saveFoodTemplate(t: FoodTemplate) {
-        viewModelScope.launch(Dispatchers.IO) { dao.upsertFoodTemplate(t) }
-        foodTemplates = (foodTemplates.filterNot { it.id == t.id } + t).sortedBy { it.name }
+        // 内置模板被手动修改：打标记，数据源升级重播种时保留用户版本
+        val toSave = if (!t.isCustom) t.copy(userEdited = true) else t
+        viewModelScope.launch(Dispatchers.IO) { dao.upsertFoodTemplate(toSave) }
+        foodTemplates = (foodTemplates.filterNot { it.id == t.id } + toSave).sortedBy { it.name }
     }
 
     fun deleteFoodTemplate(t: FoodTemplate) {
@@ -313,8 +360,9 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun saveExerciseTemplate(t: ExerciseTemplate) {
-        viewModelScope.launch(Dispatchers.IO) { dao.upsertExerciseTemplate(t) }
-        exerciseTemplates = (exerciseTemplates.filterNot { it.id == t.id } + t).sortedBy { it.name }
+        val toSave = if (!t.isCustom) t.copy(userEdited = true) else t
+        viewModelScope.launch(Dispatchers.IO) { dao.upsertExerciseTemplate(toSave) }
+        exerciseTemplates = (exerciseTemplates.filterNot { it.id == t.id } + toSave).sortedBy { it.name }
     }
 
     fun deleteExerciseTemplate(t: ExerciseTemplate) {
@@ -430,6 +478,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             sb.appendLine("waentry,${it.date},${it.ml},${it.createdAt}")
         }
         val dir = java.io.File(getApplication<Application>().filesDir, "backup").apply { mkdirs() }
+        // 中转文件用完会被调用方删除；这里顺手清掉历史版本遗留（旧版按天累积从不清理）
+        dir.listFiles()?.forEach { it.delete() }
         val f = java.io.File(dir, "musclediary_backup_${LocalDate.now()}.csv")
         f.writeText(sb.toString())
         withContext(Dispatchers.Main) { onDone(f) }
@@ -451,7 +501,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             val customsF = mutableListOf<FoodTemplate>()
             val customsX = mutableListOf<ExerciseTemplate>()
             val fEntries = mutableListOf<FoodEntry>()
-            val xEntries = mutableListOf<Triple<ExerciseEntry, String, String>>() // entry, qtyType, secondary
+            val xEntries = mutableListOf<ExerciseEntry>()
             val wEntries = mutableListOf<WeightEntry>()
             val waEntries = mutableListOf<WaterEntry>()
             var section = ""
@@ -497,10 +547,11 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                         val p = parseCsvLine(line)
                         val d = p[1].trim()
                         if (!dateOk(d)) { skipped++; return@runCatching }
-                        xEntries += Triple(ExerciseEntry(date = d, templateId = 0, name = CsvCodec.unSafe(p[2].trim()),
+                        // 条目不存 qtyType（历史版本字段）：单位显示按模板 id/名称回查，模板已删则按名称兜底
+                        xEntries += ExerciseEntry(date = d, templateId = 0, name = CsvCodec.unSafe(p[2].trim()),
                             qty = num(p[3]), weightKg = num(p[4]), calories = num(p[6]),
                             minutes = num(p.getOrElse(7) { "0" }),
-                            musclesJson = p.getOrNull(8)?.takeIf { it.isNotBlank() } ?: "{}"), p[5].trim(), "")
+                            musclesJson = p.getOrNull(8)?.takeIf { it.isNotBlank() } ?: "{}")
                         sawExercise = true
                     }.onFailure { skipped++ }
                     section == "weight_entries" && line.startsWith("wentry,") -> runCatching {
@@ -550,7 +601,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                     dao.insertWaterEntries(waEntries)
                 }
                 if (sawFood) { dao.clearFoodEntries(); dao.insertFoodEntries(fEntries) }
-                if (sawExercise) { dao.clearExerciseEntries(); dao.insertExerciseEntries(xEntries.map { it.first }) }
+                if (sawExercise) { dao.clearExerciseEntries(); dao.insertExerciseEntries(xEntries) }
                 if (sawCustomF) { dao.clearCustomFoodTemplates(); dao.insertFoodTemplates(customsF) }
                 if (sawCustomX) { dao.clearCustomExerciseTemplates(); dao.insertExerciseTemplates(customsX) }
                 foodEntries = dao.allFoodEntries()

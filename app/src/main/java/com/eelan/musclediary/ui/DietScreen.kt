@@ -26,6 +26,7 @@ import com.eelan.musclediary.L
 import com.eelan.musclediary.tagLabel
 import com.eelan.musclediary.data.FoodEntry
 import com.eelan.musclediary.data.FoodTemplate
+import com.eelan.musclediary.data.matchesEntryName
 import com.eelan.musclediary.ui.theme.*
 import kotlinx.coroutines.launch
 
@@ -154,7 +155,7 @@ fun DietScreen(vm: AppViewModel, onOpenRecords: () -> Unit = {}) {
             FoodEditDialog(
                 entryName = e.name,
                 currentGrams = e.grams,
-                template = vm.foodTemplates.firstOrNull { it.dispName == e.name || it.name == e.name },
+                template = vm.foodTemplates.firstOrNull { it.matchesEntryName(e.name) },
                 onDismiss = { editingEntry = null },
                 onConfirm = { grams -> vm.updateFoodEntry(e, grams); editingEntry = null },
             )

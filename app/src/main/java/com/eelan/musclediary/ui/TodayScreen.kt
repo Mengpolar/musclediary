@@ -224,6 +224,10 @@ fun WaterDialog(vm: AppViewModel, date: LocalDate, targetMl: Double, onDismiss: 
                         keyboardType = androidx.compose.ui.text.input.KeyboardType.Number),
                     colors = fieldColors(),
                 )
+                if (text.isNotBlank() && (text.toDoubleOrNull() ?: 0.0) <= 0.0) {
+                    Text(L("请输入大于 0 的毫升数", "Enter an amount greater than 0"),
+                        fontSize = 12.sp, color = Warn)
+                }
             }
         },
         confirmButton = {
@@ -256,9 +260,14 @@ fun DateHeader(vm: AppViewModel, onOpenCalendar: () -> Unit = {}) {
                 .weight(1f)
                 .clickable { onOpenCalendar() }
         ) {
+            // 今天按当日实际锻炼情况区分训练日/休息日，非今天只显示星期
+            val suffix = when {
+                d != today -> ""
+                vm.exerciseOn(d).isNotEmpty() -> L(" · 训练日", " · TRAINING DAY")
+                else -> L(" · 休息日", " · REST DAY")
+            }
             Text(
-                (listOf("MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN")[d.dayOfWeek.value - 1]) +
-                    if (d == today) L(" · 训练日", " · TRAINING DAY") else "",
+                (listOf("MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN")[d.dayOfWeek.value - 1]) + suffix,
                 fontSize = 11.sp, color = TextLo, letterSpacing = 3.sp,
             )
             Spacer(Modifier.height(2.dp))

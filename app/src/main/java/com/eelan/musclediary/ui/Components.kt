@@ -22,6 +22,7 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
@@ -438,6 +439,12 @@ fun SwipeEntryRow(
                         scope.launch {
                             offset.snapTo((offset.value + dragAmount).coerceIn(-maxSwipePx, 0f))
                         }
+                    }
+                }
+                // 左滑打开后点卡片本体即可收回（与常见手势习惯一致）
+                .pointerInput(Unit) {
+                    detectTapGestures {
+                        if (offset.value < 0f) scope.launch { offset.animateTo(0f, tween(150)) }
                     }
                 }
                 .padding(horizontal = 12.dp, vertical = 10.dp),
