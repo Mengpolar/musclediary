@@ -75,7 +75,9 @@ fun MuscleMap(
     Column(modifier.fillMaxWidth()) {
         Row(
             Modifier.fillMaxWidth().height(260.dp),
-            horizontalArrangement = Arrangement.SpaceEvenly,
+            // 两视图间必须留出实间距：weight 均分时 Canvas 紧贴，
+            // 窄屏（或系统显示放大）上人形边距只剩 1-2dp，会视觉贴死
+            horizontalArrangement = Arrangement.spacedBy(16.dp),
         ) {
             MuscleView(Side.FRONT, scores, intensityOf, picked, { pulse },
                 Modifier.weight(1f).fillMaxHeight()) { picked = it; onPick(it) }
@@ -166,7 +168,7 @@ private fun MuscleView(
                 .padding(top = 6.dp)
                 .pointerInput(side) {
                     detectTapGestures { pos ->
-                        val v = svgView(size.width.toFloat(), size.height.toFloat(), side)
+                        val v = svgView(size.width.toFloat(), size.height.toFloat(), side, musclePaths.map { it.second } + baseShapes)
                         val p = Offset(pos.x - 0f, pos.y - 0f)
                         // 屏幕点 → 判定：所有绘制 path 用同变换，直接把点逆变换回模型坐标
                         val mx = (p.x - v.ox) / v.unit
@@ -178,7 +180,7 @@ private fun MuscleView(
                     }
                 }
         ) {
-            val v = svgView(size.width, size.height, side)
+            val v = svgView(size.width, size.height, side, musclePaths.map { it.second } + baseShapes)
 
             // 底图轮廓
             baseShapes.forEach { drawSvg(it, v, Ink2, isBack) }

@@ -61,36 +61,37 @@ class SvgShape(val d: String) {
 
         /** 数据量约 80 条且组合态固定：全局缓存避免重复解析 */
         fun of(d: String): SvgShape = cache.getOrPut(d) { SvgShape(d) }
+    }
+}
 
-        private fun tokens(d: String): List<Pair<Char, FloatArray>> {
-            val out = mutableListOf<Pair<Char, FloatArray>>()
-            val re = Regex("([MCZ])([^MCZ]*)")
-            val num = Regex("-?\\d*\\.?\\d+")
-            re.findAll(d).forEach { m ->
-                out += m.groupValues[1][0] to num.findAll(m.groupValues[2].replace(",", " "))
-                    .map { it.value.toFloat() }.toList().toFloatArray()
-            }
-            return out
-        }
+/** path 数据只含 M/C/Z 绝对坐标：切出命令与参数流（解析/命中/变换共用） */
+private fun tokens(d: String): List<Pair<Char, FloatArray>> {
+    val out = mutableListOf<Pair<Char, FloatArray>>()
+    val re = Regex("([MCZ])([^MCZ]*)")
+    val num = Regex("-?\\d*\\.?\\d+")
+    re.findAll(d).forEach { m ->
+        out += m.groupValues[1][0] to num.findAll(m.groupValues[2].replace(",", " "))
+            .map { it.value.toFloat() }.toList().toFloatArray()
+    }
+    return out
+}
 
-        private fun parse(d: String): Path {
-            val p = Path()
-            tokens(d).forEach { (cmd, nums) ->
-                when (cmd) {
-                    'M' -> p.moveTo(nums[0], nums[1])
-                    'C' -> {
-                        var i = 0
-                        while (i + 5 < nums.size) {
-                            p.cubicTo(nums[i], nums[i + 1], nums[i + 2], nums[i + 3], nums[i + 4], nums[i + 5])
-                            i += 6
-                        }
-                    }
-                    'Z' -> p.close()
+private fun parse(d: String): Path {
+    val p = Path()
+    tokens(d).forEach { (cmd, nums) ->
+        when (cmd) {
+            'M' -> p.moveTo(nums[0], nums[1])
+            'C' -> {
+                var i = 0
+                while (i + 5 < nums.size) {
+                    p.cubicTo(nums[i], nums[i + 1], nums[i + 2], nums[i + 3], nums[i + 4], nums[i + 5])
+                    i += 6
                 }
             }
-            return p
+            'Z' -> p.close()
         }
     }
+    return p
 }
 
 /** 模型→屏幕的统一变换：scale + translate（正/背面通过视口 x 偏移切半） */
@@ -100,18 +101,32 @@ class SvgView(val unit: Float, val ox: Float, val oy: Float) {
 }
 
 /**
- * 视口计算：单一坐标系 535x462（正面人形在左半、背面在右半）。
- * 视口取该侧**实际内容 bbox**（含少量留白）而非固定半幅——两具人形各自完整充满
- * 自己的 Canvas，绝无越界相碰（内容 bbox 见下方常量，构建期从数据统计而来）。
+ * 视口计算：运行时从该侧全部 path 的实际 bounds 求 Union（外扩 6 单位留白），
+ * 再等比缩放居中到画布。以数据真实边界为准，数学上保证内容恒在画布内——
+ * 无论数据怎么改、屏幕多窄，两具人形各自完整居中，绝不会越界相碰或被裁切。
+ * （每侧 shape 集合固定，结果缓存按 side 记忆，只在首帧计算一次。）
  */
-private val FRONT_CONTENT = androidx.compose.ui.geometry.Rect(0f, 0f, 232f, 462f)
-private val BACK_CONTENT = androidx.compose.ui.geometry.Rect(285f, 0f, 535f, 462f)
+private val viewCache = HashMap<com.eelan.musclediary.domain.Side, androidx.compose.ui.geometry.Rect>()
 
-fun svgView(canvasW: Float, canvasH: Float, side: com.eelan.musclediary.domain.Side): SvgView {
-    val c = if (side == com.eelan.musclediary.domain.Side.BACK) BACK_CONTENT else FRONT_CONTENT
-    val unit = minOf(canvasW / c.width, canvasH / c.height)
-    val ox = (canvasW - c.width * unit) / 2f - c.left * unit
-    val oy = (canvasH - c.height * unit) / 2f
+fun svgView(
+    canvasW: Float, canvasH: Float,
+    side: com.eelan.musclediary.domain.Side,
+    shapes: List<SvgShape>,
+): SvgView {
+    val content = synchronized(viewCache) { viewCache[side] } ?: run {
+        var l = Float.MAX_VALUE; var t = Float.MAX_VALUE; var r = -Float.MAX_VALUE; var b = -Float.MAX_VALUE
+        shapes.forEach { s ->
+            val bb = s.path.getBounds()
+            l = minOf(l, bb.left); t = minOf(t, bb.top)
+            r = maxOf(r, bb.right); b = maxOf(b, bb.bottom)
+        }
+        val rect = androidx.compose.ui.geometry.Rect(l - 6f, t - 6f, r + 6f, b + 6f)
+        synchronized(viewCache) { viewCache[side] = rect }
+        rect
+    }
+    val unit = minOf(canvasW / content.width, canvasH / content.height)
+    val ox = (canvasW - content.width * unit) / 2f - content.left * unit
+    val oy = (canvasH - content.height * unit) / 2f - content.top * unit
     return SvgView(unit, ox, oy)
 }
 
@@ -125,23 +140,39 @@ fun DrawScope.drawSvgOutline(shape: SvgShape, v: SvgView, color: Color, width: F
     drawPath(shape.transformed(v, isBack), color, style = Stroke(width))
 }
 
-/** 缓存变换后的 path：正/背面各一槽（同一帧内两侧交替绘制，避免单槽反复失效） */
-private val tfCache = arrayOfNulls<Pair<Path, Boolean>>(2)   // path to isBack
+/**
+ * 缓存变换后的 path：正/背面各一槽。
+ * 变换不依赖 Matrix（scale/translate 组合顺序在不同版本语义有差异），
+ * 直接重走 path 命令流逐点计算屏幕坐标：px = ox + x·unit，所见即所得。
+ */
+private val tfCache = arrayOfNulls<Path>(2)
 private val tfCacheShape = arrayOfNulls<SvgShape>(2)
 private var tfCacheView = arrayOfNulls<Pair<Float, Float>>(2)
 
 private fun SvgShape.transformed(v: SvgView, isBack: Boolean): Path {
     val slot = if (isBack) 1 else 0
     val key = v.unit to v.ox
-    if (tfCacheShape[slot] === this && tfCacheView[slot] == key) return tfCache[slot]!!.first
-    val m = androidx.compose.ui.graphics.Matrix().apply {
-        scale(v.unit, v.unit, 1f)
-        translate(v.ox, v.oy, 0f)
-    }
+    if (tfCacheShape[slot] === this && tfCacheView[slot] == key) return tfCache[slot]!!
     val out = Path()
-    out.addPath(path)
-    out.transform(m)
-    tfCache[slot] = out to isBack
+    var i = 0
+    tokens(d).forEach { (cmd, nums) ->
+        when (cmd) {
+            'M' -> out.moveTo(v.px(nums[0]), v.py(nums[1]))
+            'C' -> {
+                i = 0
+                while (i + 5 < nums.size) {
+                    out.cubicTo(
+                        v.px(nums[i]), v.py(nums[i + 1]),
+                        v.px(nums[i + 2]), v.py(nums[i + 3]),
+                        v.px(nums[i + 4]), v.py(nums[i + 5]),
+                    )
+                    i += 6
+                }
+            }
+            'Z' -> out.close()
+        }
+    }
+    tfCache[slot] = out
     tfCacheShape[slot] = this
     tfCacheView[slot] = key
     return out
