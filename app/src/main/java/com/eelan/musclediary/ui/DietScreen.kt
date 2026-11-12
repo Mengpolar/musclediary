@@ -82,17 +82,12 @@ fun DietScreen(vm: AppViewModel, onOpenRecords: () -> Unit = {}) {
             DateHeader(vm, onOpenCalendar = { showCalendar = true })
             Spacer(Modifier.height(8.dp))
             CardBox(title = L("当日摄入", "Today's intake")) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Column(Modifier.weight(1f)) {
-                        Text("${fmt0(kcal)} kcal", fontSize = 24.sp, fontWeight = FontWeight.ExtraBold, color = Accent)
-                        Spacer(Modifier.height(6.dp))
-                        FoodMacroChips(
-                            protein = protein,
-                            carb = carb,
-                            fat = fat,
-                        )
-                    }
-                }
+                DietMacroDashboard(
+                    kcal = kcal,
+                    protein = protein,
+                    carb = carb,
+                    fat = fat,
+                )
             }
             SectionTitleRow(L("饮食记录（", "Food records (") + "${entries.size})", L("全部 >", "All >"), onMore = onOpenRecords)
             if (entries.isEmpty()) {
@@ -198,6 +193,201 @@ fun DietScreen(vm: AppViewModel, onOpenRecords: () -> Unit = {}) {
     }
 }
 
+/**
+ * 饮食页顶部宏量仪表盘（新颖呈现）：
+ * 1) 顶部大热量灯牌 + 宏量供能占比标签
+ * 2) 三段式彩色宏量光谱条（按 P:4 kcal / C:4 kcal / F:9 kcal 热量占比实时分配宽度）
+ * 3) 下方三等分微浮雕数据舱（顶部彩色灯条 + 营养素名称 + 供能百分比 + 大号等宽克数）
+ */
+@Composable
+private fun DietMacroDashboard(
+    kcal: Double,
+    protein: Double,
+    carb: Double,
+    fat: Double,
+) {
+    val pKcal = (protein * 4.0).coerceAtLeast(0.0)
+    val cKcal = (carb * 4.0).coerceAtLeast(0.0)
+    val fKcal = (fat * 9.0).coerceAtLeast(0.0)
+    val totalMacroKcal = pKcal + cKcal + fKcal
+    val hasData = totalMacroKcal > 0.1
+    val pRatio = if (hasData) (pKcal / totalMacroKcal).toFloat() else 0.34f
+    val cRatio = if (hasData) (cKcal / totalMacroKcal).toFloat() else 0.33f
+    val fRatio = if (hasData) (fKcal / totalMacroKcal).toFloat() else 0.33f
+
+    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        // 1. 顶部大热量 + 供能比微标
+        Row(
+            Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.Bottom,
+        ) {
+            Text(
+                text = fmt0(kcal),
+                fontSize = 26.sp,
+                fontWeight = FontWeight.ExtraBold,
+                color = Accent,
+            )
+            Spacer(Modifier.width(4.dp))
+            Text(
+                text = "kcal",
+                fontSize = 12.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = TextLo,
+                modifier = Modifier.padding(bottom = 3.dp),
+            )
+            Spacer(Modifier.weight(1f))
+            Text(
+                text = if (hasData) {
+                    "P ${(pRatio * 100).toInt()}% · C ${(cRatio * 100).toInt()}% · F ${(100 - (pRatio * 100).toInt() - (cRatio * 100).toInt()).coerceAtLeast(0)}%"
+                } else {
+                    L("今日暂未录入", "No intake yet")
+                },
+                fontSize = 11.sp,
+                color = TextLo,
+                modifier = Modifier.padding(bottom = 3.dp),
+            )
+        }
+
+        // 2. 三段式彩色能量光谱条（按三大营养素实际供能比分配宽度）
+        Row(
+            Modifier
+                .fillMaxWidth()
+                .height(7.dp)
+                .clip(RoundedCornerShape(99.dp))
+                .background(Ink2),
+            horizontalArrangement = Arrangement.spacedBy(2.dp),
+        ) {
+            if (hasData) {
+                if (pRatio > 0.01f) {
+                    Box(
+                        Modifier
+                            .weight(pRatio.coerceAtLeast(0.04f))
+                            .fillMaxHeight()
+                            .clip(RoundedCornerShape(99.dp))
+                            .background(Protein),
+                    )
+                }
+                if (cRatio > 0.01f) {
+                    Box(
+                        Modifier
+                            .weight(cRatio.coerceAtLeast(0.04f))
+                            .fillMaxHeight()
+                            .clip(RoundedCornerShape(99.dp))
+                            .background(CarbC),
+                    )
+                }
+                if (fRatio > 0.01f) {
+                    Box(
+                        Modifier
+                            .weight(fRatio.coerceAtLeast(0.04f))
+                            .fillMaxHeight()
+                            .clip(RoundedCornerShape(99.dp))
+                            .background(FatC),
+                    )
+                }
+            } else {
+                Box(Modifier.weight(1f).fillMaxHeight().background(Protein.copy(alpha = 0.22f)))
+                Box(Modifier.weight(1f).fillMaxHeight().background(CarbC.copy(alpha = 0.22f)))
+                Box(Modifier.weight(1f).fillMaxHeight().background(FatC.copy(alpha = 0.22f)))
+            }
+        }
+
+        // 3. 三等分微浮雕数据舱（顶部彩色灯条 + 标签 + 占比 + 大字克数）
+        val pPct = if (hasData) (pRatio * 100).toInt() else 0
+        val cPct = if (hasData) (cRatio * 100).toInt() else 0
+        val fPct = if (hasData) (100 - pPct - cPct).coerceAtLeast(0) else 0
+        Row(
+            Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            MacroStatTile(
+                modifier = Modifier.weight(1f),
+                label = L("蛋白质", "Protein"),
+                grams = protein,
+                pct = pPct,
+                color = Protein,
+            )
+            MacroStatTile(
+                modifier = Modifier.weight(1f),
+                label = L("碳水", "Carbs"),
+                grams = carb,
+                pct = cPct,
+                color = CarbC,
+            )
+            MacroStatTile(
+                modifier = Modifier.weight(1f),
+                label = L("脂肪", "Fat"),
+                grams = fat,
+                pct = fPct,
+                color = FatC,
+            )
+        }
+    }
+}
+
+@Composable
+private fun MacroStatTile(
+    modifier: Modifier = Modifier,
+    label: String,
+    grams: Double,
+    pct: Int,
+    color: Color,
+) {
+    Column(
+        modifier
+            .clip(RoundedCornerShape(10.dp))
+            .background(Ink2)
+            .border(0.75.dp, color.copy(alpha = 0.25f), RoundedCornerShape(10.dp))
+            .padding(horizontal = 10.dp, vertical = 8.dp),
+    ) {
+        // 顶部彩色能量灯条 + 百分比
+        Row(
+            Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Box(
+                Modifier
+                    .width(14.dp)
+                    .height(3.dp)
+                    .clip(RoundedCornerShape(99.dp))
+                    .background(color),
+            )
+            Spacer(Modifier.weight(1f))
+            Text(
+                text = "$pct%",
+                fontSize = 10.sp,
+                color = color.copy(alpha = 0.85f),
+                fontWeight = FontWeight.SemiBold,
+            )
+        }
+        Spacer(Modifier.height(4.dp))
+        Text(
+            text = label,
+            fontSize = 11.sp,
+            color = TextLo,
+            maxLines = 1,
+        )
+        Spacer(Modifier.height(1.dp))
+        Row(verticalAlignment = Alignment.Bottom) {
+            Text(
+                text = fmt1(grams),
+                fontSize = 15.sp,
+                fontWeight = FontWeight.Bold,
+                color = TextHi,
+                maxLines = 1,
+            )
+            Spacer(Modifier.width(2.dp))
+            Text(
+                text = "g",
+                fontSize = 10.sp,
+                color = color,
+                fontWeight = FontWeight.SemiBold,
+                modifier = Modifier.padding(bottom = 1.dp),
+            )
+        }
+    }
+}
+
 /** 食物/动作模板选择器 */
 @Composable
 fun TemplatePickerDialog(
@@ -280,7 +470,7 @@ fun TemplatePickerDialog(
                                 }
                             }
                         }
-                        Spacer(Modifier.height(5.dp))
+                        Spacer(Modifier.height(3.dp))
                         val unitBadge = if (t.unitName.isNotBlank() && t.unitGrams > 0)
                             "1${foodUnitLabel(t.unitName)}=${fmt0(t.unitGrams)}g"
                         else null

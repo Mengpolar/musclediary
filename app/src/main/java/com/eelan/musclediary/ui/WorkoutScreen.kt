@@ -335,7 +335,7 @@ private fun ExercisePickerDialog(
                 ) {
                     Column(Modifier.weight(1f)) {
                         Text(t.dispName, color = TextHi, fontSize = 14.sp, fontWeight = FontWeight.Medium)
-                        Spacer(Modifier.height(5.dp))
+                        Spacer(Modifier.height(3.dp))
                         WorkoutMetaChips(
                             qtyText = when (t.qtyType) {
                                 QtyType.REPS -> L("按次", "reps")

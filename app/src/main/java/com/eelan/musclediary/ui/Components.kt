@@ -45,9 +45,12 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
@@ -598,7 +601,7 @@ fun SwipeEntryRow(
             Column(Modifier.weight(1f)) {
                 Text(title, fontSize = 14.sp, color = TextHi, fontWeight = FontWeight.Medium)
                 if (detailContent != null) {
-                    Spacer(Modifier.height(5.dp))
+                    Spacer(Modifier.height(3.dp))
                     detailContent()
                 } else if (detail.isNotEmpty()) {
                     Text(detail, fontSize = 12.sp, color = TextLo)
@@ -612,12 +615,11 @@ fun SwipeEntryRow(
 }
 
 /**
- * 饮食/食物卡片的结构化营养徽章行：
- * - 可选前缀胶囊（如日期 `11-12`、重量 `150g`）
- * - 蛋白质（Protein 冰蓝）、碳水（CarbC 暖黄）、脂肪（FatC 淡紫）三色圆点微胶囊
- * - 可选后缀胶囊（如量词换算 `1个=50g`）
+ * 饮食/食物卡片的单行紧凑富文本详情行（永不换行撑高卡片）：
+ * - 可选日期 `11-12`、高亮克重 `150g`
+ * - 三色圆点 + 紧凑克数：`● 蛋白 31.0  ● 碳水 0.0  ● 脂肪 3.6`（冰蓝 / 暖黄 / 淡紫）
+ * - 可选单位换算 `1个=50g`
  */
-@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun FoodMacroChips(
     protein: Double,
@@ -627,87 +629,59 @@ fun FoodMacroChips(
     grams: Double? = null,
     extraBadge: String? = null,
 ) {
-    FlowRow(
-        horizontalArrangement = Arrangement.spacedBy(5.dp),
-        verticalArrangement = Arrangement.spacedBy(4.dp),
-    ) {
-        if (!dateText.isNullOrBlank()) {
-            NeutralMetaPill(dateText)
-        }
-        if (grams != null && grams > 0.0) {
-            NeutralMetaPill("${fmt0(grams)}g", highlight = true)
-        }
-        MacroBadgePill(L("蛋白", "P"), "${fmt1(protein)}g", Protein)
-        MacroBadgePill(L("碳水", "C"), "${fmt1(carb)}g", CarbC)
-        MacroBadgePill(L("脂肪", "F"), "${fmt1(fat)}g", FatC)
-        if (!extraBadge.isNullOrBlank()) {
-            NeutralMetaPill(extraBadge)
-        }
-    }
-}
-
-@Composable
-private fun NeutralMetaPill(text: String, highlight: Boolean = false) {
-    Box(
-        Modifier
-            .clip(RoundedCornerShape(6.dp))
-            .background(if (highlight) Ink3.copy(alpha = 0.65f) else Ink1.copy(alpha = 0.75f))
-            .border(
-                width = 0.5.dp,
-                color = if (highlight) TextLo.copy(alpha = 0.35f) else Ink3.copy(alpha = 0.6f),
-                shape = RoundedCornerShape(6.dp),
-            )
-            .padding(horizontal = 6.dp, vertical = 2.dp),
-        contentAlignment = Alignment.Center,
-    ) {
-        Text(
-            text,
-            fontSize = 11.sp,
-            fontWeight = if (highlight) FontWeight.SemiBold else FontWeight.Medium,
-            color = if (highlight) TextHi else TextLo,
-        )
-    }
-}
-
-@Composable
-private fun MacroBadgePill(label: String, value: String, color: Color) {
-    Row(
-        Modifier
-            .clip(RoundedCornerShape(6.dp))
-            .background(color.copy(alpha = 0.12f))
-            .border(0.5.dp, color.copy(alpha = 0.32f), RoundedCornerShape(6.dp))
-            .padding(horizontal = 6.dp, vertical = 2.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Box(
-            Modifier
-                .size(5.dp)
-                .background(color, androidx.compose.foundation.shape.CircleShape),
-        )
-        Spacer(Modifier.width(3.dp))
-        Text(
-            label,
-            fontSize = 10.sp,
-            color = color.copy(alpha = 0.9f),
-        )
-        Spacer(Modifier.width(2.dp))
-        Text(
-            value,
-            fontSize = 11.sp,
-            fontWeight = FontWeight.SemiBold,
-            color = color,
-        )
-    }
+    val dotSep = SpanStyle(color = Ink3, fontWeight = FontWeight.Normal)
+    Text(
+        text = buildAnnotatedString {
+            var hasPrev = false
+            fun sep() {
+                if (hasPrev) {
+                    withStyle(dotSep) { append(" · ") }
+                }
+                hasPrev = true
+            }
+            if (!dateText.isNullOrBlank()) {
+                sep()
+                withStyle(SpanStyle(color = TextLo)) { append(dateText) }
+            }
+            if (grams != null && grams > 0.0) {
+                sep()
+                withStyle(SpanStyle(color = TextHi, fontWeight = FontWeight.SemiBold)) {
+                    append("${fmt0(grams)}g")
+                }
+            }
+            sep()
+            // 蛋白质（冰蓝）
+            withStyle(SpanStyle(color = Protein, fontSize = 9.sp)) { append("●") }
+            withStyle(SpanStyle(color = TextLo)) { append(L("蛋白", "P")) }
+            withStyle(SpanStyle(color = Protein, fontWeight = FontWeight.SemiBold)) { append(fmt1(protein)) }
+            append("  ")
+            // 碳水（暖黄）
+            withStyle(SpanStyle(color = CarbC, fontSize = 9.sp)) { append("●") }
+            withStyle(SpanStyle(color = TextLo)) { append(L("碳水", "C")) }
+            withStyle(SpanStyle(color = CarbC, fontWeight = FontWeight.SemiBold)) { append(fmt1(carb)) }
+            append("  ")
+            // 脂肪（淡紫）
+            withStyle(SpanStyle(color = FatC, fontSize = 9.sp)) { append("●") }
+            withStyle(SpanStyle(color = TextLo)) { append(L("脂肪", "F")) }
+            withStyle(SpanStyle(color = FatC, fontWeight = FontWeight.SemiBold)) { append(fmt1(fat)) }
+            if (!extraBadge.isNullOrBlank()) {
+                sep()
+                withStyle(SpanStyle(color = TextLo)) { append(extraBadge) }
+            }
+        },
+        fontSize = 11.5.sp,
+        maxLines = 1,
+        overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+    )
 }
 
 /**
- * 锻炼记录/历史记录卡片的结构化徽章行：
- * - 可选日期胶囊（如 `11-12`）
- * - 高亮训练量胶囊（如 `3组×12个`、`3×12个×10kg`）
- * - 预计时长胶囊（如 `2.5 分钟`）
- * - 主/次练肌群彩色胶囊（带翡翠绿/琥珀橙圆点）
+ * 锻炼记录/历史记录卡片的单行紧凑富文本详情行（永不换行撑高卡片）：
+ * - 可选日期 `11-12`
+ * - 高亮训练量 `3组×12个`
+ * - 预计时长 `2.5 分钟`
+ * - 主/次练肌群彩色圆点标识 `● 胸  ● 三头`
  */
-@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun WorkoutMetaChips(
     qtyText: String,
@@ -716,47 +690,46 @@ fun WorkoutMetaChips(
     dateText: String? = null,
     extraBadge: String? = null,
 ) {
-    FlowRow(
-        horizontalArrangement = Arrangement.spacedBy(5.dp),
-        verticalArrangement = Arrangement.spacedBy(4.dp),
-    ) {
-        if (!dateText.isNullOrBlank()) {
-            NeutralMetaPill(dateText)
-        }
-        if (qtyText.isNotBlank()) {
-            NeutralMetaPill(qtyText, highlight = true)
-        }
-        if (minutes != null && minutes > 0.0) {
-            NeutralMetaPill("${fmt1(minutes)} " + L("分钟", "min"))
-        }
-        muscles.forEachIndexed { idx, m ->
-            val pillColor = if (idx == 0) Accent else Good
-            Row(
-                Modifier
-                    .clip(RoundedCornerShape(6.dp))
-                    .background(pillColor.copy(alpha = 0.12f))
-                    .border(0.5.dp, pillColor.copy(alpha = 0.32f), RoundedCornerShape(6.dp))
-                    .padding(horizontal = 6.dp, vertical = 2.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Box(
-                    Modifier
-                        .size(5.dp)
-                        .background(pillColor, androidx.compose.foundation.shape.CircleShape),
-                )
-                Spacer(Modifier.width(3.dp))
-                Text(
-                    m,
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    color = pillColor,
-                )
+    val dotSep = SpanStyle(color = Ink3, fontWeight = FontWeight.Normal)
+    Text(
+        text = buildAnnotatedString {
+            var hasPrev = false
+            fun sep() {
+                if (hasPrev) {
+                    withStyle(dotSep) { append(" · ") }
+                }
+                hasPrev = true
             }
-        }
-        if (!extraBadge.isNullOrBlank()) {
-            NeutralMetaPill(extraBadge)
-        }
-    }
+            if (!dateText.isNullOrBlank()) {
+                sep()
+                withStyle(SpanStyle(color = TextLo)) { append(dateText) }
+            }
+            if (qtyText.isNotBlank()) {
+                sep()
+                withStyle(SpanStyle(color = TextHi, fontWeight = FontWeight.SemiBold)) { append(qtyText) }
+            }
+            if (minutes != null && minutes > 0.0) {
+                sep()
+                withStyle(SpanStyle(color = TextLo)) { append("${fmt1(minutes)} " + L("分钟", "min")) }
+            }
+            if (muscles.isNotEmpty()) {
+                sep()
+                muscles.forEachIndexed { idx, m ->
+                    if (idx > 0) append("  ")
+                    val c = if (idx == 0) Accent else Good
+                    withStyle(SpanStyle(color = c, fontSize = 9.sp)) { append("●") }
+                    withStyle(SpanStyle(color = c, fontWeight = FontWeight.SemiBold)) { append(m) }
+                }
+            }
+            if (!extraBadge.isNullOrBlank()) {
+                sep()
+                withStyle(SpanStyle(color = TextLo)) { append(extraBadge) }
+            }
+        },
+        fontSize = 11.5.sp,
+        maxLines = 1,
+        overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+    )
 }
 
 /** 删除粒子：卡片栅格化生成的一颗尘埃（模型即屏幕坐标，速度向上） */
