@@ -3,6 +3,7 @@ package com.eelan.musclediary.ui
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -189,65 +190,70 @@ fun WaterDialog(vm: AppViewModel, date: LocalDate, targetMl: Double, onDismiss: 
     val recent = vm.recentWaterMl()
     val dateLabel = if (date == LocalDate.now()) L("今日", "Today") else dMD(date.monthValue, date.dayOfMonth)
     val remain = (targetMl - current).coerceAtLeast(0.0)
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        containerColor = Ink2,
-        title = { Text(L("记录", "Log ") + dateLabel + L("饮水", " water"), color = TextHi, fontSize = 16.sp) },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text(
-                    if (remain > 0) L("当前 ", "Now ") + "${fmt0(current)} / ${fmt0(targetMl)} ml · " +
-                            L("还差 ", "left ") + "${fmt0(remain)} ml"
-                    else L("当前 ", "Now ") + "${fmt0(current)} / ${fmt0(targetMl)} ml · " + L("已达标", "goal met"),
-                    fontSize = 13.sp, color = if (remain > 0) Protein else Good,
-                )
-                // 快捷按钮：合并最近值与常用值（去重，最多 4 个），点击直接记录并关窗
-                // weight(1f) 均分宽度：窄屏下 4 个按钮不会互相挤压截断
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
-                    val chips = (recent.map { fmt0(it) } + listOf("100", "250", "500")).distinct().take(4)
-                    chips.forEach { q ->
-                        OutlinedButton(
-                            onClick = {
+    val v = text.toDoubleOrNull()
+    val valid = v != null && v > 0
+    val statusText = if (remain > 0)
+        L("当前 ", "Now ") + "${fmt0(current)} / ${fmt0(targetMl)} ml · " + L("还差 ", "left ") + "${fmt0(remain)} ml"
+    else
+        L("当前 ", "Now ") + "${fmt0(current)} / ${fmt0(targetMl)} ml · " + L("已达标", "goal met")
+
+    AppDialog(
+        title = L("记录", "Log ") + dateLabel + L("饮水", " Water"),
+        subtitle = statusText,
+        badge = "${fmt0(current)} ml",
+        accentColor = if (remain > 0) Protein else Good,
+        onDismiss = onDismiss,
+        confirmText = L("记录", "Log"),
+        confirmEnabled = valid,
+        onConfirm = {
+            if (valid) {
+                vm.addWater(v!!, date)
+                onDismiss()
+            }
+        },
+        dismissText = L("关闭", "Close"),
+        extraActionText = L("全部记录 >", "All records >"),
+        onExtraAction = { onDismiss(); onOpenRecords() },
+    ) {
+        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            // 快捷按钮：合并最近值与常用值（去重，最多 4 个），点击直接记录并关窗
+            // weight(1f) 均分宽度：窄屏下 4 个按钮不会互相挤压截断
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                val chips = (recent.map { fmt0(it) } + listOf("100", "250", "500")).distinct().take(4)
+                chips.forEach { q ->
+                    Box(
+                        Modifier
+                            .weight(1f)
+                            .height(42.dp)
+                            .clip(RoundedCornerShape(10.dp))
+                            .background(Protein.copy(alpha = 0.12f))
+                            .border(1.dp, Protein.copy(alpha = 0.40f), RoundedCornerShape(10.dp))
+                            .clickable {
                                 q.toDoubleOrNull()?.let { vm.addWater(it, date) }
                                 onDismiss()
                             },
-                            modifier = Modifier.height(44.dp).weight(1f),
-                            contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 4.dp),
-                        ) { Text("${q}ml", fontSize = 13.sp, color = TextHi, maxLines = 1) }
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Text("+${q}ml", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = Protein, maxLines = 1)
                     }
                 }
-                OutlinedTextField(
-                    value = text, onValueChange = { text = it },
-                    label = { Text(L("自定义毫升数", "Custom amount (ml)"), color = TextLo) },
-                    singleLine = true,
-                    keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
-                        keyboardType = androidx.compose.ui.text.input.KeyboardType.Number),
-                    colors = fieldColors(),
-                )
-                if (text.isNotBlank() && (text.toDoubleOrNull() ?: 0.0) <= 0.0) {
-                    Text(L("请输入大于 0 的毫升数", "Enter an amount greater than 0"),
-                        fontSize = 12.sp, color = Warn)
-                }
             }
-        },
-        confirmButton = {
-            TextButton(onClick = {
-                text.toDoubleOrNull()?.let { v ->
-                    if (v > 0) {
-                        vm.addWater(v, date)
-                        onDismiss()
-                    }
-                }
-            }) { Text(L("记录", "Log"), color = Accent) }
-        },
-        dismissButton = {
-            Row {
-                // 全部记录入口：查看当日/历史明细
-                TextButton(onClick = onOpenRecords) { Text(L("全部记录", "All records"), color = Protein, fontSize = 13.sp) }
-                TextButton(onClick = onDismiss) { Text(L("关闭", "Close"), color = TextLo, fontSize = 13.sp) }
+            OutlinedTextField(
+                value = text, onValueChange = { text = it },
+                label = { Text(L("或输入自定义毫升数", "Or enter custom ml"), color = TextLo) },
+                singleLine = true,
+                shape = appFieldShape,
+                modifier = Modifier.fillMaxWidth(),
+                keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
+                    keyboardType = androidx.compose.ui.text.input.KeyboardType.Number),
+                colors = fieldColors(),
+            )
+            if (text.isNotBlank() && !valid) {
+                Text(L("请输入大于 0 的毫升数", "Enter an amount greater than 0"),
+                    fontSize = 12.sp, color = Warn)
             }
-        },
-    )
+        }
+    }
 }
 
 @Composable

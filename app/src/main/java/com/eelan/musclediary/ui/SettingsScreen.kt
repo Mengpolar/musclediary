@@ -8,6 +8,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -376,82 +377,80 @@ fun SettingsScreen(
         onConfirm = { vm.updateProfile(vm.profile.copy(weightKg = it)); editWeight = false })
 
     updateInfo?.let { info ->
-        AlertDialog(
-            // 点遮罩/返回键等同「以后再说」：不打断下载状态机
-            onDismissRequest = { updateInfo = null },
-            containerColor = Ink2,
-            title = { Text(L("发现新版本 v", "New version v") + info.version, color = TextHi) },
-            text = {
-                Column {
-                    Text(L("新版本 v", "New version v") + "${info.version} · " +
-                            L("包大小 ", "size ") + Updater.formatSize(info.sizeBytes),
-                        fontSize = 14.sp, color = TextHi, fontWeight = FontWeight.Medium)
-                    Spacer(Modifier.height(6.dp))
-                    Text(info.notes.ifBlank { L("无更新说明", "No release notes") }, fontSize = 13.sp, color = TextLo,
-                        modifier = Modifier.heightIn(max = 200.dp))
+        AppDialog(
+            title = L("发现新版本", "Update Available"),
+            subtitle = L("安装包大小 ", "Package size ") + Updater.formatSize(info.sizeBytes) + " · SHA-256",
+            badge = "v${info.version}",
+            onDismiss = { updateInfo = null },
+            confirmText = L("下载并安装", "Download & Install"),
+            confirmEnabled = !downloading,
+            onConfirm = {
+                downloading = true
+                progress = 0
+                downloadSize = info.sizeBytes
+                updateState = null
+                updateInfo = null
+                // 下载是长任务：用 ViewModel 作用域，切页不中断；安装走应用级 context，防页面销毁后 Activity 失效
+                val appCtx = ctx.applicationContext
+                vm.viewModelScope.launch {
+                    runCatching {
+                        Updater.downloadApk(appCtx, info.apkUrl, { progress = it }, updateSource)
+                    }.onSuccess { apk ->
+                        // 校验下载包与 Release 资产摘要一致，防止下载损坏或被篡改
+                        if (!Updater.verifySha256(apk, info.sha256)) {
+                            apk.delete()
+                            downloading = false
+                            updateState = L("安装包校验失败，已取消。请稍后重试",
+                                "Checksum verification failed, cancelled. Try again later")
+                            return@launch
+                        }
+                        downloading = false
+                        updateInfo = null
+                        Updater.install(appCtx, apk)
+                    }.onFailure {
+                        downloading = false
+                        updateState = L("下载失败：", "Download failed: ") + (it.message ?: "")
+                    }
                 }
             },
-            confirmButton = {
-                // 点击后立即关对话框（进度条在设置卡片里），并禁用按钮防止双击并发下载同一个文件
-                TextButton(enabled = !downloading, onClick = {
-                    downloading = true
-                    progress = 0
-                    downloadSize = info.sizeBytes
-                    updateState = null
-                    updateInfo = null
-                    // 下载是长任务：用 ViewModel 作用域，切页不中断；安装走应用级 context，防页面销毁后 Activity 失效
-                    val appCtx = ctx.applicationContext
-                    vm.viewModelScope.launch {
-                        runCatching {
-                            Updater.downloadApk(appCtx, info.apkUrl, { progress = it }, updateSource)
-                        }.onSuccess { apk ->
-                            // 校验下载包与 Release 资产摘要一致，防止下载损坏或被篡改
-                            if (!Updater.verifySha256(apk, info.sha256)) {
-                                apk.delete()
-                                downloading = false
-                                updateState = L("安装包校验失败，已取消。请稍后重试",
-                                    "Checksum verification failed, cancelled. Try again later")
-                                return@launch
-                            }
-                            downloading = false
-                            updateInfo = null
-                            Updater.install(appCtx, apk)
-                        }.onFailure {
-                            downloading = false
-                            updateState = L("下载失败：", "Download failed: ") + (it.message ?: "")
-                        }
-                    }
-                }) { Text(L("下载并安装", "Download & install"), color = Accent) }
-            },
-            dismissButton = {
-                TextButton(onClick = { updateInfo = null }) { Text(L("以后再说", "Later"), color = TextLo) }
-            },
-        )
+            dismissText = L("以后再说", "Later"),
+        ) {
+            Box(
+                Modifier
+                    .fillMaxWidth()
+                    .heightIn(max = 200.dp)
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(Ink2)
+                    .padding(12.dp)
+                    .verticalScroll(rememberScrollState()),
+            ) {
+                Text(
+                    info.notes.ifBlank { L("无更新说明", "No release notes") },
+                    fontSize = 13.sp, color = TextLo,
+                )
+            }
+        }
     }
 
     // 导入覆盖不可撤销：文件选好后先确认再写入
     pendingImport?.let { text ->
-        AlertDialog(
-            onDismissRequest = { pendingImport = null },
-            containerColor = Ink2,
-            title = { Text(L("导入备份？", "Import backup?"), color = TextHi, fontSize = 16.sp) },
-            text = {
-                Text(
-                    L("导入会用备份中的数据覆盖现有饮食、锻炼、饮水记录与自定义模板（体重按日期合并），此操作不可撤销。",
-                        "Importing overwrites current food, exercise and water records and custom templates (weight merges by date). This cannot be undone."),
-                    fontSize = 13.sp, color = TextLo,
-                )
+        AppDialog(
+            title = L("导入备份？", "Import Backup?"),
+            subtitle = L("此操作不可撤销", "This action cannot be undone"),
+            accentColor = Warn,
+            onDismiss = { pendingImport = null },
+            confirmText = L("继续导入", "Import"),
+            onConfirm = {
+                pendingImport = null
+                vm.importCsv(text) { msg -> Toast.makeText(ctx, msg, Toast.LENGTH_LONG).show() }
             },
-            confirmButton = {
-                TextButton(onClick = {
-                    pendingImport = null
-                    vm.importCsv(text) { msg -> Toast.makeText(ctx, msg, Toast.LENGTH_LONG).show() }
-                }) { Text(L("继续导入", "Import"), color = Warn) }
-            },
-            dismissButton = {
-                TextButton(onClick = { pendingImport = null }) { Text(L("取消", "Cancel"), color = TextLo) }
-            },
-        )
+        ) {
+            Text(
+                L("导入会用备份中的数据覆盖现有饮食、锻炼、饮水记录与自定义模板（体重按日期合并）。",
+                    "Importing overwrites current food, exercise and water records and custom templates (weight merges by date)."),
+                fontSize = 13.sp, color = TextLo,
+            )
+        }
     }
 }
 

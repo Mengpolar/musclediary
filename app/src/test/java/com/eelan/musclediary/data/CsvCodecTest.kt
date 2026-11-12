@@ -51,12 +51,13 @@ class CsvCodecTest {
     }
 
     @Test fun roundTrip_musclesJson() {
-        // xentry 尾列的 musclesJson 含引号与逗号，是转义压力最大的字段
+        // xentry 尾列的 musclesJson 含引号与逗号，是转义压力最大的字段；第 9 列为组数 sets
         val json = "{\"chest\":12.5,\"abs,core\":8}"
-        val line = "xentry,2026-10-24,${CsvCodec.escape(json)},20,0,REPS,7,1.0,${CsvCodec.escape(json)}"
+        val line = "xentry,2026-10-24,${CsvCodec.escape(json)},60,0,REPS,21,3.0,${CsvCodec.escape(json)},3"
         val p = CsvCodec.parseLine(line)
         assertEquals(json, p[2])
         assertEquals(json, p[8])
+        assertEquals("3", p[9])
     }
 
     // —— 公式注入防护 ——

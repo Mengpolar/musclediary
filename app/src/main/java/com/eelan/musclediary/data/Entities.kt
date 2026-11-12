@@ -108,13 +108,16 @@ data class ExerciseEntry(
     val date: String,
     val templateId: Long,
     val name: String,
-    val qty: Double,
+    val qty: Double,            // 当次总数量（= 单组数量 × sets）
     val weightKg: Double = 0.0, // 哑铃类附加重量
     val calories: Double,
     val minutes: Double,
-    val musclesJson: String, // {"chest":12.5,...} 当次各肌群刺激分
+    val musclesJson: String,    // {"chest":12.5,...} 当次各肌群刺激分
     val createdAt: Long = System.currentTimeMillis(),
-)
+    val sets: Int = 1,          // 组数（>=1，默认 1 组；单组数量 = qty / sets）
+) {
+    val perSetQty: Double get() = if (sets > 1) qty / sets else qty
+}
 
 @Dao
 interface AppDao {
@@ -245,7 +248,7 @@ interface AppDao {
 @Database(
     entities = [Profile::class, FoodTemplate::class, FoodEntry::class,
         ExerciseTemplate::class, ExerciseEntry::class, WeightEntry::class, WaterEntry::class],
-    version = 10,
+    version = 11,
     exportSchema = true,
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -351,12 +354,19 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        val MIGRATION_10_11 = object : androidx.room.migration.Migration(10, 11) {
+            override fun migrate(db: androidx.sqlite.db.SupportSQLiteDatabase) {
+                // 锻炼记录支持组数（默认 1 组，qty 为总数量 = 单组数量 × sets）
+                db.execSQL("ALTER TABLE `exercise_entries` ADD COLUMN `sets` INTEGER NOT NULL DEFAULT 1")
+            }
+        }
+
         fun get(ctx: Context): AppDatabase =
             inst ?: synchronized(this) {
                 inst ?: Room.databaseBuilder(
                     ctx.applicationContext, AppDatabase::class.java, "musclediary.db"
                 ).addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6,
-                    MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10)
+                    MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11)
                     .build().also { inst = it }
             }
     }

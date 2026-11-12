@@ -225,12 +225,15 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         foodEntries = foodEntries.map { if (it.id == e.id) upd else it }
     }
 
-    /** 修改锻炼记录数量：热量与刺激分按比例重算 */
-    fun updateExerciseEntry(e: ExerciseEntry, newQty: Double) {
+    /** 修改锻炼记录的单组数量与组数：总数量 = perSetQty × sets，热量与刺激分按总数量比例重算 */
+    fun updateExerciseEntry(e: ExerciseEntry, newPerSetQty: Double, newSets: Int = e.sets.coerceAtLeast(1)) {
         if (e.qty <= 0) return
-        val k = newQty / e.qty
+        val s = newSets.coerceAtLeast(1)
+        val newTotalQty = newPerSetQty * s
+        val k = newTotalQty / e.qty
         val upd = e.copy(
-            qty = newQty,
+            qty = newTotalQty,
+            sets = s,
             calories = e.calories * k,
             minutes = e.minutes * k,
             musclesJson = run {
@@ -330,12 +333,12 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         return seen.take(3).toList()
     }
 
-    /** 某动作最近 3 次记录的「数量+附加重量」（去重，新→旧），用于快捷标签与预填 */
-    fun recentExerciseQty(template: ExerciseTemplate): List<Pair<Double, Double>> {
-        val seen = linkedSetOf<Pair<Double, Double>>()
+    /** 某动作最近 3 次记录的「(单组数量, 附加重量, 组数)」（去重，新→旧），用于快捷标签与预填 */
+    fun recentExerciseQty(template: ExerciseTemplate): List<Triple<Double, Double, Int>> {
+        val seen = linkedSetOf<Triple<Double, Double, Int>>()
         exerciseEntries.filter { it.templateId == template.id || template.matchesEntryName(it.name) }
             .sortedByDescending { it.createdAt }
-            .forEach { e -> seen.add(e.qty to e.weightKg) }
+            .forEach { e -> seen.add(Triple(e.perSetQty, e.weightKg, e.sets.coerceAtLeast(1))) }
         return seen.take(3).toList()
     }
 
@@ -408,13 +411,16 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    fun addExercise(t: ExerciseTemplate, qty: Double, extraWeight: Double, date: LocalDate) {
-        val (kcal, minutes) = Calc.exerciseCalories(t, qty, profile.weightKg)
-        val scores = Calc.muscleScores(t, qty, extraWeight)
+    fun addExercise(t: ExerciseTemplate, perSetQty: Double, extraWeight: Double, date: LocalDate, sets: Int = 1) {
+        val s = sets.coerceAtLeast(1)
+        val totalQty = perSetQty * s
+        val (kcal, minutes) = Calc.exerciseCalories(t, totalQty, profile.weightKg)
+        val scores = Calc.muscleScores(t, totalQty, extraWeight)
         val json = org.json.JSONObject().apply { scores.forEach { (k, v) -> put(k, v) } }.toString()
         val e = ExerciseEntry(
             date = date.toString(), templateId = t.id, name = t.dispName,
-            qty = qty, weightKg = extraWeight, calories = kcal, minutes = minutes, musclesJson = json,
+            qty = totalQty, weightKg = extraWeight, calories = kcal, minutes = minutes,
+            musclesJson = json, sets = s,
         )
         bumpExerciseUsage(t)
         viewModelScope.launch(Dispatchers.IO) {
@@ -467,7 +473,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         }
         sb.appendLine("# exercise_entries")
         exerciseEntries.forEach {
-            sb.appendLine("xentry,${it.date},${CsvCodec.escape(CsvCodec.safe(it.name))},${it.qty},${it.weightKg},${it.qtyTypeOf(exerciseTemplates)},${it.calories},${it.minutes},${CsvCodec.escape(it.musclesJson)}")
+            sb.appendLine("xentry,${it.date},${CsvCodec.escape(CsvCodec.safe(it.name))},${it.qty},${it.weightKg},${it.qtyTypeOf(exerciseTemplates)},${it.calories},${it.minutes},${CsvCodec.escape(it.musclesJson)},${it.sets}")
         }
         sb.appendLine("# weight_entries")
         weightEntries.forEach {
@@ -551,7 +557,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                         xEntries += ExerciseEntry(date = d, templateId = 0, name = CsvCodec.unSafe(p[2].trim()),
                             qty = num(p[3]), weightKg = num(p[4]), calories = num(p[6]),
                             minutes = num(p.getOrElse(7) { "0" }),
-                            musclesJson = p.getOrNull(8)?.takeIf { it.isNotBlank() } ?: "{}")
+                            musclesJson = p.getOrNull(8)?.takeIf { it.isNotBlank() } ?: "{}",
+                            sets = p.getOrNull(9)?.trim()?.toIntOrNull()?.coerceAtLeast(1) ?: 1)
                         sawExercise = true
                     }.onFailure { skipped++ }
                     section == "weight_entries" && line.startsWith("wentry,") -> runCatching {

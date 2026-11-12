@@ -20,6 +20,7 @@ import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInWindow
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
@@ -51,6 +52,8 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import com.eelan.musclediary.ui.theme.*
 import com.eelan.musclediary.L
 import kotlinx.coroutines.launch
@@ -256,6 +259,153 @@ fun isDistanceName(n: String): Boolean =
     n.contains("跑") || n.contains("步") || n.contains("骑") ||
             n.contains("Run") || n.contains("Walk") || n.contains("Cycl")
 
+/** 统一输入框圆角：与卡片/胶囊体系呼应，告别默认直角底线 */
+val appFieldShape = RoundedCornerShape(12.dp)
+
+/**
+ * 「铁馆夜训」统一弹窗外壳：
+ * - Ink1 卡片底 + 22.dp 圆角 + 1.dp Ink3 暗光描边（内部子项用 Ink2 即可自然分层）
+ * - 顶部标题 + 可选副标题 + 标志性主色短灯线（与主页 DateHeader 呼应）
+ * - 底部胶囊主按钮（Accent 实心 / 危险态红底）+ 幽灵取消按钮
+ */
+@Composable
+fun AppDialog(
+    title: String,
+    subtitle: String? = null,
+    badge: String? = null,
+    accentColor: Color = Accent,
+    onDismiss: () -> Unit,
+    confirmText: String? = null,
+    confirmEnabled: Boolean = true,
+    confirmDanger: Boolean = false,
+    onConfirm: (() -> Unit)? = null,
+    dismissText: String? = L("取消", "Cancel"),
+    extraActionText: String? = null,
+    onExtraAction: (() -> Unit)? = null,
+    content: @Composable ColumnScope.() -> Unit,
+) {
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(usePlatformDefaultWidth = false),
+    ) {
+        Column(
+            Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 20.dp)
+                .clip(RoundedCornerShape(22.dp))
+                .background(Ink1)
+                .border(1.dp, Ink3.copy(alpha = 0.75f), RoundedCornerShape(22.dp))
+                .padding(horizontal = 20.dp, vertical = 18.dp),
+        ) {
+            // 标题行 + 可选右侧胶囊徽章
+            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+                Column(Modifier.weight(1f)) {
+                    Text(title, fontSize = 17.sp, fontWeight = FontWeight.ExtraBold, color = TextHi)
+                    if (!subtitle.isNullOrBlank()) {
+                        Spacer(Modifier.height(2.dp))
+                        Text(subtitle, fontSize = 12.sp, color = TextLo)
+                    }
+                }
+                if (!badge.isNullOrBlank()) {
+                    Spacer(Modifier.width(8.dp))
+                    PhaseBadge(badge, color = accentColor)
+                }
+            }
+            // 标志性短灯线：与今日/饮食/锻炼页 DateHeader 统一视觉语言
+            Spacer(Modifier.height(8.dp))
+            Box(
+                Modifier
+                    .width(32.dp)
+                    .height(2.dp)
+                    .clip(RoundedCornerShape(2.dp))
+                    .background(if (confirmDanger) Color(0xFFEF5350) else accentColor),
+            )
+            Spacer(Modifier.height(14.dp))
+
+            // 正文内容区
+            content()
+
+            // 底部按钮栏（当有任一操作按钮时展示）
+            if (confirmText != null || dismissText != null || extraActionText != null) {
+                Spacer(Modifier.height(16.dp))
+                Row(
+                    Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.End,
+                ) {
+                    if (extraActionText != null && onExtraAction != null) {
+                        Text(
+                            extraActionText,
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Medium,
+                            color = Protein,
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(99.dp))
+                                .clickable(onClick = onExtraAction)
+                                .padding(horizontal = 12.dp, vertical = 8.dp),
+                        )
+                        Spacer(Modifier.weight(1f))
+                    }
+                    if (dismissText != null) {
+                        Text(
+                            dismissText,
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Medium,
+                            color = TextLo,
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(99.dp))
+                                .background(Ink2)
+                                .clickable(onClick = onDismiss)
+                                .padding(horizontal = 16.dp, vertical = 9.dp),
+                        )
+                    }
+                    if (confirmText != null && onConfirm != null) {
+                        Spacer(Modifier.width(8.dp))
+                        val mainBg = when {
+                            !confirmEnabled -> Ink2
+                            confirmDanger -> Color(0xFFEF5350)
+                            else -> accentColor
+                        }
+                        val mainFg = when {
+                            !confirmEnabled -> TextLo.copy(alpha = 0.5f)
+                            confirmDanger -> Color.White
+                            else -> Ink0
+                        }
+                        Box(
+                            Modifier
+                                .clip(RoundedCornerShape(99.dp))
+                                .background(mainBg)
+                                .then(if (confirmEnabled) Modifier.clickable(onClick = onConfirm) else Modifier)
+                                .padding(horizontal = 20.dp, vertical = 9.dp),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Text(confirmText, fontSize = 13.sp, fontWeight = FontWeight.Bold, color = mainFg)
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+/** 弹窗内的实时计算/提示高亮条（主色弱底 + 细描边胶囊框） */
+@Composable
+fun DialogPreviewPill(text: String, color: Color = Accent) {
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(10.dp))
+            .background(color.copy(alpha = 0.10f))
+            .border(1.dp, color.copy(alpha = 0.35f), RoundedCornerShape(10.dp))
+            .padding(horizontal = 12.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box(Modifier.size(6.dp).background(color, androidx.compose.foundation.shape.CircleShape))
+        Spacer(Modifier.width(8.dp))
+        Text(text, fontSize = 12.sp, fontWeight = FontWeight.Medium, color = color)
+    }
+}
+
 /** 数字输入对话框 */
 @Composable
 fun NumberDialog(
@@ -268,33 +418,27 @@ fun NumberDialog(
     var text by remember { mutableStateOf(initial) }
     val v = text.toDoubleOrNull()
     val valid = v != null && v > 0
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        containerColor = Ink2,
-        title = { Text(title, color = TextHi) },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                OutlinedTextField(
-                    value = text, onValueChange = { text = it },
-                    label = { Text(label, color = TextLo) },
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                    singleLine = true,
-                    colors = TextFieldDefaults.colors(
-                        focusedTextColor = TextHi, unfocusedTextColor = TextHi,
-                        focusedContainerColor = Ink1, unfocusedContainerColor = Ink1,
-                        focusedIndicatorColor = Accent, unfocusedIndicatorColor = Ink3,
-                    ),
-                )
-                if (!valid) Text(L("请输入大于 0 的数字", "Enter a number greater than 0"), fontSize = 12.sp, color = Warn)
-            }
-        },
-        confirmButton = {
-            TextButton(enabled = valid, onClick = {
-                onConfirm(v!!)
-            }) { Text(L("确定", "OK"), color = if (valid) Accent else TextLo) }
-        },
-        dismissButton = { TextButton(onClick = onDismiss) { Text(L("取消", "Cancel"), color = TextLo) } },
-    )
+    AppDialog(
+        title = title,
+        onDismiss = onDismiss,
+        confirmText = L("确定", "OK"),
+        confirmEnabled = valid,
+        onConfirm = { onConfirm(v!!) },
+    ) {
+        OutlinedTextField(
+            value = text, onValueChange = { text = it },
+            label = { Text(label, color = TextLo) },
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+            singleLine = true,
+            shape = appFieldShape,
+            modifier = Modifier.fillMaxWidth(),
+            colors = fieldColors(),
+        )
+        if (!valid) {
+            Spacer(Modifier.height(6.dp))
+            Text(L("请输入大于 0 的数字", "Enter a number greater than 0"), fontSize = 12.sp, color = Warn)
+        }
+    }
 }
 
 /** 左滑显示「修改」「删」按钮的记录卡片；删除时卡片绕右端点沿弧线飞出（缩小+旋转+淡出） */

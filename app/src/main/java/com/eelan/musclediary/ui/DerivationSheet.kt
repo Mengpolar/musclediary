@@ -43,11 +43,19 @@ fun DerivationSheet(
                         .padding(horizontal = 20.dp)
                         .padding(bottom = 32.dp)
                 ) {
-                    Text(L("数值是怎么算出来的", "How the numbers are calculated"), fontSize = 18.sp, fontWeight = FontWeight.Bold, color = TextHi)
+                    Text(L("数值是怎么算出来的", "How the numbers are calculated"), fontSize = 18.sp, fontWeight = FontWeight.ExtraBold, color = TextHi)
                     Spacer(Modifier.height(4.dp))
                     Text(L("你的数据：", "Your data: ") + "${L("体重 ", "wt ")}${w}kg · ${L("身高 ", "ht ")}${h}cm · ${L("年龄 ", "age ")}${profile.age} · ${if (profile.male) L("男", "male") else L("女", "female")} · ${if (cut) L("减脂期", "cut phase") else L("增肌期", "bulk phase")}",
-                        fontSize = 13.sp, color = TextLo)
-                    Spacer(Modifier.height(12.dp))
+                        fontSize = 12.sp, color = TextLo)
+                    Spacer(Modifier.height(8.dp))
+                    Box(
+                        Modifier
+                            .width(36.dp)
+                            .height(2.dp)
+                            .clip(RoundedCornerShape(2.dp))
+                            .background(Accent),
+                    )
+                    Spacer(Modifier.height(14.dp))
 
                     FormulaRow(L("基础代谢 BMR", "BMR"),
                         L("Mifflin-St Jeor：10×体重 + 6.25×身高 − 5×年龄 ", "Mifflin-St Jeor: 10xWt + 6.25xHt - 5xAge ") + "${if (profile.male) L("+ 5（男）", "+ 5 (male)") else L("− 161（女）", "- 161 (female)")}",

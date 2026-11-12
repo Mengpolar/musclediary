@@ -47,74 +47,80 @@ fun FoodGramsDialog(
     val grams = gramsText.toDoubleOrNull()
     val valid = grams != null && grams > 0
 
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        containerColor = Ink2,
-        title = { Text(title, color = TextHi, fontSize = 16.sp) },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                if (hasUnit) {
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-                        OutlinedTextField(
-                            value = unitText, onValueChange = { v ->
-                                unitText = v
-                                v.toDoubleOrNull()?.let { u -> gramsText = fmt1(u * template!!.unitGrams) }
-                            },
-                            label = { Text(L("吃了多少", "How many ") + "$unitName" + L("？", "?"), color = TextLo) },
-                            singleLine = true,
-                            keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
-                                keyboardType = KeyboardType.Decimal),
-                            modifier = Modifier.weight(1f), colors = fieldColors(),
-                        )
-                        Text("$unitName = ${fmt0(template!!.unitGrams)}g",
-                            fontSize = 12.sp, color = TextLo)
-                    }
-                }
-                OutlinedTextField(
-                    value = gramsText, onValueChange = { v ->
-                        gramsText = v
-                        if (hasUnit) {
+    AppDialog(
+        title = title,
+        badge = if (hasUnit) "1$unitName=${fmt0(template!!.unitGrams)}g" else null,
+        onDismiss = onDismiss,
+        confirmText = confirmText,
+        confirmEnabled = valid,
+        onConfirm = { onConfirm(grams!!); onDismiss() },
+    ) {
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            if (hasUnit) {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                    OutlinedTextField(
+                        value = unitText, onValueChange = { v ->
+                            unitText = v
+                            v.toDoubleOrNull()?.let { u -> gramsText = fmt1(u * template!!.unitGrams) }
+                        },
+                        label = { Text(L("吃了多少", "How many ") + "$unitName" + L("？", "?"), color = TextLo, fontSize = 12.sp) },
+                        singleLine = true,
+                        shape = appFieldShape,
+                        keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
+                            keyboardType = KeyboardType.Decimal),
+                        modifier = Modifier.weight(1f), colors = fieldColors(),
+                    )
+                    OutlinedTextField(
+                        value = gramsText, onValueChange = { v ->
+                            gramsText = v
                             v.toDoubleOrNull()?.let { g -> unitText = fmt1(g / template!!.unitGrams) }
-                        }
-                    },
-                    label = { Text(if (hasUnit) L("或输入克数 g", "or grams") else L("克数", "Grams"), color = TextLo) },
+                        },
+                        label = { Text(L("克数 g", "Grams g"), color = TextLo, fontSize = 12.sp) },
+                        singleLine = true,
+                        shape = appFieldShape,
+                        keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
+                            keyboardType = KeyboardType.Decimal),
+                        modifier = Modifier.weight(1f), colors = fieldColors(),
+                    )
+                }
+            } else {
+                OutlinedTextField(
+                    value = gramsText, onValueChange = { gramsText = it },
+                    label = { Text(L("克数 g", "Grams g"), color = TextLo) },
                     singleLine = true,
+                    shape = appFieldShape,
+                    modifier = Modifier.fillMaxWidth(),
                     keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
                         keyboardType = KeyboardType.Decimal),
                     colors = fieldColors(),
                 )
-                if (recent.isNotEmpty()) {
-                    // 标签与克数成对生成，点击按标签直查数值（量词单位任意，不做文本反解）
-                    val chipMap = recent.associate { g ->
-                        (if (hasUnit) "${fmt1(g / template!!.unitGrams)}$unitName" else "${fmt0(g)}g") to g
-                    }
-                    QuickChips(
-                        chips = chipMap.keys.toList(),
-                        onPick = { c ->
-                            chipMap[c]?.let { g ->
-                                gramsText = fmt1(g)
-                                if (hasUnit) unitText = fmt1(g / template!!.unitGrams)
-                            }
-                        },
-                    )
-                }
-                if (valid && template != null) {
-                    val k = grams!! / 100.0
-                    Text(
-                        L("蛋白", "P") + "${fmt1(template.protein * k)}g · " + L("碳水", "C") + "${fmt1(template.carb * k)}g · " +
-                                L("脂肪", "F") + "${fmt1(template.fat * k)}g · ${fmt0(template.kcal * k)} kcal",
-                        color = Accent, fontSize = 13.sp,
-                    )
-                }
             }
-        },
-        confirmButton = {
-            TextButton(enabled = valid, onClick = {
-                onConfirm(grams!!); onDismiss()
-            }) { Text(confirmText, color = if (valid) Accent else TextLo) }
-        },
-        dismissButton = { TextButton(onClick = onDismiss) { Text(L("取消", "Cancel"), color = TextLo) } },
-    )
+            if (recent.isNotEmpty()) {
+                // 标签与克数成对生成，点击按标签直查数值（量词单位任意，不做文本反解）
+                val chipMap = recent.associate { g ->
+                    (if (hasUnit) "${fmt1(g / template!!.unitGrams)}$unitName" else "${fmt0(g)}g") to g
+                }
+                QuickChips(
+                    chips = chipMap.keys.toList(),
+                    onPick = { c ->
+                        chipMap[c]?.let { g ->
+                            gramsText = fmt1(g)
+                            if (hasUnit) unitText = fmt1(g / template!!.unitGrams)
+                        }
+                    },
+                )
+            }
+            if (valid && template != null) {
+                val k = grams!! / 100.0
+                DialogPreviewPill(
+                    "${fmt0(template.kcal * k)} kcal · " +
+                            L("蛋白", "P") + "${fmt1(template.protein * k)}g · " +
+                            L("碳水", "C") + "${fmt1(template.carb * k)}g · " +
+                            L("脂肪", "F") + "${fmt1(template.fat * k)}g",
+                )
+            }
+        }
+    }
 }
 
 /** 修改饮食记录：模板带量词单位时支持按个数联动克数（无单位退化为纯克数） */

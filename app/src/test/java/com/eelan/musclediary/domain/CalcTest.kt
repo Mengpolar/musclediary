@@ -1,5 +1,6 @@
 package com.eelan.musclediary.domain
 
+import com.eelan.musclediary.data.ExerciseEntry
 import com.eelan.musclediary.data.ExerciseTemplate
 import com.eelan.musclediary.data.Profile
 import com.eelan.musclediary.data.QtyType
@@ -143,6 +144,22 @@ class CalcTest {
         assertEquals(2, Calc.intensity(20.0))
         assertEquals(2, Calc.intensity(49.9))
         assertEquals(3, Calc.intensity(50.0))
+    }
+
+    // —— 锻炼组数 ——
+
+    @Test fun exerciseEntry_perSetQtyAndSetsScale() {
+        // 3 组 × 12 次 = 总数量 36 次
+        val e = ExerciseEntry(
+            date = "2026-11-12", templateId = 1, name = "卧推",
+            qty = 36.0, calories = 11.7, minutes = 1.8, musclesJson = "{\"chest\":36.0}", sets = 3,
+        )
+        assertEquals(12.0, e.perSetQty, 1e-9)
+        // 热量与刺激分按总数量（perSet × sets）线性放大
+        val (k1, m1) = Calc.exerciseCalories(reps(), 12.0, 65.0)
+        val (k3, m3) = Calc.exerciseCalories(reps(), 12.0 * 3, 65.0)
+        assertEquals(k1 * 3, k3, 1e-9)
+        assertEquals(m1 * 3, m3, 1e-9)
     }
 
     // —— BMI（中国标准）——

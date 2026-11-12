@@ -80,6 +80,7 @@ fun ManageTemplatesScreen(vm: AppViewModel, kind: Int, onClose: () -> Unit) {
             value = search, onValueChange = { search = it },
             placeholder = { Text(L("搜索", "Search"), color = TextLo) },
             singleLine = true,
+            shape = appFieldShape,
             colors = fieldColors(),
             modifier = Modifier.fillMaxWidth(),
         )
@@ -157,40 +158,41 @@ fun ManageTemplatesScreen(vm: AppViewModel, kind: Int, onClose: () -> Unit) {
 
     // —— 删除确认 ——
     confirmDelete?.let { t ->
-        AlertDialog(
-            onDismissRequest = { confirmDelete = null },
-            containerColor = Ink2,
-            title = { Text(L("删除「", "Delete [") + "${nameOf(t)}" + L("」", "]") + L("？", "?"), color = TextHi, fontSize = 16.sp) },
-            text = { Text(L("只删除模板，已记录的历史数据保留。", "Only the template is deleted; logged history is kept."), fontSize = 13.sp, color = TextLo) },
-            confirmButton = {
-                TextButton(onClick = {
-                    if (t is FoodTemplate) vm.deleteFoodTemplate(t) else vm.deleteExerciseTemplate(t as ExerciseTemplate)
-                    confirmDelete = null
-                }) { Text(L("删除", "Delete"), color = MaterialTheme.colorScheme.error) }
+        AppDialog(
+            title = L("删除「", "Delete [") + "${nameOf(t)}" + L("」？", "]?"),
+            onDismiss = { confirmDelete = null },
+            confirmText = L("删除", "Delete"),
+            confirmDanger = true,
+            onConfirm = {
+                if (t is FoodTemplate) vm.deleteFoodTemplate(t) else vm.deleteExerciseTemplate(t as ExerciseTemplate)
+                confirmDelete = null
             },
-            dismissButton = {
-                TextButton(onClick = { confirmDelete = null }) { Text(L("取消", "Cancel"), color = TextLo) }
-            },
-        )
+        ) {
+            Text(
+                L("只删除模板，已记录的历史数据保留。", "Only the template is deleted; logged history is kept."),
+                fontSize = 13.sp, color = TextLo,
+            )
+        }
     }
 
     // —— 清空确认 ——
     if (confirmClear) {
-        AlertDialog(
-            onDismissRequest = { confirmClear = false },
-            containerColor = Ink2,
-            title = { Text(L("清空全部", "Clear all ") + (if (kind == 0) L("食物模板", "food templates") else L("锻炼模板", "exercise templates")) + L("？", "?"), color = TextHi, fontSize = 16.sp) },
-            text = { Text(L("将删除该类型的全部内置与自定义模板，历史记录不受影响；内置模板可随时补回，自定义模板删除后无法恢复。",
-                "This deletes ALL built-in and custom templates of this type. History is unaffected; built-ins can be restored anytime, custom templates cannot."),
-                fontSize = 13.sp, color = TextLo) },
-            confirmButton = {
-                TextButton(onClick = {
-                    vm.clearAllTemplates(kind)
-                    confirmClear = false
-                }) { Text(L("清空", "Clear"), color = MaterialTheme.colorScheme.error) }
+        AppDialog(
+            title = L("清空全部", "Clear all ") + (if (kind == 0) L("食物模板", "food templates") else L("锻炼模板", "exercise templates")) + L("？", "?"),
+            onDismiss = { confirmClear = false },
+            confirmText = L("清空", "Clear"),
+            confirmDanger = true,
+            onConfirm = {
+                vm.clearAllTemplates(kind)
+                confirmClear = false
             },
-            dismissButton = { TextButton(onClick = { confirmClear = false }) { Text(L("取消", "Cancel"), color = TextLo) } },
-        )
+        ) {
+            Text(
+                L("将删除该类型的全部内置与自定义模板，历史记录不受影响；内置模板可随时补回，自定义模板删除后无法恢复。",
+                    "This deletes ALL built-in and custom templates of this type. History is unaffected; built-ins can be restored anytime, custom templates cannot."),
+                fontSize = 13.sp, color = TextLo,
+            )
+        }
     }
 }
 

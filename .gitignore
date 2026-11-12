@@ -35,3 +35,4 @@ tap.txt
 
 # 本地 UI 自动化测试脚本（不入库）
 .uitest/
+.zcode/

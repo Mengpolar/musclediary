@@ -58,7 +58,7 @@ fun RecordsScreen(vm: AppViewModel, kind: Int, onClose: () -> Unit) {
         OutlinedTextField(
             value = search, onValueChange = { search = it },
             placeholder = { Text(L("搜索日期（如 10-16 或 2026-10）", "Search date (e.g. 10-16 or 2026-10)"), color = TextLo) },
-            singleLine = true, colors = fieldColors(), modifier = Modifier.fillMaxWidth(),
+            singleLine = true, shape = appFieldShape, colors = fieldColors(), modifier = Modifier.fillMaxWidth(),
         )
         Spacer(Modifier.height(8.dp))
         RecordsBody(
@@ -82,26 +82,23 @@ fun RecordsScreen(vm: AppViewModel, kind: Int, onClose: () -> Unit) {
             is FoodEntry -> "${entry.date} ${entry.name}"
             else -> (entry as ExerciseEntry).let { "${entry.date} ${it.name}" }
         }
-        AlertDialog(
-            onDismissRequest = { pendingDelete = null },
-            containerColor = Ink2,
-            title = { Text(L("删除这条记录？", "Delete this record?"), color = TextHi, fontSize = 16.sp) },
-            text = { Text(name, color = TextLo, fontSize = 13.sp) },
-            confirmButton = {
-                TextButton(onClick = {
-                    when (entry) {
-                        is WeightEntry -> vm.deleteWeight(entry)
-                        is WaterEntry -> vm.deleteWater(entry)
-                        is FoodEntry -> vm.deleteFood(entry)
-                        is ExerciseEntry -> vm.deleteExercise(entry)
-                    }
-                    pendingDelete = null
-                }) { Text(L("删除", "Delete"), color = Color(0xFFEF5350)) }
+        AppDialog(
+            title = L("删除这条记录？", "Delete this record?"),
+            onDismiss = { pendingDelete = null },
+            confirmText = L("删除", "Delete"),
+            confirmDanger = true,
+            onConfirm = {
+                when (entry) {
+                    is WeightEntry -> vm.deleteWeight(entry)
+                    is WaterEntry -> vm.deleteWater(entry)
+                    is FoodEntry -> vm.deleteFood(entry)
+                    is ExerciseEntry -> vm.deleteExercise(entry)
+                }
+                pendingDelete = null
             },
-            dismissButton = {
-                TextButton(onClick = { pendingDelete = null }) { Text(L("取消", "Cancel"), color = TextLo) }
-            },
-        )
+        ) {
+            Text(name, color = TextLo, fontSize = 13.sp)
+        }
     }
 
     editingWeight?.let { e ->
@@ -135,24 +132,25 @@ fun RecordsScreen(vm: AppViewModel, kind: Int, onClose: () -> Unit) {
         }
     }
     editingExercise?.let { e ->
-        NumberDialog(
+        ExerciseEditDialog(
             title = L("修改「", "Edit [") + "${e.name}" + L("」", "]"),
-            label = qtyLabel(e, vm.exerciseTemplates),
-            initial = fmt1(e.qty),
+            qtyLabel = qtyLabel(e, vm.exerciseTemplates),
+            initialPerSetQty = fmt1(e.perSetQty),
+            initialSets = e.sets.coerceAtLeast(1),
             onDismiss = { editingExercise = null },
-            onConfirm = { v -> vm.updateExerciseEntry(e, v); editingExercise = null },
+            onConfirm = { perSetQty, sets -> vm.updateExerciseEntry(e, perSetQty, sets); editingExercise = null },
         )
     }
 }
 
-/** 锻炼修改弹框的数量单位标签：按模板类型显示 个/公里/秒，模板已删按名称兜底 */
+/** 锻炼修改弹框的单组数量单位标签：按模板类型显示 个/公里/秒，模板已删按名称兜底 */
 private fun qtyLabel(e: ExerciseEntry, templates: List<ExerciseTemplate>): String {
     val template = templates.firstOrNull { it.id == e.templateId }
         ?: templates.firstOrNull { it.matchesEntryName(e.name) }
     return when {
-        template != null -> L("数量（", "Qty (") + Calc.unitLabel(template) + ")"
-        isDistanceName(e.name) -> L("数量（", "Qty (") + L("公里", "km") + ")"
-        else -> L("数量", "qty")
+        template != null -> L("单组数量（", "Per set (") + Calc.unitLabel(template) + ")"
+        isDistanceName(e.name) -> L("单组数量（", "Per set (") + L("公里", "km") + ")"
+        else -> L("单组数量", "Per set qty")
     }
 }
 
@@ -308,7 +306,7 @@ private fun RecordsBody(
                         Box(Modifier.stackApproach()) {
                             SwipeEntryRow(
                                 e.name,
-                                "${e.date.substring(5)} · ${fmt0(e.calories)} kcal · ${fmt1(e.minutes)} " + L("分钟", "min"),
+                                "${e.date.substring(5)} · ${workoutQtyText(e, vm.exerciseTemplates)} · ${fmt1(e.minutes)} " + L("分钟", "min"),
                                 "${fmt0(e.calories)} kcal",
                                 onEdit = { onEdit(e) },
                                 onDelete = { onDelete(e) },

@@ -46,11 +46,21 @@ fun CalendarSheet(vm: AppViewModel, onDismiss: () -> Unit) {
                 IconButton(onClick = { month = month.minusMonths(1) }) {
                     Icon(Icons.Default.ChevronLeft, L("上个月", "Previous month"), tint = TextLo)
                 }
-                Text(
-                    dYM(month.year, month.monthValue),
-                    fontSize = 16.sp, fontWeight = FontWeight.Bold, color = TextHi,
-                    modifier = Modifier.weight(1f), textAlign = TextAlign.Center,
-                )
+                Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text(
+                        dYM(month.year, month.monthValue),
+                        fontSize = 17.sp, fontWeight = FontWeight.ExtraBold, color = TextHi,
+                        textAlign = TextAlign.Center,
+                    )
+                    Spacer(Modifier.height(4.dp))
+                    Box(
+                        Modifier
+                            .width(28.dp)
+                            .height(2.dp)
+                            .clip(RoundedCornerShape(2.dp))
+                            .background(Accent),
+                    )
+                }
                 IconButton(onClick = { month = month.plusMonths(1) }) {
                     Icon(Icons.Default.ChevronRight, L("下个月", "Next month"), tint = TextLo)
                 }

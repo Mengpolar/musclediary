@@ -109,6 +109,7 @@ private fun SetupField(
         value = value, onValueChange = onChange,
         label = { Text(label, color = TextLo) },
         singleLine = true,
+        shape = appFieldShape,
         keyboardOptions = KeyboardOptions(keyboardType = keyboard),
         colors = fieldColors(),
         modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp),
