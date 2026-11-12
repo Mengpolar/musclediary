@@ -198,8 +198,9 @@ fun DietScreen(vm: AppViewModel, onOpenRecords: () -> Unit = {}) {
 
 /**
  * 饮食页顶部宏量光谱卡（精简紧凑）：
- * 1) 顶部大热量灯牌 + 右侧中文彩色克数与供能百分比（空格分隔，无 `·`）
+ * 1) 顶部大热量灯牌
  * 2) 三段式彩色宏量百分比光谱条（按 P:4 kcal / C:4 kcal / F:9 kcal 热量占比实时分配宽度）
+ * 3) 百分比条下方展示中文彩色克数与供能百分比（空格分隔，无 `·`）
  */
 @Composable
 private fun DietMacroDashboard(
@@ -221,7 +222,7 @@ private fun DietMacroDashboard(
     val fPct = if (hasData) (100 - pPct - cPct).coerceAtLeast(0) else 0
 
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        // 1. 顶部大热量 + 中文彩色营养素克数与供能占比（空格分隔）
+        // 1. 顶部大热量灯牌
         Row(
             Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.Bottom,
@@ -238,40 +239,6 @@ private fun DietMacroDashboard(
                 fontSize = 12.sp,
                 fontWeight = FontWeight.SemiBold,
                 color = TextLo,
-                modifier = Modifier.padding(bottom = 3.dp),
-            )
-            Spacer(Modifier.weight(1f))
-            Text(
-                text = buildAnnotatedString {
-                    withStyle(SpanStyle(color = Protein, fontWeight = FontWeight.SemiBold)) {
-                        append(L("蛋白", "Protein ") + "${fmt1(protein)}g")
-                    }
-                    if (hasData) {
-                        withStyle(SpanStyle(color = Protein.copy(alpha = 0.8f), fontSize = 10.5.sp)) {
-                            append("($pPct%)")
-                        }
-                    }
-                    append("  ")
-                    withStyle(SpanStyle(color = CarbC, fontWeight = FontWeight.SemiBold)) {
-                        append(L("碳水", "Carbs ") + "${fmt1(carb)}g")
-                    }
-                    if (hasData) {
-                        withStyle(SpanStyle(color = CarbC.copy(alpha = 0.8f), fontSize = 10.5.sp)) {
-                            append("($cPct%)")
-                        }
-                    }
-                    append("  ")
-                    withStyle(SpanStyle(color = FatC, fontWeight = FontWeight.SemiBold)) {
-                        append(L("脂肪", "Fat ") + "${fmt1(fat)}g")
-                    }
-                    if (hasData) {
-                        withStyle(SpanStyle(color = FatC.copy(alpha = 0.8f), fontSize = 10.5.sp)) {
-                            append("($fPct%)")
-                        }
-                    }
-                },
-                fontSize = 11.5.sp,
-                maxLines = 1,
                 modifier = Modifier.padding(bottom = 3.dp),
             )
         }
@@ -319,6 +286,43 @@ private fun DietMacroDashboard(
                 Box(Modifier.weight(1f).fillMaxHeight().background(FatC.copy(alpha = 0.22f)))
             }
         }
+
+        // 3. 百分比条下方：中文彩色营养素克数与供能占比（空格分隔）
+        Text(
+            text = buildAnnotatedString {
+                withStyle(SpanStyle(color = Protein, fontSize = 9.sp)) { append("●") }
+                withStyle(SpanStyle(color = Protein, fontWeight = FontWeight.SemiBold)) {
+                    append(L("蛋白质", "Protein ") + " ${fmt1(protein)}g")
+                }
+                if (hasData) {
+                    withStyle(SpanStyle(color = Protein.copy(alpha = 0.8f), fontSize = 11.sp)) {
+                        append("($pPct%)")
+                    }
+                }
+                append("   ")
+                withStyle(SpanStyle(color = CarbC, fontSize = 9.sp)) { append("●") }
+                withStyle(SpanStyle(color = CarbC, fontWeight = FontWeight.SemiBold)) {
+                    append(L("碳水", "Carbs ") + " ${fmt1(carb)}g")
+                }
+                if (hasData) {
+                    withStyle(SpanStyle(color = CarbC.copy(alpha = 0.8f), fontSize = 11.sp)) {
+                        append("($cPct%)")
+                    }
+                }
+                append("   ")
+                withStyle(SpanStyle(color = FatC, fontSize = 9.sp)) { append("●") }
+                withStyle(SpanStyle(color = FatC, fontWeight = FontWeight.SemiBold)) {
+                    append(L("脂肪", "Fat ") + " ${fmt1(fat)}g")
+                }
+                if (hasData) {
+                    withStyle(SpanStyle(color = FatC.copy(alpha = 0.8f), fontSize = 11.sp)) {
+                        append("($fPct%)")
+                    }
+                }
+            },
+            fontSize = 12.sp,
+            maxLines = 1,
+        )
     }
 }
 

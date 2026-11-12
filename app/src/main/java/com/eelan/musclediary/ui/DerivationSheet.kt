@@ -15,10 +15,14 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.PlatformTextStyle
 import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.LineHeightStyle
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -418,13 +422,27 @@ private fun StepFormulaItem(
         ) {
             Box(
                 Modifier
-                    .size(18.dp)
+                    .size(20.dp)
                     .clip(CircleShape)
-                    .background(Ink1)
-                    .border(1.dp, valueColor.copy(alpha = 0.6f), CircleShape),
+                    .background(valueColor.copy(alpha = 0.14f))
+                    .border(1.dp, valueColor.copy(alpha = 0.65f), CircleShape),
                 contentAlignment = Alignment.Center,
             ) {
-                Text(step, fontSize = 10.sp, fontWeight = FontWeight.Bold, color = valueColor)
+                Text(
+                    text = step,
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.ExtraBold,
+                    color = valueColor,
+                    textAlign = TextAlign.Center,
+                    style = TextStyle(
+                        platformStyle = PlatformTextStyle(includeFontPadding = false),
+                        lineHeight = 11.sp,
+                        lineHeightStyle = LineHeightStyle(
+                            alignment = LineHeightStyle.Alignment.Center,
+                            trim = LineHeightStyle.Trim.Both,
+                        ),
+                    ),
+                )
             }
             Spacer(Modifier.width(7.dp))
             Text(title, fontSize = 13.sp, fontWeight = FontWeight.Bold, color = TextHi, modifier = Modifier.weight(1f))
