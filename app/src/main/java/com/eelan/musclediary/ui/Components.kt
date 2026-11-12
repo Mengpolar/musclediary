@@ -616,8 +616,8 @@ fun SwipeEntryRow(
 
 /**
  * 饮食/食物卡片的单行紧凑富文本详情行（永不换行撑高卡片）：
- * - 可选日期 `11-12`、高亮克重 `150g`
- * - 三色圆点 + 紧凑克数：`● 蛋白 31.0  ● 碳水 0.0  ● 脂肪 3.6`（冰蓝 / 暖黄 / 淡紫）
+ * - 可选日期 `11-12`、高亮克重 `150g`（与后方营养素用空格分隔，不加 `·`）
+ * - 三色圆点 + 对应颜色标签与克数：`●蛋白31.0  ●碳水0.0  ●脂肪3.6`（冰蓝 / 暖黄 / 淡紫）
  * - 可选单位换算 `1个=50g`
  */
 @Composable
@@ -629,43 +629,34 @@ fun FoodMacroChips(
     grams: Double? = null,
     extraBadge: String? = null,
 ) {
-    val dotSep = SpanStyle(color = Ink3, fontWeight = FontWeight.Normal)
     Text(
         text = buildAnnotatedString {
-            var hasPrev = false
-            fun sep() {
-                if (hasPrev) {
-                    withStyle(dotSep) { append(" · ") }
-                }
-                hasPrev = true
-            }
             if (!dateText.isNullOrBlank()) {
-                sep()
                 withStyle(SpanStyle(color = TextLo)) { append(dateText) }
+                append("  ")
             }
             if (grams != null && grams > 0.0) {
-                sep()
                 withStyle(SpanStyle(color = TextHi, fontWeight = FontWeight.SemiBold)) {
                     append("${fmt0(grams)}g")
                 }
+                append("  ")
             }
-            sep()
             // 蛋白质（冰蓝）
             withStyle(SpanStyle(color = Protein, fontSize = 9.sp)) { append("●") }
-            withStyle(SpanStyle(color = TextLo)) { append(L("蛋白", "P")) }
+            withStyle(SpanStyle(color = Protein, fontWeight = FontWeight.Medium)) { append(L("蛋白", "P ")) }
             withStyle(SpanStyle(color = Protein, fontWeight = FontWeight.SemiBold)) { append(fmt1(protein)) }
             append("  ")
             // 碳水（暖黄）
             withStyle(SpanStyle(color = CarbC, fontSize = 9.sp)) { append("●") }
-            withStyle(SpanStyle(color = TextLo)) { append(L("碳水", "C")) }
+            withStyle(SpanStyle(color = CarbC, fontWeight = FontWeight.Medium)) { append(L("碳水", "C ")) }
             withStyle(SpanStyle(color = CarbC, fontWeight = FontWeight.SemiBold)) { append(fmt1(carb)) }
             append("  ")
             // 脂肪（淡紫）
             withStyle(SpanStyle(color = FatC, fontSize = 9.sp)) { append("●") }
-            withStyle(SpanStyle(color = TextLo)) { append(L("脂肪", "F")) }
+            withStyle(SpanStyle(color = FatC, fontWeight = FontWeight.Medium)) { append(L("脂肪", "F ")) }
             withStyle(SpanStyle(color = FatC, fontWeight = FontWeight.SemiBold)) { append(fmt1(fat)) }
             if (!extraBadge.isNullOrBlank()) {
-                sep()
+                append("  ")
                 withStyle(SpanStyle(color = TextLo)) { append(extraBadge) }
             }
         },

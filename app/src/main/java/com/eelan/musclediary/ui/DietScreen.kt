@@ -20,8 +20,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.eelan.musclediary.AppViewModel
@@ -194,10 +197,9 @@ fun DietScreen(vm: AppViewModel, onOpenRecords: () -> Unit = {}) {
 }
 
 /**
- * 饮食页顶部宏量仪表盘（新颖呈现）：
- * 1) 顶部大热量灯牌 + 宏量供能占比标签
- * 2) 三段式彩色宏量光谱条（按 P:4 kcal / C:4 kcal / F:9 kcal 热量占比实时分配宽度）
- * 3) 下方三等分微浮雕数据舱（顶部彩色灯条 + 营养素名称 + 供能百分比 + 大号等宽克数）
+ * 饮食页顶部宏量光谱卡（精简紧凑）：
+ * 1) 顶部大热量灯牌 + 右侧中文彩色克数与供能百分比（空格分隔，无 `·`）
+ * 2) 三段式彩色宏量百分比光谱条（按 P:4 kcal / C:4 kcal / F:9 kcal 热量占比实时分配宽度）
  */
 @Composable
 private fun DietMacroDashboard(
@@ -214,16 +216,19 @@ private fun DietMacroDashboard(
     val pRatio = if (hasData) (pKcal / totalMacroKcal).toFloat() else 0.34f
     val cRatio = if (hasData) (cKcal / totalMacroKcal).toFloat() else 0.33f
     val fRatio = if (hasData) (fKcal / totalMacroKcal).toFloat() else 0.33f
+    val pPct = if (hasData) (pRatio * 100).toInt() else 0
+    val cPct = if (hasData) (cRatio * 100).toInt() else 0
+    val fPct = if (hasData) (100 - pPct - cPct).coerceAtLeast(0) else 0
 
-    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        // 1. 顶部大热量 + 供能比微标
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        // 1. 顶部大热量 + 中文彩色营养素克数与供能占比（空格分隔）
         Row(
             Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.Bottom,
         ) {
             Text(
                 text = fmt0(kcal),
-                fontSize = 26.sp,
+                fontSize = 24.sp,
                 fontWeight = FontWeight.ExtraBold,
                 color = Accent,
             )
@@ -237,18 +242,41 @@ private fun DietMacroDashboard(
             )
             Spacer(Modifier.weight(1f))
             Text(
-                text = if (hasData) {
-                    "P ${(pRatio * 100).toInt()}% · C ${(cRatio * 100).toInt()}% · F ${(100 - (pRatio * 100).toInt() - (cRatio * 100).toInt()).coerceAtLeast(0)}%"
-                } else {
-                    L("今日暂未录入", "No intake yet")
+                text = buildAnnotatedString {
+                    withStyle(SpanStyle(color = Protein, fontWeight = FontWeight.SemiBold)) {
+                        append(L("蛋白", "Protein ") + "${fmt1(protein)}g")
+                    }
+                    if (hasData) {
+                        withStyle(SpanStyle(color = Protein.copy(alpha = 0.8f), fontSize = 10.5.sp)) {
+                            append("($pPct%)")
+                        }
+                    }
+                    append("  ")
+                    withStyle(SpanStyle(color = CarbC, fontWeight = FontWeight.SemiBold)) {
+                        append(L("碳水", "Carbs ") + "${fmt1(carb)}g")
+                    }
+                    if (hasData) {
+                        withStyle(SpanStyle(color = CarbC.copy(alpha = 0.8f), fontSize = 10.5.sp)) {
+                            append("($cPct%)")
+                        }
+                    }
+                    append("  ")
+                    withStyle(SpanStyle(color = FatC, fontWeight = FontWeight.SemiBold)) {
+                        append(L("脂肪", "Fat ") + "${fmt1(fat)}g")
+                    }
+                    if (hasData) {
+                        withStyle(SpanStyle(color = FatC.copy(alpha = 0.8f), fontSize = 10.5.sp)) {
+                            append("($fPct%)")
+                        }
+                    }
                 },
-                fontSize = 11.sp,
-                color = TextLo,
+                fontSize = 11.5.sp,
+                maxLines = 1,
                 modifier = Modifier.padding(bottom = 3.dp),
             )
         }
 
-        // 2. 三段式彩色能量光谱条（按三大营养素实际供能比分配宽度）
+        // 2. 三段式彩色能量百分比条（按三大营养素实际供能比分配宽度）
         Row(
             Modifier
                 .fillMaxWidth()
@@ -290,100 +318,6 @@ private fun DietMacroDashboard(
                 Box(Modifier.weight(1f).fillMaxHeight().background(CarbC.copy(alpha = 0.22f)))
                 Box(Modifier.weight(1f).fillMaxHeight().background(FatC.copy(alpha = 0.22f)))
             }
-        }
-
-        // 3. 三等分微浮雕数据舱（顶部彩色灯条 + 标签 + 占比 + 大字克数）
-        val pPct = if (hasData) (pRatio * 100).toInt() else 0
-        val cPct = if (hasData) (cRatio * 100).toInt() else 0
-        val fPct = if (hasData) (100 - pPct - cPct).coerceAtLeast(0) else 0
-        Row(
-            Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            MacroStatTile(
-                modifier = Modifier.weight(1f),
-                label = L("蛋白质", "Protein"),
-                grams = protein,
-                pct = pPct,
-                color = Protein,
-            )
-            MacroStatTile(
-                modifier = Modifier.weight(1f),
-                label = L("碳水", "Carbs"),
-                grams = carb,
-                pct = cPct,
-                color = CarbC,
-            )
-            MacroStatTile(
-                modifier = Modifier.weight(1f),
-                label = L("脂肪", "Fat"),
-                grams = fat,
-                pct = fPct,
-                color = FatC,
-            )
-        }
-    }
-}
-
-@Composable
-private fun MacroStatTile(
-    modifier: Modifier = Modifier,
-    label: String,
-    grams: Double,
-    pct: Int,
-    color: Color,
-) {
-    Column(
-        modifier
-            .clip(RoundedCornerShape(10.dp))
-            .background(Ink2)
-            .border(0.75.dp, color.copy(alpha = 0.25f), RoundedCornerShape(10.dp))
-            .padding(horizontal = 10.dp, vertical = 8.dp),
-    ) {
-        // 顶部彩色能量灯条 + 百分比
-        Row(
-            Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Box(
-                Modifier
-                    .width(14.dp)
-                    .height(3.dp)
-                    .clip(RoundedCornerShape(99.dp))
-                    .background(color),
-            )
-            Spacer(Modifier.weight(1f))
-            Text(
-                text = "$pct%",
-                fontSize = 10.sp,
-                color = color.copy(alpha = 0.85f),
-                fontWeight = FontWeight.SemiBold,
-            )
-        }
-        Spacer(Modifier.height(4.dp))
-        Text(
-            text = label,
-            fontSize = 11.sp,
-            color = TextLo,
-            maxLines = 1,
-        )
-        Spacer(Modifier.height(1.dp))
-        Row(verticalAlignment = Alignment.Bottom) {
-            Text(
-                text = fmt1(grams),
-                fontSize = 15.sp,
-                fontWeight = FontWeight.Bold,
-                color = TextHi,
-                maxLines = 1,
-            )
-            Spacer(Modifier.width(2.dp))
-            Text(
-                text = "g",
-                fontSize = 10.sp,
-                color = color,
-                fontWeight = FontWeight.SemiBold,
-                modifier = Modifier.padding(bottom = 1.dp),
-            )
         }
     }
 }
