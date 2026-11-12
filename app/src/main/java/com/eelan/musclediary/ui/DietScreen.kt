@@ -287,40 +287,61 @@ private fun DietMacroDashboard(
             }
         }
 
-        // 3. 百分比条下方：中文彩色营养素克数与供能占比（空格分隔）
+        // 3. 百分比条下方：无框三等分对齐栏（左/中/右两端对齐，单行完整展示克数与百分比）
+        Row(
+            Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            MacroLegendItem(
+                label = L("蛋白", "Protein"),
+                grams = protein,
+                pct = if (hasData) pPct else null,
+                color = Protein,
+            )
+            MacroLegendItem(
+                label = L("碳水", "Carbs"),
+                grams = carb,
+                pct = if (hasData) cPct else null,
+                color = CarbC,
+            )
+            MacroLegendItem(
+                label = L("脂肪", "Fat"),
+                grams = fat,
+                pct = if (hasData) fPct else null,
+                color = FatC,
+            )
+        }
+    }
+}
+
+@Composable
+private fun MacroLegendItem(
+    label: String,
+    grams: Double,
+    pct: Int?,
+    color: Color,
+) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Box(
+            Modifier
+                .size(6.dp)
+                .clip(RoundedCornerShape(99.dp))
+                .background(color),
+        )
+        Spacer(Modifier.width(4.dp))
         Text(
             text = buildAnnotatedString {
-                withStyle(SpanStyle(color = Protein, fontSize = 9.sp)) { append("●") }
-                withStyle(SpanStyle(color = Protein, fontWeight = FontWeight.SemiBold)) {
-                    append(L("蛋白质", "Protein ") + " ${fmt1(protein)}g")
+                withStyle(SpanStyle(color = color, fontWeight = FontWeight.SemiBold)) {
+                    append("$label ${fmt1(grams)}g")
                 }
-                if (hasData) {
-                    withStyle(SpanStyle(color = Protein.copy(alpha = 0.8f), fontSize = 11.sp)) {
-                        append("($pPct%)")
-                    }
-                }
-                append("   ")
-                withStyle(SpanStyle(color = CarbC, fontSize = 9.sp)) { append("●") }
-                withStyle(SpanStyle(color = CarbC, fontWeight = FontWeight.SemiBold)) {
-                    append(L("碳水", "Carbs ") + " ${fmt1(carb)}g")
-                }
-                if (hasData) {
-                    withStyle(SpanStyle(color = CarbC.copy(alpha = 0.8f), fontSize = 11.sp)) {
-                        append("($cPct%)")
-                    }
-                }
-                append("   ")
-                withStyle(SpanStyle(color = FatC, fontSize = 9.sp)) { append("●") }
-                withStyle(SpanStyle(color = FatC, fontWeight = FontWeight.SemiBold)) {
-                    append(L("脂肪", "Fat ") + " ${fmt1(fat)}g")
-                }
-                if (hasData) {
-                    withStyle(SpanStyle(color = FatC.copy(alpha = 0.8f), fontSize = 11.sp)) {
-                        append("($fPct%)")
+                if (pct != null) {
+                    withStyle(SpanStyle(color = TextLo, fontSize = 10.5.sp)) {
+                        append(" $pct%")
                     }
                 }
             },
-            fontSize = 12.sp,
+            fontSize = 11.5.sp,
             maxLines = 1,
         )
     }
