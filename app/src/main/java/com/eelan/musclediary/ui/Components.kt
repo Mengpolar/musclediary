@@ -445,10 +445,11 @@ fun NumberDialog(
 @Composable
 fun SwipeEntryRow(
     title: String,
-    detail: String,
+    detail: String = "",
     trailing: String,
     onEdit: () -> Unit,
     onDelete: () -> Unit,
+    detailContent: (@Composable () -> Unit)? = null,
 ) {
     val scope = rememberCoroutineScope()
     val density = LocalDensity.current
@@ -596,10 +597,164 @@ fun SwipeEntryRow(
         ) {
             Column(Modifier.weight(1f)) {
                 Text(title, fontSize = 14.sp, color = TextHi, fontWeight = FontWeight.Medium)
-                Text(detail, fontSize = 12.sp, color = TextLo)
+                if (detailContent != null) {
+                    Spacer(Modifier.height(5.dp))
+                    detailContent()
+                } else if (detail.isNotEmpty()) {
+                    Text(detail, fontSize = 12.sp, color = TextLo)
+                }
             }
+            Spacer(Modifier.width(8.dp))
             Text(trailing, fontSize = 14.sp, color = Accent, fontWeight = FontWeight.Bold,
                 textAlign = TextAlign.End)
+        }
+    }
+}
+
+/**
+ * 饮食/食物卡片的结构化营养徽章行：
+ * - 可选前缀胶囊（如日期 `11-12`、重量 `150g`）
+ * - 蛋白质（Protein 冰蓝）、碳水（CarbC 暖黄）、脂肪（FatC 淡紫）三色圆点微胶囊
+ * - 可选后缀胶囊（如量词换算 `1个=50g`）
+ */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+fun FoodMacroChips(
+    protein: Double,
+    carb: Double,
+    fat: Double,
+    dateText: String? = null,
+    grams: Double? = null,
+    extraBadge: String? = null,
+) {
+    FlowRow(
+        horizontalArrangement = Arrangement.spacedBy(5.dp),
+        verticalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        if (!dateText.isNullOrBlank()) {
+            NeutralMetaPill(dateText)
+        }
+        if (grams != null && grams > 0.0) {
+            NeutralMetaPill("${fmt0(grams)}g", highlight = true)
+        }
+        MacroBadgePill(L("蛋白", "P"), "${fmt1(protein)}g", Protein)
+        MacroBadgePill(L("碳水", "C"), "${fmt1(carb)}g", CarbC)
+        MacroBadgePill(L("脂肪", "F"), "${fmt1(fat)}g", FatC)
+        if (!extraBadge.isNullOrBlank()) {
+            NeutralMetaPill(extraBadge)
+        }
+    }
+}
+
+@Composable
+private fun NeutralMetaPill(text: String, highlight: Boolean = false) {
+    Box(
+        Modifier
+            .clip(RoundedCornerShape(6.dp))
+            .background(if (highlight) Ink3.copy(alpha = 0.65f) else Ink1.copy(alpha = 0.75f))
+            .border(
+                width = 0.5.dp,
+                color = if (highlight) TextLo.copy(alpha = 0.35f) else Ink3.copy(alpha = 0.6f),
+                shape = RoundedCornerShape(6.dp),
+            )
+            .padding(horizontal = 6.dp, vertical = 2.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(
+            text,
+            fontSize = 11.sp,
+            fontWeight = if (highlight) FontWeight.SemiBold else FontWeight.Medium,
+            color = if (highlight) TextHi else TextLo,
+        )
+    }
+}
+
+@Composable
+private fun MacroBadgePill(label: String, value: String, color: Color) {
+    Row(
+        Modifier
+            .clip(RoundedCornerShape(6.dp))
+            .background(color.copy(alpha = 0.12f))
+            .border(0.5.dp, color.copy(alpha = 0.32f), RoundedCornerShape(6.dp))
+            .padding(horizontal = 6.dp, vertical = 2.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box(
+            Modifier
+                .size(5.dp)
+                .background(color, androidx.compose.foundation.shape.CircleShape),
+        )
+        Spacer(Modifier.width(3.dp))
+        Text(
+            label,
+            fontSize = 10.sp,
+            color = color.copy(alpha = 0.9f),
+        )
+        Spacer(Modifier.width(2.dp))
+        Text(
+            value,
+            fontSize = 11.sp,
+            fontWeight = FontWeight.SemiBold,
+            color = color,
+        )
+    }
+}
+
+/**
+ * 锻炼记录/历史记录卡片的结构化徽章行：
+ * - 可选日期胶囊（如 `11-12`）
+ * - 高亮训练量胶囊（如 `3组×12个`、`3×12个×10kg`）
+ * - 预计时长胶囊（如 `2.5 分钟`）
+ * - 主/次练肌群彩色胶囊（带翡翠绿/琥珀橙圆点）
+ */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+fun WorkoutMetaChips(
+    qtyText: String,
+    minutes: Double? = null,
+    muscles: List<String> = emptyList(),
+    dateText: String? = null,
+    extraBadge: String? = null,
+) {
+    FlowRow(
+        horizontalArrangement = Arrangement.spacedBy(5.dp),
+        verticalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        if (!dateText.isNullOrBlank()) {
+            NeutralMetaPill(dateText)
+        }
+        if (qtyText.isNotBlank()) {
+            NeutralMetaPill(qtyText, highlight = true)
+        }
+        if (minutes != null && minutes > 0.0) {
+            NeutralMetaPill("${fmt1(minutes)} " + L("分钟", "min"))
+        }
+        muscles.forEachIndexed { idx, m ->
+            val pillColor = if (idx == 0) Accent else Good
+            Row(
+                Modifier
+                    .clip(RoundedCornerShape(6.dp))
+                    .background(pillColor.copy(alpha = 0.12f))
+                    .border(0.5.dp, pillColor.copy(alpha = 0.32f), RoundedCornerShape(6.dp))
+                    .padding(horizontal = 6.dp, vertical = 2.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Box(
+                    Modifier
+                        .size(5.dp)
+                        .background(pillColor, androidx.compose.foundation.shape.CircleShape),
+                )
+                Spacer(Modifier.width(3.dp))
+                Text(
+                    m,
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = pillColor,
+                )
+            }
+        }
+        if (!extraBadge.isNullOrBlank()) {
+            NeutralMetaPill(extraBadge)
         }
     }
 }

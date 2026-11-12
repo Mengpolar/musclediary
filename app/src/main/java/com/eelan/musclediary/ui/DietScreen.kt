@@ -84,12 +84,13 @@ fun DietScreen(vm: AppViewModel, onOpenRecords: () -> Unit = {}) {
             CardBox(title = L("当日摄入", "Today's intake")) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Column(Modifier.weight(1f)) {
-                        Text("${fmt0(kcal)} kcal", fontSize = 22.sp, fontWeight = FontWeight.Bold, color = Accent)
-                    }
-                    Column(horizontalAlignment = Alignment.End) {
-                        Text(L("蛋白质 ", "Protein ") + "${fmt1(protein)}g", fontSize = 12.sp, color = Protein)
-                        Text(L("碳水 ", "Carbs ") + "${fmt1(carb)}g", fontSize = 12.sp, color = CarbC)
-                        Text(L("脂肪 ", "Fat ") + "${fmt1(fat)}g", fontSize = 12.sp, color = FatC)
+                        Text("${fmt0(kcal)} kcal", fontSize = 24.sp, fontWeight = FontWeight.ExtraBold, color = Accent)
+                        Spacer(Modifier.height(6.dp))
+                        FoodMacroChips(
+                            protein = protein,
+                            carb = carb,
+                            fat = fat,
+                        )
                     }
                 }
             }
@@ -108,12 +109,18 @@ fun DietScreen(vm: AppViewModel, onOpenRecords: () -> Unit = {}) {
                         key(f.id) {
                         Box(Modifier.stackApproach()) {
                             SwipeEntryRow(
-                                f.name,
-                                foodDetail(f),
-                                "${fmt0(f.kcal)} kcal",
+                                title = f.name,
+                                trailing = "${fmt0(f.kcal)} kcal",
                                 onEdit = { editingEntry = f },
                                 onDelete = { deleteWithUndo(f) },
-                            )
+                            ) {
+                                FoodMacroChips(
+                                    protein = f.protein,
+                                    carb = f.carb,
+                                    fat = f.fat,
+                                    grams = f.grams,
+                                )
+                            }
                         }
                         }
                     }
@@ -126,8 +133,6 @@ fun DietScreen(vm: AppViewModel, onOpenRecords: () -> Unit = {}) {
         TemplatePickerDialog(
             title = L("选择食物（每100g营养）", "Pick a food (per 100g)"),
             templates = vm.foodTemplates,
-            detail = { t -> L("蛋白", "P") + "${fmt1(t.protein)} " + L("碳水", "C") + "${fmt1(t.carb)} " +
-                    L("脂肪", "F") + "${fmt1(t.fat)}" },
             trailing = { t -> "${fmt0(t.kcal)} kcal" },
             onPick = { pickOpen = false; pendingTemplate = it },
             onCustom = { pickOpen = false; customOpen = true },
@@ -198,7 +203,6 @@ fun DietScreen(vm: AppViewModel, onOpenRecords: () -> Unit = {}) {
 fun TemplatePickerDialog(
     title: String,
     templates: List<FoodTemplate>,
-    detail: (FoodTemplate) -> String,
     trailing: (FoodTemplate) -> String,
     onPick: (FoodTemplate) -> Unit,
     onCustom: () -> Unit,
@@ -255,6 +259,7 @@ fun TemplatePickerDialog(
                         .fillMaxWidth()
                         .clip(RoundedCornerShape(12.dp))
                         .background(Ink2)
+                        .border(0.75.dp, Ink3.copy(alpha = 0.7f), RoundedCornerShape(12.dp))
                         .clickable { onPick(t) }
                         .padding(horizontal = 12.dp, vertical = 10.dp),
                     verticalAlignment = Alignment.CenterVertically,
@@ -275,9 +280,18 @@ fun TemplatePickerDialog(
                                 }
                             }
                         }
-                        Spacer(Modifier.height(2.dp))
-                        Text(detail(t), color = TextLo, fontSize = 12.sp)
+                        Spacer(Modifier.height(5.dp))
+                        val unitBadge = if (t.unitName.isNotBlank() && t.unitGrams > 0)
+                            "1${foodUnitLabel(t.unitName)}=${fmt0(t.unitGrams)}g"
+                        else null
+                        FoodMacroChips(
+                            protein = t.protein,
+                            carb = t.carb,
+                            fat = t.fat,
+                            extraBadge = unitBadge,
+                        )
                     }
+                    Spacer(Modifier.width(8.dp))
                     Text(trailing(t), color = Accent, fontSize = 13.sp, fontWeight = FontWeight.Bold)
                 }
             }

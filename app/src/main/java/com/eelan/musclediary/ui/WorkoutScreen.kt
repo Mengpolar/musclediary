@@ -189,12 +189,17 @@ fun WorkoutScreen(vm: AppViewModel, onOpenWeightRecords: () -> Unit = {}, onOpen
                     entries.forEach { e ->
                         key(e.id) {
                             SwipeEntryRow(
-                                e.name,
-                                workoutDetail(e, vm.exerciseTemplates),
-                                "${fmt0(e.calories)} kcal",
+                                title = e.name,
+                                trailing = "${fmt0(e.calories)} kcal",
                                 onEdit = { editingEntry = e },
                                 onDelete = { deleteWithUndo(e) },
-                            )
+                            ) {
+                                WorkoutMetaChips(
+                                    qtyText = workoutQtyText(e, vm.exerciseTemplates),
+                                    minutes = e.minutes,
+                                    muscles = workoutMuscleLabels(e),
+                                )
+                            }
                         }
                     }
                 }
@@ -278,16 +283,14 @@ internal fun workoutQtyText(e: com.eelan.musclediary.data.ExerciseEntry, templat
     return if (e.weightKg > 0) "$setsPrefix$perSet×${fmt1(e.weightKg)}kg" else "$setsPrefix$perSet"
 }
 
-/** 锻炼行 detail：单位按模板类型区分（个/公里/秒），支持组数展示 */
-private fun workoutDetail(e: com.eelan.musclediary.data.ExerciseEntry, templates: List<ExerciseTemplate>): String {
-    val qty = workoutQtyText(e, templates)
-    val muscles = runCatching {
-        JSONObject(e.musclesJson).keys().asSequence().toList()
-            .sortedByDescending { JSONObject(e.musclesJson).optDouble(it, 0.0) }
-            .take(2).joinToString(", ") { Muscle.labelOf(it) }
-    }.getOrDefault("")
-    return "$qty · ${fmt1(e.minutes)} " + L("分钟", "min") + if (muscles.isNotBlank()) " · $muscles" else ""
-}
+/** 提取锻炼条目按刺激分排序的前 2 个肌群名称 */
+internal fun workoutMuscleLabels(e: com.eelan.musclediary.data.ExerciseEntry): List<String> = runCatching {
+    val obj = JSONObject(e.musclesJson)
+    obj.keys().asSequence().toList()
+        .sortedByDescending { obj.optDouble(it, 0.0) }
+        .take(2)
+        .map { Muscle.labelOf(it) }
+}.getOrDefault(emptyList())
 
 @Composable
 private fun ExercisePickerDialog(
@@ -319,29 +322,30 @@ private fun ExercisePickerDialog(
             verticalArrangement = Arrangement.spacedBy(6.dp),
         ) {
             items(filtered, key = { it.id }) { t ->
+                val secLabels = t.secondaryMuscles.split(',').filter { it.isNotBlank() }.take(1).map { Muscle.labelOf(it) }
                 Row(
                     Modifier
                         .fillMaxWidth()
                         .clip(RoundedCornerShape(12.dp))
                         .background(Ink2)
+                        .border(0.75.dp, Ink3.copy(alpha = 0.7f), RoundedCornerShape(12.dp))
                         .clickable { onPick(t) }
                         .padding(horizontal = 12.dp, vertical = 10.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Column(Modifier.weight(1f)) {
                         Text(t.dispName, color = TextHi, fontSize = 14.sp, fontWeight = FontWeight.Medium)
-                        Spacer(Modifier.height(2.dp))
-                        Text(
-                            L("主练 ", "Primary: ") + "${Muscle.labelOf(t.primaryMuscle)} · ${
-                                when (t.qtyType) {
-                                    QtyType.REPS -> L("按次", "reps")
-                                    QtyType.DISTANCE -> L("按公里", "km")
-                                    QtyType.SECONDS -> L("按秒", "sec")
-                                }
-                            }",
-                            color = TextLo, fontSize = 12.sp,
+                        Spacer(Modifier.height(5.dp))
+                        WorkoutMetaChips(
+                            qtyText = when (t.qtyType) {
+                                QtyType.REPS -> L("按次", "reps")
+                                QtyType.DISTANCE -> L("按公里", "km")
+                                QtyType.SECONDS -> L("按秒", "sec")
+                            },
+                            muscles = listOf(Muscle.labelOf(t.primaryMuscle)) + secLabels,
                         )
                     }
+                    Spacer(Modifier.width(8.dp))
                     Text(
                         "MET ${fmt1(t.met)}",
                         color = Accent, fontSize = 11.sp, fontWeight = FontWeight.Bold,
@@ -382,15 +386,14 @@ private fun WorkoutQtyDialog(
     onConfirm: (Double, Double, Int) -> Unit,
 ) {
     var qty by remember { mutableStateOf(lastQty?.let { fmt1(it) } ?: "") }
-    var setsText by remember { mutableStateOf((lastSets?.coerceAtLeast(1) ?: 1).toString()) }
+    var sets by remember { mutableIntStateOf(lastSets?.coerceIn(1, 99) ?: 1) }
     var weight by remember {
         mutableStateOf(lastWeight?.takeIf { it > 0 }?.let { fmt1(it) }
             ?: if (isDumbbell(template)) "10" else "")
     }
     val q = qty.toDoubleOrNull()
-    val s = setsText.toIntOrNull()
-    val valid = q != null && q > 0 && s != null && s in 1..99
-    val totalQty = if (valid) q!! * s!! else null
+    val valid = q != null && q > 0 && sets in 1..99
+    val totalQty = if (valid) q!! * sets else null
     val preview = if (totalQty != null) Calc.exerciseCalories(template, totalQty, bodyWeight) else null
     AppDialog(
         title = template.dispName,
@@ -399,53 +402,25 @@ private fun WorkoutQtyDialog(
         onDismiss = onDismiss,
         confirmText = L("记录", "Log"),
         confirmEnabled = valid,
-        onConfirm = { onConfirm(q!!, weight.toDoubleOrNull() ?: 0.0, s!!) },
+        onConfirm = { onConfirm(q!!, weight.toDoubleOrNull() ?: 0.0, sets) },
     ) {
-        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedTextField(
-                    value = qty, onValueChange = { qty = it },
-                    // 按 qtyType 分支取问题文案：unitLabel 已本地化，拿它比较在英文模式下会全部失配
-                    label = { Text(when (template.qtyType) {
-                        QtyType.REPS -> L("每组多少个？", "Reps per set?")
-                        QtyType.DISTANCE -> L("每组多少公里？", "Km per set?")
-                        QtyType.SECONDS -> L("每组多少秒？", "Sec per set?")
-                    }, color = TextLo, fontSize = 12.sp) },
-                    singleLine = true,
-                    shape = appFieldShape,
-                    modifier = Modifier.weight(1.6f),
-                    keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                    colors = com.eelan.musclediary.ui.fieldColors(),
-                )
-                OutlinedTextField(
-                    value = setsText, onValueChange = { setsText = it.filter { ch -> ch.isDigit() }.take(2) },
-                    label = { Text(L("组数", "Sets"), color = TextLo, fontSize = 12.sp) },
-                    singleLine = true,
-                    shape = appFieldShape,
-                    modifier = Modifier.weight(1f),
-                    keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = KeyboardType.Number),
-                    colors = com.eelan.musclediary.ui.fieldColors(),
-                )
-            }
-            // 常用组数快捷点选（1~5 组）
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(6.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Text(L("组数：", "Sets: "), fontSize = 12.sp, color = TextLo)
-                (1..5).forEach { n ->
-                    val selected = s == n
-                    FilterChip(
-                        selected = selected,
-                        onClick = { setsText = n.toString() },
-                        label = { Text("$n" + L("组", ""), fontSize = 12.sp) },
-                        colors = FilterChipDefaults.filterChipColors(
-                            selectedContainerColor = Accent.copy(alpha = 0.28f),
-                            selectedLabelColor = Accent,
-                        ),
-                    )
-                }
-            }
+        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            OutlinedTextField(
+                value = qty, onValueChange = { qty = it },
+                // 按 qtyType 分支取问题文案：unitLabel 已本地化，拿它比较在英文模式下会全部失配
+                label = { Text(when (template.qtyType) {
+                    QtyType.REPS -> L("每组多少个？", "Reps per set?")
+                    QtyType.DISTANCE -> L("每组多少公里？", "Km per set?")
+                    QtyType.SECONDS -> L("每组多少秒？", "Sec per set?")
+                }, color = TextLo, fontSize = 12.sp) },
+                singleLine = true,
+                shape = appFieldShape,
+                modifier = Modifier.fillMaxWidth(),
+                keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                colors = com.eelan.musclediary.ui.fieldColors(),
+            )
+            // 仅保留一行等宽紧凑的组数选择按钮（1~6 组），去除冗余的组数输入框并彻底解决第 5 个按钮被挤扁的问题
+            SetsSelectorRow(selectedSets = sets, onSelect = { sets = it })
             if (isDumbbell(template)) {
                 OutlinedTextField(
                     value = weight, onValueChange = { weight = it },
@@ -472,19 +447,57 @@ private fun WorkoutQtyDialog(
                 onPick = { c ->
                     chipMap[c]?.let { (q0, w0, s0) ->
                         qty = fmt1(q0)
-                        setsText = s0.toString()
+                        sets = s0.coerceIn(1, 99)
                         if (w0 > 0) weight = fmt1(w0)
                     }
                 },
             )
             if (preview != null) {
-                val totalHint = if (s != null && s > 1) {
+                val totalHint = if (sets > 1) {
                     val unitStr = Calc.unitLabel(template)
                     L("共 ", "total ") + "${fmt1(totalQty!!)}$unitStr · "
                 } else ""
                 DialogPreviewPill(
                     totalHint + L("预计消耗 ", "Est. burn ") + "${fmt0(preview.first)} kcal · ${fmt1(preview.second)} " + L("分钟", "min"),
                 )
+            }
+        }
+    }
+}
+
+/** 组数快捷选择行：6 个等宽胶囊按钮（1~6 组），高对比选中态，永不截断变形 */
+@Composable
+private fun SetsSelectorRow(selectedSets: Int, onSelect: (Int) -> Unit) {
+    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Text(L("训练组数", "Sets"), fontSize = 12.sp, color = TextLo)
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
+            (1..6).forEach { n ->
+                val selected = selectedSets == n
+                Box(
+                    Modifier
+                        .weight(1f)
+                        .clip(RoundedCornerShape(9.dp))
+                        .background(if (selected) Accent else Ink2)
+                        .border(
+                            width = 1.dp,
+                            color = if (selected) Accent else Ink3,
+                            shape = RoundedCornerShape(9.dp),
+                        )
+                        .clickable { onSelect(n) }
+                        .padding(vertical = 8.dp),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text(
+                        text = "$n" + L("组", ""),
+                        fontSize = 12.sp,
+                        fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
+                        color = if (selected) Ink0 else TextHi,
+                        maxLines = 1,
+                    )
+                }
             }
         }
     }
@@ -501,41 +514,30 @@ internal fun ExerciseEditDialog(
     onConfirm: (Double, Int) -> Unit,
 ) {
     var qtyText by remember { mutableStateOf(initialPerSetQty) }
-    var setsText by remember { mutableStateOf(initialSets.coerceAtLeast(1).toString()) }
+    var sets by remember { mutableIntStateOf(initialSets.coerceIn(1, 99)) }
     val q = qtyText.toDoubleOrNull()
-    val s = setsText.toIntOrNull()
-    val valid = q != null && q > 0 && s != null && s in 1..99
+    val valid = q != null && q > 0 && sets in 1..99
     AppDialog(
         title = title,
         subtitle = L("调整单组数量或组数，消耗与刺激分自动重算", "Adjust per-set qty or sets; burn & scores auto-update"),
         onDismiss = onDismiss,
         confirmText = L("确定", "OK"),
         confirmEnabled = valid,
-        onConfirm = { onConfirm(q!!, s!!) },
+        onConfirm = { onConfirm(q!!, sets) },
     ) {
-        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedTextField(
-                    value = qtyText, onValueChange = { qtyText = it },
-                    label = { Text(qtyLabel, color = TextLo, fontSize = 12.sp) },
-                    singleLine = true,
-                    shape = appFieldShape,
-                    modifier = Modifier.weight(1.6f),
-                    keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                    colors = com.eelan.musclediary.ui.fieldColors(),
-                )
-                OutlinedTextField(
-                    value = setsText, onValueChange = { setsText = it.filter { ch -> ch.isDigit() }.take(2) },
-                    label = { Text(L("组数", "Sets"), color = TextLo, fontSize = 12.sp) },
-                    singleLine = true,
-                    shape = appFieldShape,
-                    modifier = Modifier.weight(1f),
-                    keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = KeyboardType.Number),
-                    colors = com.eelan.musclediary.ui.fieldColors(),
-                )
-            }
+        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            OutlinedTextField(
+                value = qtyText, onValueChange = { qtyText = it },
+                label = { Text(qtyLabel, color = TextLo, fontSize = 12.sp) },
+                singleLine = true,
+                shape = appFieldShape,
+                modifier = Modifier.fillMaxWidth(),
+                keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                colors = com.eelan.musclediary.ui.fieldColors(),
+            )
+            SetsSelectorRow(selectedSets = sets, onSelect = { sets = it })
             if (!valid) {
-                Text(L("请输入大于 0 的数量与 1~99 的组数", "Enter a qty > 0 and sets between 1 and 99"),
+                Text(L("请输入大于 0 的数量", "Enter a value greater than 0"),
                     fontSize = 12.sp, color = Warn)
             }
         }

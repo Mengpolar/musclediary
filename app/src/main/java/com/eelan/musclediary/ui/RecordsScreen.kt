@@ -278,12 +278,19 @@ private fun RecordsBody(
                         key(e.id) {
                         Box(Modifier.stackApproach()) {
                             SwipeEntryRow(
-                                e.name,
-                                "${e.date.substring(5)} · " + foodDetail(e).trimStart(),
-                                "${fmt0(e.kcal)} kcal",
+                                title = e.name,
+                                trailing = "${fmt0(e.kcal)} kcal",
                                 onEdit = { onEdit(e) },
                                 onDelete = { onDelete(e) },
-                            )
+                            ) {
+                                FoodMacroChips(
+                                    protein = e.protein,
+                                    carb = e.carb,
+                                    fat = e.fat,
+                                    dateText = e.date.substring(5),
+                                    grams = e.grams,
+                                )
+                            }
                         }
                         }
                     }
@@ -305,12 +312,18 @@ private fun RecordsBody(
                         key(e.id) {
                         Box(Modifier.stackApproach()) {
                             SwipeEntryRow(
-                                e.name,
-                                "${e.date.substring(5)} · ${workoutQtyText(e, vm.exerciseTemplates)} · ${fmt1(e.minutes)} " + L("分钟", "min"),
-                                "${fmt0(e.calories)} kcal",
+                                title = e.name,
+                                trailing = "${fmt0(e.calories)} kcal",
                                 onEdit = { onEdit(e) },
                                 onDelete = { onDelete(e) },
-                            )
+                            ) {
+                                WorkoutMetaChips(
+                                    qtyText = workoutQtyText(e, vm.exerciseTemplates),
+                                    minutes = e.minutes,
+                                    muscles = workoutMuscleLabels(e),
+                                    dateText = e.date.substring(5),
+                                )
+                            }
                         }
                         }
                     }

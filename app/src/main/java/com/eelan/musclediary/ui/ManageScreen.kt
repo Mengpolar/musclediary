@@ -221,24 +221,35 @@ private fun ActionChip(label: String, color: Color, onClick: () -> Unit) {
 
 @Composable
 private fun FoodManageRow(t: FoodTemplate, onEdit: () -> Unit, onDelete: () -> Unit) {
-    val unitInfo = if (t.unitName.isNotBlank() && t.unitGrams > 0) " · 1${foodUnitLabel(t.unitName)}=${fmt0(t.unitGrams)}g" else ""
+    val unitInfo = if (t.unitName.isNotBlank() && t.unitGrams > 0) "1${foodUnitLabel(t.unitName)}=${fmt0(t.unitGrams)}g" else null
     SwipeEntryRow(
         title = t.dispName + if (t.isCustom) L(" · 自定义", " · custom") else L(" · 内置", " · built-in"),
-        detail = L("蛋白", "P") + "${fmt1(t.protein)} " + L("碳水", "C") + "${fmt1(t.carb)} " + L("脂肪", "F") + "${fmt1(t.fat)}$unitInfo",
         trailing = "${fmt0(t.kcal)} kcal",
         onEdit = onEdit,
         onDelete = onDelete,
-    )
+    ) {
+        FoodMacroChips(
+            protein = t.protein,
+            carb = t.carb,
+            fat = t.fat,
+            extraBadge = unitInfo,
+        )
+    }
 }
 
 @Composable
 private fun ExerciseManageRow(t: ExerciseTemplate, onEdit: () -> Unit, onDelete: () -> Unit) {
+    val secLabels = t.secondaryMuscles.split(',').filter { it.isNotBlank() }.take(1).map { Muscle.labelOf(it) }
     SwipeEntryRow(
         title = t.dispName + if (t.isCustom) L(" · 自定义", " · custom") else L(" · 内置", " · built-in"),
-        detail = "${Calc.unitLabel(t)} · MET ${fmt1(t.met)}",
-        trailing = Muscle.labelOf(t.primaryMuscle),
+        trailing = "MET ${fmt1(t.met)}",
         onEdit = onEdit,
         onDelete = onDelete,
-    )
+    ) {
+        WorkoutMetaChips(
+            qtyText = Calc.unitLabel(t),
+            muscles = listOf(Muscle.labelOf(t.primaryMuscle)) + secLabels,
+        )
+    }
 }
 
