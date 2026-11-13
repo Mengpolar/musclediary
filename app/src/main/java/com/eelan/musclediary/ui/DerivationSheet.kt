@@ -479,7 +479,8 @@ private fun MacroFormulaCard(
             .clip(RoundedCornerShape(10.dp))
             .background(Ink1)
             .border(0.75.dp, color.copy(alpha = 0.28f), RoundedCornerShape(10.dp))
-            .padding(horizontal = 11.dp, vertical = 8.dp),
+            .padding(horizontal = 12.dp, vertical = 9.dp),
+        verticalArrangement = Arrangement.spacedBy(4.dp),
     ) {
         Row(
             Modifier.fillMaxWidth(),
@@ -499,21 +500,37 @@ private fun MacroFormulaCard(
                 fontFamily = FontFamily.Monospace,
             )
         }
-        Spacer(Modifier.height(3.dp))
         Row(
             Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Text(
-                L("基础 ", "Base ") + "$perKgFormula = ${baseGrams}g",
+                L("基础目标", "Base target"),
                 fontSize = 11.sp,
                 color = TextLo,
+            )
+            Spacer(Modifier.weight(1f))
+            Text(
+                "$perKgFormula = ${baseGrams}g",
+                fontSize = 11.5.sp,
+                color = TextLo,
                 fontFamily = FontFamily.Monospace,
+            )
+        }
+        Row(
+            Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                L("等比缩放", "Scaled target"),
+                fontSize = 11.sp,
+                color = TextLo,
             )
             Spacer(Modifier.weight(1f))
             Text(
                 "${baseGrams}g × $scaleStr = ${finalGrams}g",
-                fontSize = 11.sp,
+                fontSize = 11.5.sp,
+                fontWeight = FontWeight.SemiBold,
                 color = TextHi,
                 fontFamily = FontFamily.Monospace,
             )

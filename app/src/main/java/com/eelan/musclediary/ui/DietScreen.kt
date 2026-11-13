@@ -8,6 +8,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -94,12 +95,29 @@ fun DietScreen(vm: AppViewModel, onOpenRecords: () -> Unit = {}) {
             }
             SectionTitleRow(L("饮食记录（", "Food records (") + "${entries.size})", L("全部 >", "All >"), onMore = onOpenRecords)
             if (entries.isEmpty()) {
-                EmptyState(
-                    icon = Icons.Default.Restaurant,
-                    text = L("还没有记录，从内置模板快速添加", "No records yet — add from built-in templates"),
-                    actionText = L("添加饮食", "Add food"),
-                    onAction = { pickOpen = true },
-                )
+                Column(
+                    Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(Ink1)
+                        .clickable { pickOpen = true }
+                        .padding(vertical = 28.dp, horizontal = 16.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                ) {
+                    Icon(Icons.Default.Restaurant, null, tint = Ink3, modifier = Modifier.size(34.dp))
+                    Spacer(Modifier.height(10.dp))
+                    Text(
+                        text = buildAnnotatedString {
+                            withStyle(SpanStyle(color = TextLo)) {
+                                append(L("还没有记录，去", "No records yet — "))
+                            }
+                            withStyle(SpanStyle(color = Accent, fontWeight = FontWeight.Bold)) {
+                                append(L("添加饮食", "Add food"))
+                            }
+                        },
+                        fontSize = 13.sp,
+                    )
+                }
             } else {
                 StackedColumn(contentPadding = PaddingValues(bottom = 80.dp)) {
                     entries.forEach { f ->
@@ -129,7 +147,7 @@ fun DietScreen(vm: AppViewModel, onOpenRecords: () -> Unit = {}) {
 
     if (pickOpen) {
         TemplatePickerDialog(
-            title = L("选择食物（每100g营养）", "Pick a food (per 100g)"),
+            title = L("选择食物", "Pick a food"),
             templates = vm.foodTemplates,
             trailing = { t -> "${fmt0(t.kcal)} kcal" },
             onPick = { pickOpen = false; pendingTemplate = it },
@@ -360,9 +378,12 @@ fun TemplatePickerDialog(
 ) {
     var search by remember { mutableStateOf("") }
     var tagFilter by remember { mutableStateOf<String?>(null) }
+    val listState = rememberLazyListState()
+    LaunchedEffect(tagFilter, search) {
+        listState.scrollToItem(0)
+    }
     AppDialog(
         title = title,
-        subtitle = L("点选食材直接录入，也可新建或快速记整餐", "Tap a food to log, or create custom / quick meal"),
         badge = "${templates.size}",
         onDismiss = onDismiss,
         dismissText = L("关闭", "Close"),
@@ -399,6 +420,7 @@ fun TemplatePickerDialog(
                     (tagFilter == null || it.tag.contains(tagFilter!!))
         }
         LazyColumn(
+            state = listState,
             modifier = Modifier.height(290.dp),
             verticalArrangement = Arrangement.spacedBy(6.dp),
         ) {
@@ -489,6 +511,46 @@ fun fieldColors() = OutlinedTextFieldDefaults.colors(
     cursorColor = Accent,
 )
 
+/** 二选一分段切换滑块（用于「三维营养 vs 包装能量/整餐热量」互斥录入模式切换） */
+@Composable
+private fun InputModeSwitch(
+    options: List<String>,
+    selectedIndex: Int,
+    accentColor: Color = Accent,
+    onSelect: (Int) -> Unit,
+) {
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(10.dp))
+            .background(Ink2)
+            .border(0.75.dp, Ink3.copy(alpha = 0.7f), RoundedCornerShape(10.dp))
+            .padding(3.dp),
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        options.forEachIndexed { idx, label ->
+            val selected = idx == selectedIndex
+            Box(
+                Modifier
+                    .weight(1f)
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(if (selected) accentColor else Color.Transparent)
+                    .clickable { onSelect(idx) }
+                    .padding(vertical = 7.dp),
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(
+                    text = label,
+                    fontSize = 12.sp,
+                    fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
+                    color = if (selected) Ink0 else TextLo,
+                    maxLines = 1,
+                )
+            }
+        }
+    }
+}
+
 @Composable
 fun CustomFoodDialog(
     initial: FoodTemplate? = null,
@@ -503,8 +565,14 @@ fun CustomFoodDialog(
     var tag by remember { mutableStateOf(initial?.tag ?: "") }
     var unitName by remember { mutableStateOf(initial?.unitName ?: "") }
     var unitGrams by remember { mutableStateOf(initial?.takeIf { it.unitGrams > 0 }?.let { fmt0(it.unitGrams) } ?: "") }
-    var kJ by remember { mutableStateOf("") } // 包装能量（千焦），填后自动反推三维
-    val pd = p.toDoubleOrNull(); val cd = c.toDoubleOrNull(); val fd = f.toDoubleOrNull()
+    var kJ by remember { mutableStateOf("") } // 包装能量（千焦）
+    // 录入方式：0 = 填三维营养（g/100g），1 = 填包装能量（kJ/100g）
+    var inputMode by remember { mutableIntStateOf(0) }
+
+    val kjd = kJ.toDoubleOrNull()
+    val pd = if (inputMode == 1) kjd?.takeIf { it > 0 }?.let { (it / 4.184) * 0.15 / 4.0 } else p.toDoubleOrNull()
+    val cd = if (inputMode == 1) kjd?.takeIf { it > 0 }?.let { (it / 4.184) * 0.50 / 4.0 } else c.toDoubleOrNull()
+    val fd = if (inputMode == 1) kjd?.takeIf { it > 0 }?.let { (it / 4.184) * 0.35 / 9.0 } else f.toDoubleOrNull()
     val ug = unitGrams.toDoubleOrNull()
     val unitInvalid = unitName.isNotBlank() && (ug == null || ug <= 0)
     val valid = name.isNotBlank() && pd != null && cd != null && fd != null && !unitInvalid
@@ -537,42 +605,44 @@ fun CustomFoodDialog(
             }
             if (dup) Text(L("已存在同名内置模板，仍可保存", "A built-in template with this name exists (still saveable)"),
                 fontSize = 12.sp, color = Warn)
-            // 能量直填：包装标签单位是千焦（kJ），填后按 15/50/35 能量占比反推三维营养
-            OutlinedTextField(
-                value = kJ, onValueChange = { v ->
-                    kJ = v
-                    v.toDoubleOrNull()?.let { kj ->
-                        if (kj > 0) {
-                            val kcal = kj / 4.184
-                            p = fmt1(kcal * 0.15 / 4)
-                            c = fmt1(kcal * 0.50 / 4)
-                            f = fmt1(kcal * 0.35 / 9)
-                        }
-                    }
-                },
-                label = { Text(L("包装能量 kJ（选填，自动推算三维）", "Package kJ (optional, auto-fills macros)"), color = TextLo, fontSize = 12.sp) },
-                singleLine = true, shape = appFieldShape,
-                modifier = Modifier.fillMaxWidth(),
-                keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
-                    keyboardType = KeyboardType.Decimal), colors = fieldColors(),
+
+            // 二选一录入方式滑块：不同时展示两套输入框
+            InputModeSwitch(
+                options = listOf(L("填三维营养", "By Macros"), L("填包装能量 kJ", "By Energy kJ")),
+                selectedIndex = inputMode,
+                accentColor = Accent,
+                onSelect = { inputMode = it },
             )
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedTextField(value = p, onValueChange = { p = it },
-                    label = { Text(L("蛋白g", "P g"), color = TextLo, fontSize = 12.sp) }, singleLine = true,
-                    shape = appFieldShape,
+
+            if (inputMode == 0) {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedTextField(value = p, onValueChange = { p = it },
+                        label = { Text(L("蛋白g", "P g"), color = TextLo, fontSize = 12.sp) }, singleLine = true,
+                        shape = appFieldShape,
+                        keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
+                            keyboardType = KeyboardType.Decimal), modifier = Modifier.weight(1f), colors = fieldColors())
+                    OutlinedTextField(value = c, onValueChange = { c = it },
+                        label = { Text(L("碳水g", "C g"), color = TextLo, fontSize = 12.sp) }, singleLine = true,
+                        shape = appFieldShape,
+                        keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
+                            keyboardType = KeyboardType.Decimal), modifier = Modifier.weight(1f), colors = fieldColors())
+                    OutlinedTextField(value = f, onValueChange = { f = it },
+                        label = { Text(L("脂肪g", "F g"), color = TextLo, fontSize = 12.sp) }, singleLine = true,
+                        shape = appFieldShape,
+                        keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
+                            keyboardType = KeyboardType.Decimal), modifier = Modifier.weight(1f), colors = fieldColors())
+                }
+            } else {
+                OutlinedTextField(
+                    value = kJ, onValueChange = { kJ = it },
+                    label = { Text(L("包装能量 kJ / 100g", "Package energy kJ / 100g"), color = TextLo, fontSize = 12.sp) },
+                    singleLine = true, shape = appFieldShape,
+                    modifier = Modifier.fillMaxWidth(),
                     keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
-                        keyboardType = KeyboardType.Decimal), modifier = Modifier.weight(1f), colors = fieldColors())
-                OutlinedTextField(value = c, onValueChange = { c = it },
-                    label = { Text(L("碳水g", "C g"), color = TextLo, fontSize = 12.sp) }, singleLine = true,
-                    shape = appFieldShape,
-                    keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
-                        keyboardType = KeyboardType.Decimal), modifier = Modifier.weight(1f), colors = fieldColors())
-                OutlinedTextField(value = f, onValueChange = { f = it },
-                    label = { Text(L("脂肪g", "F g"), color = TextLo, fontSize = 12.sp) }, singleLine = true,
-                    shape = appFieldShape,
-                    keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
-                        keyboardType = KeyboardType.Decimal), modifier = Modifier.weight(1f), colors = fieldColors())
+                        keyboardType = KeyboardType.Decimal), colors = fieldColors(),
+                )
             }
+
             // 标签选择（可多选）
             Text(L("标签（可多选）", "Tags (multi-select)"), fontSize = 12.sp, color = TextLo)
             @OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
@@ -608,17 +678,22 @@ fun CustomFoodDialog(
             }
             if (pd != null && cd != null && fd != null) {
                 val formula = pd * 4 + cd * 4 + fd * 9
-                val hint = if (kJ.toDoubleOrNull()?.let { it > 0 } == true)
-                    " (${L("包装 ", "pkg ")}${fmt0(kJ.toDoubleOrNull()!!)} kJ)"
-                else ""
-                DialogPreviewPill(L("热量 ≈ ", "~") + "${fmt0(formula)} kcal / 100g$hint")
+                val previewText = if (inputMode == 1) {
+                    L("≈ ", "~") + "${fmt0(formula)} kcal · " +
+                            L("蛋白", "P ") + "${fmt1(pd)}g " +
+                            L("碳水", "C ") + "${fmt1(cd)}g " +
+                            L("脂肪", "F ") + "${fmt1(fd)}g"
+                } else {
+                    L("热量 ≈ ", "~") + "${fmt0(formula)} kcal / 100g"
+                }
+                DialogPreviewPill(previewText)
             }
         }
     }
 }
 
 /**
- * 快速记录一餐：选餐次（早餐/午餐/晚餐/加餐），直接输入这一餐的热量与三大营养素。
+ * 快速记录一餐：选餐次（早餐/午餐/晚餐/加餐），二选一输入「整餐热量 kcal」或「三维营养素」。
  * 适合外食、食堂等不方便按食材拆分的场景；记录名如「午餐」，与普通食物一样参与当日统计。
  */
 @Composable
@@ -635,28 +710,40 @@ fun MealQuickDialog(
             hour < 21 -> L("晚餐", "Dinner"); else -> L("加餐", "Snack")
         })
     }
+    // 录入方式：0 = 填整餐热量 kcal，1 = 填三维营养（蛋白/碳水/脂肪）
+    var inputMode by remember { mutableIntStateOf(0) }
     var kcal by remember { mutableStateOf("") }
     var p by remember { mutableStateOf("") }
     var c by remember { mutableStateOf("") }
     var f by remember { mutableStateOf("") }
-    val kd = kcal.toDoubleOrNull(); val pd = p.toDoubleOrNull()
-    val cd = c.toDoubleOrNull(); val fd = f.toDoubleOrNull()
-    // 热量必填；三维至少填一项（未填的按 0 处理）
-    val valid = (kd != null && kd > 0) || (pd != null || cd != null || fd != null)
-    // 从三维反推热量参考
-    val calcKcal = listOfNotNull(pd, cd, fd).let { if (it.size == 3) pd!! * 4 + cd!! * 4 + fd!! * 9 else null }
+    val kd = kcal.toDoubleOrNull()
+    val pd = p.toDoubleOrNull()
+    val cd = c.toDoubleOrNull()
+    val fd = f.toDoubleOrNull()
+
+    val valid = if (inputMode == 0) {
+        kd != null && kd > 0
+    } else {
+        (pd != null || cd != null || fd != null) &&
+                ((pd ?: 0.0) + (cd ?: 0.0) + (fd ?: 0.0) > 0.0)
+    }
+    val calcKcalFromMacros = if ((pd ?: 0.0) + (cd ?: 0.0) + (fd ?: 0.0) > 0.0) {
+        (pd ?: 0.0) * 4.0 + (cd ?: 0.0) * 4.0 + (fd ?: 0.0) * 9.0
+    } else null
 
     AppDialog(
         title = L("快速记录一餐", "Quick Meal"),
-        subtitle = L("外食或食堂不便拆分时，直接记整餐热量与营养", "Log whole meal calories or macros directly"),
         badge = meal,
         accentColor = Protein,
         onDismiss = onDismiss,
         confirmText = L("记录", "Log"),
         confirmEnabled = valid,
         onConfirm = {
-            val k = kd ?: calcKcal ?: 0.0
-            onConfirm(meal, k, pd ?: 0.0, cd ?: 0.0, fd ?: 0.0)
+            if (inputMode == 0) {
+                onConfirm(meal, kd ?: 0.0, 0.0, 0.0, 0.0)
+            } else {
+                onConfirm(meal, calcKcalFromMacros ?: 0.0, pd ?: 0.0, cd ?: 0.0, fd ?: 0.0)
+            }
         },
     ) {
         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -674,42 +761,63 @@ fun MealQuickDialog(
                     )
                 }
             }
-            OutlinedTextField(
-                value = kcal, onValueChange = { kcal = it },
-                label = { Text(L("整餐热量 kcal（推荐填）", "Meal calories kcal (recommended)"), color = TextLo) },
-                singleLine = true, shape = appFieldShape,
-                modifier = Modifier.fillMaxWidth(),
-                keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
-                    keyboardType = KeyboardType.Decimal),
-                colors = fieldColors(),
+            // 二选一录入方式滑块：整餐热量 vs 三维营养
+            InputModeSwitch(
+                options = listOf(L("填整餐热量", "By Calories"), L("填三维营养", "By Macros")),
+                selectedIndex = inputMode,
+                accentColor = Protein,
+                onSelect = { inputMode = it },
             )
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedTextField(value = p, onValueChange = { p = it },
-                    label = { Text(L("蛋白g", "P g"), color = TextLo, fontSize = 12.sp) }, singleLine = true,
-                    shape = appFieldShape,
+            if (inputMode == 0) {
+                OutlinedTextField(
+                    value = kcal, onValueChange = { kcal = it },
+                    label = { Text(L("整餐热量 kcal", "Meal calories kcal"), color = TextLo) },
+                    singleLine = true, shape = appFieldShape,
+                    modifier = Modifier.fillMaxWidth(),
                     keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
                         keyboardType = KeyboardType.Decimal),
-                    modifier = Modifier.weight(1f), colors = fieldColors())
-                OutlinedTextField(value = c, onValueChange = { c = it },
-                    label = { Text(L("碳水g", "C g"), color = TextLo, fontSize = 12.sp) }, singleLine = true,
-                    shape = appFieldShape,
-                    keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
-                        keyboardType = KeyboardType.Decimal),
-                    modifier = Modifier.weight(1f), colors = fieldColors())
-                OutlinedTextField(value = f, onValueChange = { f = it },
-                    label = { Text(L("脂肪g", "F g"), color = TextLo, fontSize = 12.sp) }, singleLine = true,
-                    shape = appFieldShape,
-                    keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
-                        keyboardType = KeyboardType.Decimal),
-                    modifier = Modifier.weight(1f), colors = fieldColors())
-            }
-            if (calcKcal != null) {
-                DialogPreviewPill(
-                    L("按三维推算 ≈ ", "From macros ≈ ") + "${fmt0(calcKcal)} kcal" + L("（热量留空时采用）", " (used if kcal empty)"),
-                    color = Protein,
+                    colors = fieldColors(),
                 )
+                if (kd != null && kd > 0) {
+                    val estP = kd * 0.15 / 4.0
+                    val estC = kd * 0.50 / 4.0
+                    val estF = kd * 0.35 / 9.0
+                    DialogPreviewPill(
+                        L("自动换算：", "Auto macros: ") +
+                                L("蛋白", "P ") + "${fmt1(estP)}g  " +
+                                L("碳水", "C ") + "${fmt1(estC)}g  " +
+                                L("脂肪", "F ") + "${fmt1(estF)}g",
+                        color = Protein,
+                    )
+                }
+            } else {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedTextField(value = p, onValueChange = { p = it },
+                        label = { Text(L("蛋白g", "P g"), color = TextLo, fontSize = 12.sp) }, singleLine = true,
+                        shape = appFieldShape,
+                        keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
+                            keyboardType = KeyboardType.Decimal),
+                        modifier = Modifier.weight(1f), colors = fieldColors())
+                    OutlinedTextField(value = c, onValueChange = { c = it },
+                        label = { Text(L("碳水g", "C g"), color = TextLo, fontSize = 12.sp) }, singleLine = true,
+                        shape = appFieldShape,
+                        keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
+                            keyboardType = KeyboardType.Decimal),
+                        modifier = Modifier.weight(1f), colors = fieldColors())
+                    OutlinedTextField(value = f, onValueChange = { f = it },
+                        label = { Text(L("脂肪g", "F g"), color = TextLo, fontSize = 12.sp) }, singleLine = true,
+                        shape = appFieldShape,
+                        keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
+                            keyboardType = KeyboardType.Decimal),
+                        modifier = Modifier.weight(1f), colors = fieldColors())
+                }
+                if (calcKcalFromMacros != null) {
+                    DialogPreviewPill(
+                        L("按三维推算 ≈ ", "From macros ≈ ") + "${fmt0(calcKcalFromMacros)} kcal",
+                        color = Protein,
+                    )
+                }
             }
-            if (!valid) Text(L("至少填写热量或任一营养素", "Fill calories or any macro"), fontSize = 12.sp, color = Warn)
         }
     }
 }
