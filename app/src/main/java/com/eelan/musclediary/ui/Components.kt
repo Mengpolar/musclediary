@@ -16,10 +16,9 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.ui.zIndex
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInWindow
-import androidx.compose.ui.text.TextStyle
-import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
@@ -622,63 +621,54 @@ fun SwipeEntryRow(
 
 @Composable
 private fun AutoScrollDetailText(text: androidx.compose.ui.text.AnnotatedString) {
-    val textMeasurer = rememberTextMeasurer()
-    val density = LocalDensity.current
-    val style = TextStyle(fontSize = 11.5.sp)
-    val textWidthPx = remember(text, textMeasurer, density) {
-        with(density) {
-            textMeasurer.measure(
-                text = text,
-                style = style,
-                constraints = Constraints(maxWidth = Int.MAX_VALUE),
-                softWrap = false,
-                maxLines = 1,
-            ).size.width
-        }
-    }
-    var viewportWidthPx by remember { mutableIntStateOf(0) }
-    val overflowPx = (textWidthPx - viewportWidthPx).coerceAtLeast(0)
+    var overflowPx by remember(text) { mutableIntStateOf(0) }
     val offset = remember(text) { Animatable(0f) }
 
-    LaunchedEffect(overflowPx) {
+    LaunchedEffect(text, overflowPx) {
         offset.snapTo(0f)
         if (overflowPx <= 0) return@LaunchedEffect
 
         while (true) {
-            delay(700)
+            delay(800)
+            val dur = (overflowPx * 15).coerceIn(1200, 9000)
             offset.animateTo(
                 targetValue = -overflowPx.toFloat(),
-                animationSpec = tween(
-                    durationMillis = (overflowPx * 14).coerceIn(1200, 9000),
-                    easing = LinearEasing,
-                ),
+                animationSpec = tween(durationMillis = dur, easing = LinearEasing),
             )
-            delay(700)
+            delay(800)
             offset.animateTo(
                 targetValue = 0f,
-                animationSpec = tween(
-                    durationMillis = (overflowPx * 14).coerceIn(1200, 9000),
-                    easing = LinearEasing,
-                ),
+                animationSpec = tween(durationMillis = dur, easing = LinearEasing),
             )
         }
     }
 
-    Box(
+    Layout(
+        content = {
+            Text(
+                text = text,
+                fontSize = 11.5.sp,
+                maxLines = 1,
+                softWrap = false,
+                overflow = androidx.compose.ui.text.style.TextOverflow.Visible,
+            )
+        },
         modifier = Modifier
             .fillMaxWidth()
-            .onGloballyPositioned { viewportWidthPx = it.size.width }
             .clipToBounds(),
-        contentAlignment = Alignment.CenterStart,
-    ) {
-        Text(
-            text = text,
-            modifier = Modifier.offset { IntOffset(offset.value.roundToInt(), 0) },
-            fontSize = 11.5.sp,
-            maxLines = 1,
-            softWrap = false,
-            style = style,
+    ) { measurables, constraints ->
+        // 以无限最大宽度测量 Text，确保末尾文字不被截断，完整排版
+        val textPlaceable = measurables.first().measure(
+            constraints.copy(minWidth = 0, maxWidth = Constraints.Infinity)
         )
+        val containerWidth = if (constraints.hasBoundedWidth) constraints.maxWidth else textPlaceable.width
+        val newOverflow = (textPlaceable.width - containerWidth).coerceAtLeast(0)
+        if (overflowPx != newOverflow) {
+            overflowPx = newOverflow
+        }
+        layout(containerWidth, textPlaceable.height) {
+            textPlaceable.placeRelative(offset.value.roundToInt(), 0)
+        }
     }
 }
 
