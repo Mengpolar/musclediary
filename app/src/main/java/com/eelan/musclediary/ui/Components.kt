@@ -18,6 +18,9 @@ import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInWindow
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.rememberTextMeasurer
+import androidx.compose.ui.unit.Constraints
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -34,6 +37,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.graphics.drawscope.clipRect
 import androidx.compose.ui.graphics.drawscope.clipPath
@@ -53,12 +57,14 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.eelan.musclediary.ui.theme.*
 import com.eelan.musclediary.L
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
 
@@ -614,8 +620,69 @@ fun SwipeEntryRow(
     }
 }
 
-/**
- * 饮食/食物卡片的单行紧凑富文本详情行（永不换行撑高卡片）：
+@Composable
+private fun AutoScrollDetailText(text: androidx.compose.ui.text.AnnotatedString) {
+    val textMeasurer = rememberTextMeasurer()
+    val density = LocalDensity.current
+    val style = TextStyle(fontSize = 11.5.sp)
+    val textWidthPx = remember(text, textMeasurer, density) {
+        with(density) {
+            textMeasurer.measure(
+                text = text,
+                style = style,
+                constraints = Constraints(maxWidth = Int.MAX_VALUE),
+                softWrap = false,
+                maxLines = 1,
+            ).size.width
+        }
+    }
+    var viewportWidthPx by remember { mutableIntStateOf(0) }
+    val overflowPx = (textWidthPx - viewportWidthPx).coerceAtLeast(0)
+    val offset = remember(text) { Animatable(0f) }
+
+    LaunchedEffect(overflowPx) {
+        offset.snapTo(0f)
+        if (overflowPx <= 0) return@LaunchedEffect
+
+        while (true) {
+            delay(700)
+            offset.animateTo(
+                targetValue = -overflowPx.toFloat(),
+                animationSpec = tween(
+                    durationMillis = (overflowPx * 14).coerceIn(1200, 9000),
+                    easing = LinearEasing,
+                ),
+            )
+            delay(700)
+            offset.animateTo(
+                targetValue = 0f,
+                animationSpec = tween(
+                    durationMillis = (overflowPx * 14).coerceIn(1200, 9000),
+                    easing = LinearEasing,
+                ),
+            )
+        }
+    }
+
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .onGloballyPositioned { viewportWidthPx = it.size.width }
+            .clipToBounds(),
+        contentAlignment = Alignment.CenterStart,
+    ) {
+        Text(
+            text = text,
+            modifier = Modifier.offset { IntOffset(offset.value.roundToInt(), 0) },
+            fontSize = 11.5.sp,
+            maxLines = 1,
+            softWrap = false,
+            style = style,
+        )
+    }
+}
+
+/** 饮食/食物卡片的单行紧凑富文本详情行（超出时往返滚动）：
  * - 可选日期 `11-12`、高亮克重 `150g`（与后方营养素用空格分隔，不加 `·`）
  * - 三色圆点 + 对应颜色标签与克数：`●蛋白31.0  ●碳水0.0  ●脂肪3.6`（冰蓝 / 暖黄 / 淡紫）
  * - 可选单位换算 `1个=50g`
@@ -629,7 +696,7 @@ fun FoodMacroChips(
     grams: Double? = null,
     extraBadge: String? = null,
 ) {
-    Text(
+    AutoScrollDetailText(
         text = buildAnnotatedString {
             if (!dateText.isNullOrBlank()) {
                 withStyle(SpanStyle(color = TextLo)) { append(dateText) }
@@ -660,9 +727,6 @@ fun FoodMacroChips(
                 withStyle(SpanStyle(color = TextLo)) { append(extraBadge) }
             }
         },
-        fontSize = 11.5.sp,
-        maxLines = 1,
-        overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
     )
 }
 
@@ -682,7 +746,7 @@ fun WorkoutMetaChips(
     extraBadge: String? = null,
 ) {
     val dotSep = SpanStyle(color = Ink3, fontWeight = FontWeight.Normal)
-    Text(
+    AutoScrollDetailText(
         text = buildAnnotatedString {
             var hasPrev = false
             fun sep() {
@@ -717,9 +781,6 @@ fun WorkoutMetaChips(
                 withStyle(SpanStyle(color = TextLo)) { append(extraBadge) }
             }
         },
-        fontSize = 11.5.sp,
-        maxLines = 1,
-        overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
     )
 }
 
