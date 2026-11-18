@@ -437,12 +437,21 @@ fun TemplatePickerDialog(
                 ) {
                     Column(Modifier.weight(1f)) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text(t.dispName, color = TextHi, fontSize = 14.sp, fontWeight = FontWeight.Medium)
+                            // 名称占满剩余宽度，过长时单行滚动展示完整名称，不挤压右侧标签
+                            Box(Modifier.weight(1f)) {
+                                MarqueeSingleLineText(
+                                    t.dispName,
+                                    fontSize = 14.sp,
+                                    fontWeight = FontWeight.Medium,
+                                    color = TextHi,
+                                )
+                            }
                             if (t.tag.isNotBlank()) {
                                 Spacer(Modifier.width(6.dp))
                                 t.tag.split(',').filter { it.isNotBlank() }.take(2).forEach { tg ->
                                     Text(
                                         tagLabel(tg), fontSize = 10.sp, color = Accent,
+                                        maxLines = 1, softWrap = false,
                                         modifier = Modifier
                                             .padding(end = 4.dp)
                                             .background(Accent.copy(alpha = 0.14f), RoundedCornerShape(4.dp))

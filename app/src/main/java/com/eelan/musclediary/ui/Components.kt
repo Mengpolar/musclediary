@@ -619,8 +619,15 @@ fun SwipeEntryRow(
     }
 }
 
+/** 单行文本：超出一行时左右往返滚动展示完整内容，不超行则保持静止（卡片详情行与弹窗名称共用） */
 @Composable
-private fun AutoScrollDetailText(text: androidx.compose.ui.text.AnnotatedString) {
+fun MarqueeSingleLineText(
+    text: androidx.compose.ui.text.AnnotatedString,
+    modifier: Modifier = Modifier,
+    fontSize: androidx.compose.ui.unit.TextUnit = 11.5.sp,
+    fontWeight: FontWeight? = null,
+    color: Color = Color.Unspecified,
+) {
     var overflowPx by remember(text) { mutableIntStateOf(0) }
     val offset = remember(text) { Animatable(0f) }
 
@@ -647,13 +654,15 @@ private fun AutoScrollDetailText(text: androidx.compose.ui.text.AnnotatedString)
         content = {
             Text(
                 text = text,
-                fontSize = 11.5.sp,
+                fontSize = fontSize,
+                fontWeight = fontWeight,
+                color = color,
                 maxLines = 1,
                 softWrap = false,
                 overflow = androidx.compose.ui.text.style.TextOverflow.Visible,
             )
         },
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
             .clipToBounds(),
     ) { measurables, constraints ->
@@ -672,6 +681,17 @@ private fun AutoScrollDetailText(text: androidx.compose.ui.text.AnnotatedString)
     }
 }
 
+@Composable
+fun MarqueeSingleLineText(
+    text: String,
+    modifier: Modifier = Modifier,
+    fontSize: androidx.compose.ui.unit.TextUnit = 11.5.sp,
+    fontWeight: FontWeight? = null,
+    color: Color = Color.Unspecified,
+) = MarqueeSingleLineText(
+    androidx.compose.ui.text.AnnotatedString(text), modifier, fontSize, fontWeight, color,
+)
+
 /** 饮食/食物卡片的单行紧凑富文本详情行（超出时往返滚动）：
  * - 可选日期 `11-12`、高亮克重 `150g`（与后方营养素用空格分隔，不加 `·`）
  * - 三色圆点 + 对应颜色标签与克数：`●蛋白31.0  ●碳水0.0  ●脂肪3.6`（冰蓝 / 暖黄 / 淡紫）
@@ -686,7 +706,7 @@ fun FoodMacroChips(
     grams: Double? = null,
     extraBadge: String? = null,
 ) {
-    AutoScrollDetailText(
+    MarqueeSingleLineText(
         text = buildAnnotatedString {
             if (!dateText.isNullOrBlank()) {
                 withStyle(SpanStyle(color = TextLo)) { append(dateText) }
@@ -736,7 +756,7 @@ fun WorkoutMetaChips(
     extraBadge: String? = null,
 ) {
     val dotSep = SpanStyle(color = Ink3, fontWeight = FontWeight.Normal)
-    AutoScrollDetailText(
+    MarqueeSingleLineText(
         text = buildAnnotatedString {
             var hasPrev = false
             fun sep() {
